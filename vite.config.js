@@ -7,5 +7,12 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
+    proxy: {
+      '/gcal-proxy': {
+        target: 'https://calendar.google.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/gcal-proxy/, ''),
+      },
+    },
   },
 })

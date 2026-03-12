@@ -1,23 +1,26 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { Plus, Trash2, Package, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { Plus, Trash2, Package, ArrowUpRight, ArrowDownLeft, Pencil } from 'lucide-react'
 import Modal from '../components/Modal'
 import { E, STATUS } from '../styles/earth'
 
 const CATEGORIES = ['3C','攝影器材','辦公家具','交通工具','活動器材','其他']
 
 export default function Assets() {
-  const { data, addItem, updateItem, deleteItem } = useApp()
+  const { data, addItem, updateItem, deleteItem, logEdit } = useApp()
+  const { currentUser } = useAuth()
   const [tab, setTab] = useState('list')
   const [showAdd, setShowAdd] = useState(false)
   const [showLoan, setShowLoan] = useState(null)
-  const [newAsset, setNewAsset] = useState({ name: '', category: '3C', quantity: 1, purchaseDate: '', status: '正常', note: '' })
+  const [editAsset, setEditAsset] = useState(null)
+  const [newAsset, setNewAsset] = useState({ name: '', category: '3C', quantity: 1, purchaseDate: '', status: '正常', note: '', location: '' })
   const [newLoan, setNewLoan] = useState({ borrower: '', purpose: '', expectedReturn: '' })
 
   function addAsset() {
     if (!newAsset.name.trim()) return
     addItem('assets', { id: Date.now(), ...newAsset })
-    setNewAsset({ name: '', category: '3C', quantity: 1, purchaseDate: '', status: '正常', note: '' })
+    setNewAsset({ name: '', category: '3C', quantity: 1, purchaseDate: '', status: '正常', note: '', location: '' })
     setShowAdd(false)
   }
   function submitLoan(assetId) {
@@ -70,10 +73,13 @@ export default function Assets() {
                     <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '5px' }}>
                       數量：{a.quantity}{a.purchaseDate ? ` · 購入：${a.purchaseDate}` : ''}
                     </div>
+                    {a.location && <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '2px' }}>📍 {a.location}</div>}
                     {a.note && <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '2px' }}>{a.note}</div>}
+                    {a.updatedBy && <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '4px', fontStyle: 'italic' }}>最後編輯：{a.updatedBy} · {a.updatedAt}</div>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                  <button onClick={() => setEditAsset({ ...a })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a09080' }}><Pencil size={14} /></button>
                   <button onClick={() => deleteItem('assets', a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={14} /></button>
                   {a.status !== '借出' && a.status !== '報廢' && (
                     <button onClick={() => setShowLoan(a.id)} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: E.green, background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>
@@ -135,6 +141,7 @@ export default function Assets() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>購入日期</label>
               <input type="date" value={newAsset.purchaseDate} onChange={e => setNewAsset(p => ({ ...p, purchaseDate: e.target.value }))} style={E.input} />
             </div>
+            <input value={newAsset.location} onChange={e => setNewAsset(p => ({ ...p, location: e.target.value }))} placeholder="放置位置（例：辦公室 A 架、倉庫 2F）" style={E.input} />
             <input value={newAsset.note} onChange={e => setNewAsset(p => ({ ...p, note: e.target.value }))} placeholder="備註（可選）" style={E.input} />
           </div>
           <button onClick={addAsset} style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>新增</button>
@@ -152,6 +159,46 @@ export default function Assets() {
             </div>
           </div>
           <button onClick={() => submitLoan(showLoan)} style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>確認借出</button>
+        </Modal>
+      )}
+
+      {editAsset && (
+        <Modal title="編輯財產資訊" onClose={() => setEditAsset(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <input value={editAsset.name} onChange={e => setEditAsset(p => ({ ...p, name: e.target.value }))} placeholder="財產名稱 *" style={E.input} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>類別</label>
+                <select value={editAsset.category} onChange={e => setEditAsset(p => ({ ...p, category: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>數量</label>
+                <input type="number" min={1} value={editAsset.quantity} onChange={e => setEditAsset(p => ({ ...p, quantity: Number(e.target.value) }))} style={E.input} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>狀態</label>
+              <select value={editAsset.status} onChange={e => setEditAsset(p => ({ ...p, status: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
+                {['正常','借出','維修中','報廢'].map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>購入日期</label>
+              <input type="date" value={editAsset.purchaseDate || ''} onChange={e => setEditAsset(p => ({ ...p, purchaseDate: e.target.value }))} style={E.input} />
+            </div>
+            <input value={editAsset.location || ''} onChange={e => setEditAsset(p => ({ ...p, location: e.target.value }))} placeholder="放置位置（例：辦公室 A 架、倉庫 2F）" style={E.input} />
+            <input value={editAsset.note || ''} onChange={e => setEditAsset(p => ({ ...p, note: e.target.value }))} placeholder="備註（可選）" style={E.input} />
+          </div>
+          <button onClick={() => {
+            if (!editAsset.name.trim()) return
+            const now = new Date().toISOString().slice(0,16).replace('T',' ')
+            const who = currentUser?.name || currentUser?.username || '未知'
+            updateItem('assets', editAsset.id, { ...editAsset, updatedBy: who, updatedAt: now })
+            logEdit({ user: who, action: '編輯', entityType: '公司財產', entityName: editAsset.name, summary: `${editAsset.category} · 數量 ${editAsset.quantity}` })
+            setEditAsset(null)
+          }} style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>儲存</button>
         </Modal>
       )}
     </div>

@@ -128,4 +128,6 @@ export const STATUS = {
   '借出':   { bg: '#e0e8f5', color: '#305080' },
   '借出中': { bg: '#e0e8f5', color: '#305080' },
   '已歸還': { bg: '#e4f0e8', color: '#2e6040' },
+  '待付':   { bg: '#f5ece0', color: '#8a5828' },
+  '已付':   { bg: '#e4f0e8', color: '#2e6040' },
 }

@@ -1,21 +1,20 @@
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Palette, DollarSign, Users, Package, Menu, X, CalendarOff, FileSignature, Handshake, Megaphone, FolderOpen, Upload, ChevronDown } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History } from 'lucide-react'
 import logo from '../assets/logo.jpeg'
+import { useAuth } from '../context/AuthContext'
 
 const NAV_MAIN = [
   { to: '/',         icon: LayoutDashboard, label: '儀表板' },
   { to: '/projects', icon: FolderKanban,    label: '案件管理' },
-  { to: '/design',   icon: Palette,         label: '設計任務' },
+  { to: '/design',   icon: Kanban,          label: '執行追蹤' },
   { to: '/finance',  icon: DollarSign,      label: '財務管理' },
   { to: '/hr',       icon: Users,           label: '人事管理' },
   { to: '/assets',   icon: Package,         label: '公司財產' },
 ]
 
 const NAV_EXPAND = [
-  { to: '/leave',         icon: CalendarOff,    label: '請假管理' },
-  { to: '/contract',      icon: FileSignature,  label: '合約管理' },
-  { to: '/crm',           icon: Handshake,      label: '客戶關係' },
+  { to: '/history',       icon: History,        label: '歷年紀錄' },
   { to: '/announcements', icon: Megaphone,      label: '公告欄' },
   { to: '/documents',     icon: FolderOpen,     label: '文件庫' },
 ]
@@ -24,7 +23,6 @@ const NAV_SYSTEM = [
   { to: '/import', icon: Upload, label: '匯入資料' },
 ]
 
-// 大地色系色票
 const C = {
   sidebarBg:      '#1c2718',
   sidebarBorder:  'rgba(255,255,255,0.07)',
@@ -38,9 +36,39 @@ const C = {
   mobileTxt:      '#c8b88a',
 }
 
+function NavItem({ to, icon: Icon, label, end, size = 16, fontSize = '14px', fontWeight500 = true }) {
+  return (
+    <NavLink to={to} end={end}>
+      {({ isActive }) => (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '9px 12px', borderRadius: '8px',
+          fontSize, fontWeight: isActive ? '600' : (fontWeight500 ? '500' : '400'),
+          backgroundColor: isActive ? C.navActive : 'transparent',
+          color: isActive ? C.navActiveTxt : C.navText,
+          cursor: 'pointer', transition: 'all 0.15s',
+        }}>
+          <Icon size={size} />
+          {label}
+        </div>
+      )}
+    </NavLink>
+  )
+}
+
 export default function Layout({ children }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]           = useState(false)
   const [expandOpen, setExpandOpen] = useState(false)
+  const { currentUser, isAdmin, logout } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
+  const roleLabel = isAdmin ? '管理員' : '員工'
+  const roleColor = isAdmin ? '#c8a84a' : 'rgba(200,184,138,0.6)'
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#f5f0e8' }}>
@@ -66,22 +94,11 @@ export default function Layout({ children }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {NAV_MAIN.map(({ to, icon: Icon, label }) => (
-            <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)}>
-              {({ isActive }) => (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '9px 12px', borderRadius: '8px',
-                  fontSize: '14px', fontWeight: isActive ? '600' : '500',
-                  backgroundColor: isActive ? C.navActive : 'transparent',
-                  color: isActive ? C.navActiveTxt : C.navText,
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}>
-                  <Icon size={16} />
-                  {label}
-                </div>
-              )}
-            </NavLink>
+
+          {NAV_MAIN.map(({ to, icon, label }) => (
+            <div key={to} onClick={() => setOpen(false)}>
+              <NavItem to={to} icon={icon} label={label} end={to === '/'} />
+            </div>
           ))}
 
           {/* 擴充功能（可收合） */}
@@ -95,54 +112,75 @@ export default function Layout({ children }) {
             <ChevronDown size={12} style={{ color: 'rgba(200,184,138,0.35)', transition: 'transform 0.2s', transform: expandOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
           </button>
 
-          {expandOpen && NAV_EXPAND.map(({ to, icon: Icon, label }) => (
-            <NavLink key={to} to={to} onClick={() => setOpen(false)}>
-              {({ isActive }) => (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '8px 12px', borderRadius: '8px',
-                  fontSize: '13px', fontWeight: isActive ? '600' : '400',
-                  backgroundColor: isActive ? C.navActive : 'transparent',
-                  color: isActive ? C.navActiveTxt : 'rgba(200,184,138,0.5)',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}>
-                  <Icon size={15} />
-                  {label}
-                </div>
-              )}
-            </NavLink>
+          {expandOpen && NAV_EXPAND.map(({ to, icon, label }) => (
+            <div key={to} onClick={() => setOpen(false)}>
+              <NavItem to={to} icon={icon} label={label} size={15} fontSize="13px" fontWeight500={false} />
+            </div>
           ))}
 
-          {/* 分隔 */}
+          {/* 系統工具 */}
           <div style={{ margin: '8px 4px', borderTop: `1px solid ${C.sidebarBorder}` }} />
           <div style={{ fontSize: '10px', color: 'rgba(200,184,138,0.3)', fontWeight: '600', letterSpacing: '0.08em', padding: '2px 12px 4px' }}>
             系統工具
           </div>
 
-          {NAV_SYSTEM.map(({ to, icon: Icon, label }) => (
-            <NavLink key={to} to={to} onClick={() => setOpen(false)}>
-              {({ isActive }) => (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '8px 12px', borderRadius: '8px',
-                  fontSize: '13px', fontWeight: isActive ? '600' : '400',
-                  backgroundColor: isActive ? C.navActive : 'transparent',
-                  color: isActive ? C.navActiveTxt : 'rgba(200,184,138,0.5)',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}>
-                  <Icon size={15} />
-                  {label}
-                </div>
-              )}
-            </NavLink>
+          {NAV_SYSTEM.map(({ to, icon, label }) => (
+            <div key={to} onClick={() => setOpen(false)}>
+              <NavItem to={to} icon={icon} label={label} size={15} fontSize="13px" fontWeight500={false} />
+            </div>
           ))}
+
+          {/* 打卡後台（管理員專屬）*/}
+          {isAdmin && (
+            <a href="/checkin-admin" target="_blank" rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '9px 12px', borderRadius: '8px',
+                fontSize: '13px', fontWeight: '400',
+                color: 'rgba(200,184,138,0.5)',
+                cursor: 'pointer', textDecoration: 'none',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <ClipboardCheck size={15} />
+              打卡後台
+              <span style={{ fontSize: '10px', color: 'rgba(200,184,138,0.35)', marginLeft: 'auto' }}>↗</span>
+            </a>
+          )}
         </nav>
 
-        <div className="px-5 py-4" style={{
-          borderTop: `1px solid ${C.sidebarBorder}`,
-          color: C.footerTxt, fontSize: '11px', letterSpacing: '0.05em'
-        }}>
-          深活共構 · v1.0 · 2026
+        {/* 底部：使用者資訊 + 登出 */}
+        <div style={{ borderTop: `1px solid ${C.sidebarBorder}`, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* 頭像圓圈 */}
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+              backgroundColor: isAdmin ? '#4d3a10' : '#2a3d24',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {isAdmin
+                ? <Shield size={14} style={{ color: '#c8a84a' }} />
+                : <Users size={14} style={{ color: '#7ab870' }} />}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: C.logoText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentUser?.name || currentUser?.username}
+              </div>
+              <div style={{ fontSize: '10px', color: roleColor, marginTop: '1px' }}>{roleLabel}</div>
+            </div>
+            {/* 登出按鈕 */}
+            <button
+              onClick={handleLogout}
+              title="登出"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(200,184,138,0.35)', padding: '4px', display: 'flex', borderRadius: '6px', transition: 'color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#e07060'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(200,184,138,0.35)'}
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
         </div>
       </aside>
 

@@ -1,0 +1,2840 @@
+{
+  "expenses": [
+    {
+      "id": "slm26-001",
+      "date": "2026-01-02",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 5250,
+      "vendor": "建豪",
+      "method": "轉帳",
+      "receiptNo": "WV-26001987",
+      "note": "儲值金"
+    },
+    {
+      "id": "slm26-002",
+      "date": "2026-01-05",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 2250,
+      "vendor": "平安企業社",
+      "method": "現金",
+      "receiptNo": "收據(36876384)",
+      "note": ""
+    },
+    {
+      "id": "slm26-003",
+      "date": "2026-01-05",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 4250,
+      "vendor": "平安企業社",
+      "method": "現金",
+      "receiptNo": "收據(36876384)",
+      "note": ""
+    },
+    {
+      "id": "slm26-004",
+      "date": "2026-01-07",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 980,
+      "vendor": "平安企業社",
+      "method": "現金",
+      "receiptNo": "收據(36876384)",
+      "note": ""
+    },
+    {
+      "id": "slm26-005",
+      "date": "2026-01-07",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "印花稅",
+      "account": "稅金",
+      "amount": 933,
+      "vendor": "屏東縣政府",
+      "method": "現金",
+      "receiptNo": "9099910236",
+      "note": ""
+    },
+    {
+      "id": "slm26-006",
+      "date": "2026-01-13",
+      "direction": "支出",
+      "project": "PW_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 1863428,
+      "vendor": "開譜國際顧問有限公司",
+      "method": "轉帳",
+      "receiptNo": "VT-43384551",
+      "note": ""
+    },
+    {
+      "id": "slm26-007",
+      "date": "2026-01-13",
+      "direction": "支出",
+      "project": "PW_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 250000,
+      "vendor": "有點橫文創有限公司",
+      "method": "轉帳",
+      "receiptNo": "VT-34101250",
+      "note": ""
+    },
+    {
+      "id": "slm26-008",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 1194,
+      "vendor": "複製基地影印店",
+      "method": "現金",
+      "receiptNo": "收據(09047792)",
+      "note": ""
+    },
+    {
+      "id": "slm26-009",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "人事",
+      "account": "人事費用",
+      "amount": 33256,
+      "vendor": "祖珠",
+      "method": "轉帳",
+      "receiptNo": "12月薪水",
+      "note": ""
+    },
+    {
+      "id": "slm26-010",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "人事",
+      "account": "人事費用",
+      "amount": 34970,
+      "vendor": "家慶",
+      "method": "轉帳",
+      "receiptNo": "12月薪水",
+      "note": ""
+    },
+    {
+      "id": "slm26-011",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "人事",
+      "account": "人事費用",
+      "amount": 33669,
+      "vendor": "阿雯",
+      "method": "轉帳",
+      "receiptNo": "12月薪水",
+      "note": ""
+    },
+    {
+      "id": "slm26-012",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "人事",
+      "account": "人事費用",
+      "amount": 12820,
+      "vendor": "櫟茉莎呢",
+      "method": "轉帳",
+      "receiptNo": "12月薪水",
+      "note": ""
+    },
+    {
+      "id": "slm26-013",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "人事",
+      "account": "人事費用",
+      "amount": 19450,
+      "vendor": "陳曦",
+      "method": "轉帳",
+      "receiptNo": "12月薪水",
+      "note": ""
+    },
+    {
+      "id": "slm26-014",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "人事",
+      "account": "人事費用",
+      "amount": 4600,
+      "vendor": "芷若",
+      "method": "轉帳",
+      "receiptNo": "12月薪水",
+      "note": ""
+    },
+    {
+      "id": "slm26-015",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "人事",
+      "account": "人事費用",
+      "amount": 4200,
+      "vendor": "宇若",
+      "method": "轉帳",
+      "receiptNo": "12月薪水",
+      "note": ""
+    },
+    {
+      "id": "slm26-016",
+      "date": "2026-01-13",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 2100,
+      "vendor": "迅鋒資訊",
+      "method": "現金",
+      "receiptNo": "電腦電池",
+      "note": ""
+    },
+    {
+      "id": "slm26-017",
+      "date": "2026-01-23",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 2605,
+      "vendor": "複製基地影印店",
+      "method": "現金",
+      "receiptNo": "收據(09047792)",
+      "note": ""
+    },
+    {
+      "id": "slm26-018",
+      "date": "2026-01-23",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 80,
+      "vendor": "小北百貨",
+      "method": "現金",
+      "receiptNo": "XC-64817737",
+      "note": ""
+    },
+    {
+      "id": "slm26-019",
+      "date": "2026-01-10",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 516,
+      "vendor": "7-11代收證明 NO.22555003",
+      "method": "現金",
+      "receiptNo": "7-11代收證明 NO.22555003",
+      "note": ""
+    },
+    {
+      "id": "slm26-020",
+      "date": "2026-01-20",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 520,
+      "vendor": "平安企業社",
+      "method": "現金",
+      "receiptNo": "統編：36876384",
+      "note": ""
+    },
+    {
+      "id": "slm26-021",
+      "date": "2026-01-22",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 70,
+      "vendor": "中華郵政",
+      "method": "現金",
+      "receiptNo": "郵局購票第000143號",
+      "note": ""
+    },
+    {
+      "id": "slm26-022",
+      "date": "2026-01-23",
+      "direction": "支出",
+      "project": "DIR_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 1545,
+      "vendor": "尚藝手作館",
+      "method": "現金",
+      "receiptNo": "統編：92261038",
+      "note": ""
+    },
+    {
+      "id": "slm26-023",
+      "date": "2026-01-26",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 230055,
+      "vendor": "尚武農創企業社",
+      "method": "轉帳",
+      "receiptNo": "VT-13705750",
+      "note": ""
+    },
+    {
+      "id": "slm26-024",
+      "date": "2026-01-26",
+      "direction": "支出",
+      "project": "WTM_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 0,
+      "vendor": "複製基地影印店",
+      "method": "現金",
+      "receiptNo": "收據(09047792)",
+      "note": ""
+    },
+    {
+      "id": "slm26-025",
+      "date": "2026-01-28",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 350,
+      "vendor": "小北百貨",
+      "method": "現金",
+      "receiptNo": "XC-64823075",
+      "note": ""
+    },
+    {
+      "id": "slm26-026",
+      "date": "2026-01-29",
+      "direction": "支出",
+      "project": "DIR_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 90,
+      "vendor": "涵馥堂美術用品社",
+      "method": "現金",
+      "receiptNo": "收據(78790472)",
+      "note": ""
+    },
+    {
+      "id": "slm26-027",
+      "date": "2026-01-30",
+      "direction": "支出",
+      "project": "MJC_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 11185,
+      "vendor": "永昌布行",
+      "method": "現金",
+      "receiptNo": "收據(76384110)",
+      "note": ""
+    },
+    {
+      "id": "slm26-028",
+      "date": "2026-01-30",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 108,
+      "vendor": "中華郵政",
+      "method": "現金",
+      "receiptNo": "票號(第001150號)",
+      "note": ""
+    },
+    {
+      "id": "slm26-029",
+      "date": "2026-01-30",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 979,
+      "vendor": "小北百貨",
+      "method": "現金",
+      "receiptNo": "XC-64824095",
+      "note": ""
+    },
+    {
+      "id": "slm26-030",
+      "date": "2026-02-04",
+      "direction": "支出",
+      "project": "MJC_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 600,
+      "vendor": "一品花店",
+      "method": "現金",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "slm26-031",
+      "date": "2026-02-12",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "場地",
+      "account": "場地租金",
+      "amount": 75128,
+      "vendor": "廣新傢俱行",
+      "method": "轉帳",
+      "receiptNo": "VT-13101618",
+      "note": ""
+    },
+    {
+      "id": "slm26-032",
+      "date": "2026-02-10",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 108,
+      "vendor": "光南",
+      "method": "現金",
+      "receiptNo": "WG-91336581",
+      "note": ""
+    },
+    {
+      "id": "slm26-033",
+      "date": "2026-01-30",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 4620,
+      "vendor": "大寶維修",
+      "method": "現金",
+      "receiptNo": "VT-12864310",
+      "note": ""
+    },
+    {
+      "id": "slm26-034",
+      "date": "2026-01-21",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "交通",
+      "account": "旅費",
+      "amount": 400,
+      "vendor": "去霧臺送資料",
+      "method": "現金",
+      "receiptNo": "WM-39408633",
+      "note": ""
+    },
+    {
+      "id": "slm26-035",
+      "date": "2026-02-09",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "交通",
+      "account": "旅費",
+      "amount": 400,
+      "vendor": "去霧臺/去春日場佈",
+      "method": "現金",
+      "receiptNo": "WM-39422785",
+      "note": ""
+    },
+    {
+      "id": "slm26-036",
+      "date": "2026-02-11",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "交通",
+      "account": "旅費",
+      "amount": 200,
+      "vendor": "去霧臺開會",
+      "method": "現金",
+      "receiptNo": "XA-22962785",
+      "note": ""
+    },
+    {
+      "id": "slm26-037",
+      "date": "2026-02-06",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 1110,
+      "vendor": "小米特展審查資料",
+      "method": "現金",
+      "receiptNo": "收據：09047792",
+      "note": ""
+    },
+    {
+      "id": "slm26-038",
+      "date": "2026-02-13",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 3465,
+      "vendor": "辦公椅子",
+      "method": "現金",
+      "receiptNo": "統編：16241764",
+      "note": ""
+    },
+    {
+      "id": "slm26-039",
+      "date": "2026-02-05",
+      "direction": "支出",
+      "project": "MJC_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 1000,
+      "vendor": "瑪家記者會桌上花",
+      "method": "現金",
+      "receiptNo": "統編：37722373",
+      "note": ""
+    },
+    {
+      "id": "slm26-040",
+      "date": "2026-02-11",
+      "direction": "支出",
+      "project": "PW_sl",
+      "category": "交通",
+      "account": "旅費",
+      "amount": 1790,
+      "vendor": "協新租車",
+      "method": "信用卡",
+      "receiptNo": "ＷＷ－13536330",
+      "note": ""
+    },
+    {
+      "id": "slm26-041",
+      "date": "2026-02-12",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 260,
+      "vendor": "函覆堂",
+      "method": "現金",
+      "receiptNo": "收據：78790472",
+      "note": ""
+    },
+    {
+      "id": "slm26-042",
+      "date": "2026-02-27",
+      "direction": "支出",
+      "project": "PW_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 4234,
+      "vendor": "鈺銘",
+      "method": "轉帳",
+      "receiptNo": "VT-43338297",
+      "note": ""
+    },
+    {
+      "id": "slm26-043",
+      "date": "2026-02-23",
+      "direction": "支出",
+      "project": "PW_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 4246,
+      "vendor": "鈺銘",
+      "method": "轉帳",
+      "receiptNo": "VT-43338293",
+      "note": ""
+    },
+    {
+      "id": "slm26-044",
+      "date": "2026-02-24",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 67,
+      "vendor": "鈺銘",
+      "method": "轉帳",
+      "receiptNo": "VT-43338294",
+      "note": ""
+    },
+    {
+      "id": "slm26-045",
+      "date": "2026-02-25",
+      "direction": "支出",
+      "project": "WTM_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 491,
+      "vendor": "鈺銘",
+      "method": "轉帳",
+      "receiptNo": "VT-43338295",
+      "note": ""
+    },
+    {
+      "id": "slm26-046",
+      "date": "2026-02-25",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 6080,
+      "vendor": "鈺銘",
+      "method": "轉帳",
+      "receiptNo": "VT-43338292",
+      "note": ""
+    },
+    {
+      "id": "slm26-047",
+      "date": "2026-02-02",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 203,
+      "vendor": "文具店",
+      "method": "現金",
+      "receiptNo": "VW43790055",
+      "note": ""
+    },
+    {
+      "id": "slm26-048",
+      "date": "2026-03-10",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "印花稅",
+      "account": "稅金",
+      "amount": 933,
+      "vendor": "國稅局",
+      "method": "現金",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "slm26-049",
+      "date": "2026-03-10",
+      "direction": "支出",
+      "project": "WTM_sl",
+      "category": "印花稅",
+      "account": "稅金",
+      "amount": 1390,
+      "vendor": "國稅局",
+      "method": "現金",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "slm26-050",
+      "date": "2026-03-10",
+      "direction": "支出",
+      "project": "Admin_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 8527,
+      "vendor": "瑞珠數位",
+      "method": "現金",
+      "receiptNo": "WX-49250891",
+      "note": ""
+    },
+    {
+      "id": "exp_51",
+      "date": "",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "交通",
+      "account": "旅費",
+      "amount": 0,
+      "vendor": "",
+      "method": "",
+      "receiptNo": "XA-22962665",
+      "note": ""
+    },
+    {
+      "id": "exp_52",
+      "date": "",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "交通",
+      "account": "旅費",
+      "amount": 0,
+      "vendor": "",
+      "method": "",
+      "receiptNo": "WE-84090125",
+      "note": ""
+    },
+    {
+      "id": "exp_53",
+      "date": "",
+      "direction": "支出",
+      "project": "",
+      "category": "設計",
+      "account": "業務推廣費",
+      "amount": 1000,
+      "vendor": "",
+      "method": "",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "comp_1",
+      "date": "2026-01-02",
+      "direction": "支出",
+      "project": "PW_sl",
+      "category": "公司付款",
+      "account": "業務推廣費",
+      "amount": 250000,
+      "vendor": "小旅行",
+      "method": "轉帳",
+      "receiptNo": "VT-34101250",
+      "note": ""
+    },
+    {
+      "id": "comp_2",
+      "date": "2026-01-02",
+      "direction": "支出",
+      "project": "Admin",
+      "category": "公司付款",
+      "account": "業務推廣費",
+      "amount": 111000,
+      "vendor": "小毛攝影(收據未收）",
+      "method": "轉帳",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "comp_3",
+      "date": "2026-01-02",
+      "direction": "支出",
+      "project": "PW_sl",
+      "category": "公司付款",
+      "account": "業務推廣費",
+      "amount": 27930,
+      "vendor": "救護",
+      "method": "轉帳",
+      "receiptNo": "TT-43754540",
+      "note": ""
+    },
+    {
+      "id": "comp_4",
+      "date": "2026-01-02",
+      "direction": "支出",
+      "project": "Admin",
+      "category": "公司付款",
+      "account": "業務推廣費",
+      "amount": 73485,
+      "vendor": "愛印王",
+      "method": "轉帳",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "comp_5",
+      "date": "2026-01-02",
+      "direction": "支出",
+      "project": "Admin",
+      "category": "公司付款",
+      "account": "業務推廣費",
+      "amount": 380000,
+      "vendor": "詠辰／代墊",
+      "method": "轉帳",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "comp_6",
+      "date": "2026-01-02",
+      "direction": "支出",
+      "project": "Admin",
+      "category": "公司付款",
+      "account": "業務推廣費",
+      "amount": 22762,
+      "vendor": "鈺銘",
+      "method": "轉帳",
+      "receiptNo": "",
+      "note": ""
+    },
+    {
+      "id": "comp_7",
+      "date": "2026-01-15",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "公司付款",
+      "account": "雜項支出",
+      "amount": 1194,
+      "vendor": "小米展印刷",
+      "method": "現金",
+      "receiptNo": "收據(09047792)",
+      "note": ""
+    },
+    {
+      "id": "comp_8",
+      "date": "2026-02-05",
+      "direction": "支出",
+      "project": "MJC_sl",
+      "category": "公司付款",
+      "account": "雜項支出",
+      "amount": 1000,
+      "vendor": "瑪家記者會桌上花",
+      "method": "現金",
+      "receiptNo": "統編：37722373",
+      "note": ""
+    },
+    {
+      "id": "comp_9",
+      "date": "2026-03-10",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "公司付款",
+      "account": "雜項支出",
+      "amount": 530,
+      "vendor": "模型用的鍋子",
+      "method": "現金",
+      "receiptNo": "統編：99248953",
+      "note": ""
+    }
+  ],
+  "reimbursements": [
+    {
+      "id": 8,
+      "date": "2026-01-05",
+      "person": "阿雯",
+      "project": "Admin",
+      "amount": 2250,
+      "description": "統編：36876384",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "統編：36876384"
+    },
+    {
+      "id": 12,
+      "date": "2026-01-10",
+      "person": "阿雯",
+      "project": "Admin",
+      "amount": 516,
+      "description": "大寶車牌電腦割字",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "7-11代收證明 NO.22555003"
+    },
+    {
+      "id": 13,
+      "date": "2026-01-20",
+      "person": "阿雯",
+      "project": "Admin",
+      "amount": 520,
+      "description": "南島婚禮修正成果報告裝訂",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "統編：36876384"
+    },
+    {
+      "id": 15,
+      "date": "2026-01-21",
+      "person": "阿雯",
+      "project": "Admin",
+      "amount": 70,
+      "description": "南島婚禮修正成果報告郵寄",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "郵局購票第000143號"
+    },
+    {
+      "id": 16,
+      "date": "2026-01-22",
+      "person": "阿雯",
+      "project": "Admin",
+      "amount": 1545,
+      "description": "瑪家文健站紙相框",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "統編：92261038"
+    },
+    {
+      "id": 17,
+      "date": "2026-01-31",
+      "person": "阿慶",
+      "project": "Admin",
+      "amount": 528,
+      "description": "佈置木箱",
+      "status": "已還款",
+      "method": "信用卡",
+      "receiptNo": "WE-57655394"
+    },
+    {
+      "id": 18,
+      "date": "2026-01-30",
+      "person": "阿慶",
+      "project": "Admin",
+      "amount": 27516,
+      "description": "辦公室書櫃、窗簾",
+      "status": "已還款",
+      "method": "信用卡",
+      "receiptNo": "WE-57606558"
+    },
+    {
+      "id": 19,
+      "date": "2026-01-30",
+      "person": "阿慶",
+      "project": "MJC_sl",
+      "amount": 2000,
+      "description": "胚布差價",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "收據(76384110)"
+    },
+    {
+      "id": 20,
+      "date": "2026-02-03",
+      "person": "阿慶",
+      "project": "MJC_sl",
+      "amount": 870,
+      "description": "壓克力顏料",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "收據(78790472)"
+    },
+    {
+      "id": 21,
+      "date": "2026-02-04",
+      "person": "陳曦",
+      "project": "Admin",
+      "amount": 979,
+      "description": "CD",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "XC-64824095"
+    },
+    {
+      "id": 22,
+      "date": "2026-02-04",
+      "person": "阿慶",
+      "project": "Admin",
+      "amount": 7000,
+      "description": "辦公室訂金＋大寶清潔",
+      "status": "已還款",
+      "method": "轉帳",
+      "receiptNo": ""
+    },
+    {
+      "id": 23,
+      "date": "2026-02-04",
+      "person": "阿慶",
+      "project": "MJC_sl",
+      "amount": 600,
+      "description": "滿天星",
+      "status": "待還款",
+      "method": "轉帳",
+      "receiptNo": "收據(090966783)"
+    },
+    {
+      "id": 24,
+      "date": "2026-01-21",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 400,
+      "description": "去霧臺送資料",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "WM-39408633"
+    },
+    {
+      "id": 25,
+      "date": "2026-02-09",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 400,
+      "description": "去霧臺/去春日場佈",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "WM-39422785"
+    },
+    {
+      "id": 26,
+      "date": "2026-02-11",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 200,
+      "description": "去霧臺開會",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "XA-22962785"
+    },
+    {
+      "id": 27,
+      "date": "2026-02-06",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 1110,
+      "description": "小米特展審查資料",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "收據：09047792"
+    },
+    {
+      "id": 28,
+      "date": "2026-02-13",
+      "person": "祖珠",
+      "project": "Admin",
+      "amount": 3465,
+      "description": "辦公椅子",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "統編：16241764"
+    },
+    {
+      "id": 30,
+      "date": "2026-02-23",
+      "person": "阿慶",
+      "project": "Admin",
+      "amount": 8250,
+      "description": "尾牙餐費",
+      "status": "待還款",
+      "method": "信用卡",
+      "receiptNo": "統編：47900256"
+    },
+    {
+      "id": 31,
+      "date": "2026-02-11",
+      "person": "阿慶",
+      "project": "PW_sl",
+      "amount": 1790,
+      "description": "風域季租車",
+      "status": "待還款",
+      "method": "信用卡",
+      "receiptNo": "ww-13536330"
+    },
+    {
+      "id": 32,
+      "date": "2026-02-02",
+      "person": "阿雯",
+      "project": "Admin",
+      "amount": 203,
+      "description": "文具：鐵尺.厚紙",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "VW43790055"
+    },
+    {
+      "id": 34,
+      "date": "2026-03-05",
+      "person": "阿慶",
+      "project": "Admin",
+      "amount": 4620,
+      "description": "大寶維修",
+      "status": "待還款",
+      "method": "信用卡",
+      "receiptNo": "VT-12864310"
+    },
+    {
+      "id": 35,
+      "date": "2026-03-05",
+      "person": "阿慶",
+      "project": "Admin",
+      "amount": 100000,
+      "description": "年前回20尚缺10",
+      "status": "待還款",
+      "method": "轉帳",
+      "receiptNo": "增資金額"
+    },
+    {
+      "id": 36,
+      "date": "2026-03-05",
+      "person": "阿慶",
+      "project": "PW_sl",
+      "amount": 6622,
+      "description": "風域季獎項報名",
+      "status": "待還款",
+      "method": "信用卡",
+      "receiptNo": "國外獎項無憑證"
+    },
+    {
+      "id": 37,
+      "date": "2026-02-09",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 300,
+      "description": "去霧臺開會",
+      "status": "待還款",
+      "method": "現金",
+      "receiptNo": "XA-22962665"
+    },
+    {
+      "id": 38,
+      "date": "2026-02-24",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 250,
+      "description": "去霧臺開會",
+      "status": "待還款",
+      "method": "現金",
+      "receiptNo": "WE-84090125"
+    }
+  ],
+  "clockins": [
+    {
+      "id": 1,
+      "empName": "宝琳",
+      "date": "2026-03-09",
+      "time": "09:58",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 2,
+      "empName": "祖珠",
+      "date": "2026-03-09",
+      "time": "08:56",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 3,
+      "empName": "宝琳",
+      "date": "2026-03-06",
+      "time": "19:27",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 4,
+      "empName": "祖珠",
+      "date": "2026-03-06",
+      "time": "18:14",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 5,
+      "empName": "陳曦",
+      "date": "2026-03-06",
+      "time": "17:53",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 6,
+      "empName": "宝琳",
+      "date": "2026-03-06",
+      "time": "09:46",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 7,
+      "empName": "陳曦",
+      "date": "2026-03-06",
+      "time": "08:46",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 8,
+      "empName": "祖珠",
+      "date": "2026-03-05",
+      "time": "18:13",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 9,
+      "empName": "祖珠",
+      "date": "2026-03-05",
+      "time": "09:09",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 10,
+      "empName": "宝琳",
+      "date": "2026-03-04",
+      "time": "22:40",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 11,
+      "empName": "陳曦",
+      "date": "2026-03-04",
+      "time": "15:04",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 12,
+      "empName": "宝琳",
+      "date": "2026-03-04",
+      "time": "09:36",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 13,
+      "empName": "祖珠",
+      "date": "2026-03-04",
+      "time": "09:22",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 14,
+      "empName": "陳曦",
+      "date": "2026-03-04",
+      "time": "08:54",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 15,
+      "empName": "宝琳",
+      "date": "2026-03-03",
+      "time": "19:27",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 16,
+      "empName": "祖珠",
+      "date": "2026-03-03",
+      "time": "18:06",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 17,
+      "empName": "宝琳",
+      "date": "2026-03-03",
+      "time": "09:45",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 18,
+      "empName": "祖珠",
+      "date": "2026-03-03",
+      "time": "08:41",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 19,
+      "empName": "宝琳",
+      "date": "2026-03-02",
+      "time": "18:51",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 20,
+      "empName": "祖珠",
+      "date": "2026-03-02",
+      "time": "18:20",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 21,
+      "empName": "祖珠",
+      "date": "2026-03-02",
+      "time": "09:07",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 22,
+      "empName": "宝琳",
+      "date": "2026-03-02",
+      "time": "09:03",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 23,
+      "empName": "祖珠",
+      "date": "2026-02-26",
+      "time": "17:48",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 24,
+      "empName": "宝琳",
+      "date": "2026-02-26",
+      "time": "09:25",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 25,
+      "empName": "祖珠",
+      "date": "2026-02-26",
+      "time": "08:42",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 26,
+      "empName": "祖珠",
+      "date": "2026-02-25",
+      "time": "18:28",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 27,
+      "empName": "宝琳",
+      "date": "2026-02-25",
+      "time": "18:28",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 28,
+      "empName": "陳曦",
+      "date": "2026-02-25",
+      "time": "14:03",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 29,
+      "empName": "宝琳",
+      "date": "2026-02-25",
+      "time": "09:46",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 30,
+      "empName": "祖珠",
+      "date": "2026-02-25",
+      "time": "08:59",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 31,
+      "empName": "陳曦",
+      "date": "2026-02-25",
+      "time": "08:53",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 32,
+      "empName": "宝琳",
+      "date": "2026-02-24",
+      "time": "18:08",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 33,
+      "empName": "祖珠",
+      "date": "2026-02-24",
+      "time": "17:55",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 34,
+      "empName": "祖珠",
+      "date": "2026-02-24",
+      "time": "09:01",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 35,
+      "empName": "祖珠",
+      "date": "2026-02-23",
+      "time": "22:26",
+      "type": "加班結束",
+      "note": "文件／計畫書撰寫"
+    },
+    {
+      "id": 36,
+      "empName": "祖珠",
+      "date": "2026-02-23",
+      "time": "20:55",
+      "type": "加班開始",
+      "note": "文件／計畫書撰寫"
+    },
+    {
+      "id": 37,
+      "empName": "祖珠",
+      "date": "2026-02-23",
+      "time": "09:05",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 38,
+      "empName": "祖珠",
+      "date": "2026-02-13",
+      "time": "18:30",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 39,
+      "empName": "陳曦",
+      "date": "2026-02-13",
+      "time": "18:28",
+      "type": "加班結束",
+      "note": "其他"
+    },
+    {
+      "id": 40,
+      "empName": "祖珠",
+      "date": "2026-02-13",
+      "time": "09:36",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 41,
+      "empName": "陳曦",
+      "date": "2026-02-13",
+      "time": "00:00",
+      "type": "加班結束",
+      "note": "臨時主管交辦"
+    },
+    {
+      "id": 42,
+      "empName": "陳曦",
+      "date": "2026-02-12",
+      "time": "23:31",
+      "type": "加班開始",
+      "note": "臨時主管交辦"
+    },
+    {
+      "id": 43,
+      "empName": "陳曦",
+      "date": "2026-02-12",
+      "time": "20:35",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 44,
+      "empName": "祖珠",
+      "date": "2026-02-12",
+      "time": "18:01",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 45,
+      "empName": "陳曦",
+      "date": "2026-02-12",
+      "time": "09:05",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 46,
+      "empName": "陳曦",
+      "date": "2026-02-11",
+      "time": "18:04",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 47,
+      "empName": "陳曦",
+      "date": "2026-02-11",
+      "time": "09:02",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 48,
+      "empName": "阿雯",
+      "date": "2026-02-09",
+      "time": "15:51",
+      "type": "加班開始",
+      "note": "活動支援／籌備"
+    },
+    {
+      "id": 49,
+      "empName": "阿慶",
+      "date": "2026-02-09",
+      "time": "15:30",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 50,
+      "empName": "阿慶",
+      "date": "2026-02-09",
+      "time": "15:22",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 51,
+      "empName": "庭瑜",
+      "date": "2026-03-09",
+      "time": "13:07",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 52,
+      "empName": "庭瑜",
+      "date": "2026-03-09",
+      "time": "18:10",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 53,
+      "empName": "祖珠",
+      "date": "2026-03-09",
+      "time": "18:15",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 54,
+      "empName": "祖珠",
+      "date": "2026-03-10",
+      "time": "09:10",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 55,
+      "empName": "宝琳",
+      "date": "2026-03-10",
+      "time": "09:38",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 56,
+      "empName": "祖珠",
+      "date": "2026-03-10",
+      "time": "18:42",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 57,
+      "empName": "宝琳",
+      "date": "2026-03-10",
+      "time": "19:00",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 58,
+      "empName": "陳曦",
+      "date": "2026-03-11",
+      "time": "08:50",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 59,
+      "empName": "祖珠",
+      "date": "2026-03-11",
+      "time": "08:53",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 60,
+      "empName": "宝琳",
+      "date": "2026-03-11",
+      "time": "09:50",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 61,
+      "empName": "陳曦",
+      "date": "2026-03-11",
+      "time": "14:21",
+      "type": "下班",
+      "note": ""
+    }
+  ],
+  "payables": [
+    {
+      "id": 90001,
+      "vendor": "開譜",
+      "amount": 1358428,
+      "invoiceNo": "VT-43384551",
+      "dueDate": "2026-01-02",
+      "project": "PW_sl",
+      "status": "待付",
+      "note": ""
+    },
+    {
+      "id": 90002,
+      "vendor": "台東校外劇團票卷",
+      "amount": 164640,
+      "invoiceNo": "阿甯咕劇團收字第NO114112601號",
+      "dueDate": "2026-01-05",
+      "project": "Admin",
+      "status": "待付",
+      "note": ""
+    },
+    {
+      "id": 90003,
+      "vendor": "風域祭後擴",
+      "amount": 500000,
+      "invoiceNo": " VT-43384551",
+      "dueDate": "2026-01-07",
+      "project": "PW_sl",
+      "status": "待付",
+      "note": ""
+    },
+    {
+      "id": 90004,
+      "vendor": "大武社區",
+      "amount": 16359,
+      "invoiceNo": "稅金補開",
+      "dueDate": "2026-02-02",
+      "project": "Admin",
+      "status": "已付",
+      "note": ""
+    },
+    {
+      "id": 90005,
+      "vendor": "鈺銘１．２月印刷",
+      "amount": 15118,
+      "invoiceNo": "",
+      "dueDate": "2026-02-27",
+      "project": "Admin",
+      "status": "待付",
+      "note": ""
+    },
+    {
+      "id": 90006,
+      "vendor": "共構",
+      "amount": 0,
+      "invoiceNo": "",
+      "dueDate": "",
+      "project": "",
+      "status": "待付",
+      "note": ""
+    }
+  ],
+  "schedules": [
+    {
+      "id": 20000,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 1,
+      "shift": "休假"
+    },
+    {
+      "id": 20001,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 2,
+      "shift": "出勤"
+    },
+    {
+      "id": 20002,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 3,
+      "shift": "出勤"
+    },
+    {
+      "id": 20003,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 4,
+      "shift": "出勤"
+    },
+    {
+      "id": 20004,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 5,
+      "shift": "出勤"
+    },
+    {
+      "id": 20005,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 6,
+      "shift": "出勤"
+    },
+    {
+      "id": 20006,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 7,
+      "shift": "休假"
+    },
+    {
+      "id": 20007,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 8,
+      "shift": "休假"
+    },
+    {
+      "id": 20008,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 9,
+      "shift": "出勤"
+    },
+    {
+      "id": 20009,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 10,
+      "shift": "出勤"
+    },
+    {
+      "id": 20010,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 11,
+      "shift": "出勤"
+    },
+    {
+      "id": 20011,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 12,
+      "shift": "出勤"
+    },
+    {
+      "id": 20012,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 13,
+      "shift": "出勤"
+    },
+    {
+      "id": 20013,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 14,
+      "shift": "休假"
+    },
+    {
+      "id": 20014,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 15,
+      "shift": "休假"
+    },
+    {
+      "id": 20015,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 16,
+      "shift": "出勤"
+    },
+    {
+      "id": 20016,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 17,
+      "shift": "出勤"
+    },
+    {
+      "id": 20017,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 18,
+      "shift": "出勤"
+    },
+    {
+      "id": 20018,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 19,
+      "shift": "出勤"
+    },
+    {
+      "id": 20019,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 20,
+      "shift": "出勤"
+    },
+    {
+      "id": 20020,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 21,
+      "shift": "休假"
+    },
+    {
+      "id": 20021,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 22,
+      "shift": "休假"
+    },
+    {
+      "id": 20022,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 23,
+      "shift": "出勤"
+    },
+    {
+      "id": 20023,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 24,
+      "shift": "出勤"
+    },
+    {
+      "id": 20024,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 25,
+      "shift": "出勤"
+    },
+    {
+      "id": 20025,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 26,
+      "shift": "出勤"
+    },
+    {
+      "id": 20026,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 27,
+      "shift": "出勤"
+    },
+    {
+      "id": 20027,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 28,
+      "shift": "休假"
+    },
+    {
+      "id": 20028,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 29,
+      "shift": "休假"
+    },
+    {
+      "id": 20029,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 30,
+      "shift": "出勤"
+    },
+    {
+      "id": 20030,
+      "empId": 1,
+      "year": 2026,
+      "month": 3,
+      "day": 31,
+      "shift": "出勤"
+    },
+    {
+      "id": 20031,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 1,
+      "shift": "休假"
+    },
+    {
+      "id": 20032,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 2,
+      "shift": "出勤"
+    },
+    {
+      "id": 20033,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 3,
+      "shift": "出勤"
+    },
+    {
+      "id": 20034,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 4,
+      "shift": "出勤"
+    },
+    {
+      "id": 20035,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 5,
+      "shift": "出勤"
+    },
+    {
+      "id": 20036,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 6,
+      "shift": "出勤"
+    },
+    {
+      "id": 20037,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 7,
+      "shift": "休假"
+    },
+    {
+      "id": 20038,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 8,
+      "shift": "休假"
+    },
+    {
+      "id": 20039,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 9,
+      "shift": "出勤"
+    },
+    {
+      "id": 20040,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 10,
+      "shift": "出勤"
+    },
+    {
+      "id": 20041,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 11,
+      "shift": "出勤"
+    },
+    {
+      "id": 20042,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 12,
+      "shift": "出勤"
+    },
+    {
+      "id": 20043,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 13,
+      "shift": "出勤"
+    },
+    {
+      "id": 20044,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 14,
+      "shift": "休假"
+    },
+    {
+      "id": 20045,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 15,
+      "shift": "休假"
+    },
+    {
+      "id": 20046,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 16,
+      "shift": "出勤"
+    },
+    {
+      "id": 20047,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 17,
+      "shift": "出勤"
+    },
+    {
+      "id": 20048,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 18,
+      "shift": "出勤"
+    },
+    {
+      "id": 20049,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 19,
+      "shift": "出勤"
+    },
+    {
+      "id": 20050,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 20,
+      "shift": "出勤"
+    },
+    {
+      "id": 20051,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 21,
+      "shift": "休假"
+    },
+    {
+      "id": 20052,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 22,
+      "shift": "休假"
+    },
+    {
+      "id": 20053,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 23,
+      "shift": "出勤"
+    },
+    {
+      "id": 20054,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 24,
+      "shift": "出勤"
+    },
+    {
+      "id": 20055,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 25,
+      "shift": "出勤"
+    },
+    {
+      "id": 20056,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 26,
+      "shift": "出勤"
+    },
+    {
+      "id": 20057,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 27,
+      "shift": "出勤"
+    },
+    {
+      "id": 20058,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 28,
+      "shift": "休假"
+    },
+    {
+      "id": 20059,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 29,
+      "shift": "休假"
+    },
+    {
+      "id": 20060,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 30,
+      "shift": "出勤"
+    },
+    {
+      "id": 20061,
+      "empId": 2,
+      "year": 2026,
+      "month": 3,
+      "day": 31,
+      "shift": "出勤"
+    },
+    {
+      "id": 20062,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 1,
+      "shift": "休假"
+    },
+    {
+      "id": 20063,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 2,
+      "shift": "出勤"
+    },
+    {
+      "id": 20064,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 3,
+      "shift": "出勤"
+    },
+    {
+      "id": 20065,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 4,
+      "shift": "出勤"
+    },
+    {
+      "id": 20066,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 5,
+      "shift": "出勤"
+    },
+    {
+      "id": 20067,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 6,
+      "shift": "出勤"
+    },
+    {
+      "id": 20068,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 7,
+      "shift": "休假"
+    },
+    {
+      "id": 20069,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 8,
+      "shift": "休假"
+    },
+    {
+      "id": 20070,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 9,
+      "shift": "出勤"
+    },
+    {
+      "id": 20071,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 10,
+      "shift": "出勤"
+    },
+    {
+      "id": 20072,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 11,
+      "shift": "出勤"
+    },
+    {
+      "id": 20073,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 12,
+      "shift": "出勤"
+    },
+    {
+      "id": 20074,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 13,
+      "shift": "出勤"
+    },
+    {
+      "id": 20075,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 14,
+      "shift": "休假"
+    },
+    {
+      "id": 20076,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 15,
+      "shift": "休假"
+    },
+    {
+      "id": 20077,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 16,
+      "shift": "出勤"
+    },
+    {
+      "id": 20078,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 17,
+      "shift": "出勤"
+    },
+    {
+      "id": 20079,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 18,
+      "shift": "出勤"
+    },
+    {
+      "id": 20080,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 19,
+      "shift": "出勤"
+    },
+    {
+      "id": 20081,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 20,
+      "shift": "出勤"
+    },
+    {
+      "id": 20082,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 21,
+      "shift": "休假"
+    },
+    {
+      "id": 20083,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 22,
+      "shift": "休假"
+    },
+    {
+      "id": 20084,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 23,
+      "shift": "出勤"
+    },
+    {
+      "id": 20085,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 24,
+      "shift": "出勤"
+    },
+    {
+      "id": 20086,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 25,
+      "shift": "出勤"
+    },
+    {
+      "id": 20087,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 26,
+      "shift": "出勤"
+    },
+    {
+      "id": 20088,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 27,
+      "shift": "出勤"
+    },
+    {
+      "id": 20089,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 28,
+      "shift": "休假"
+    },
+    {
+      "id": 20090,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 29,
+      "shift": "休假"
+    },
+    {
+      "id": 20091,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 30,
+      "shift": "出勤"
+    },
+    {
+      "id": 20092,
+      "empId": 3,
+      "year": 2026,
+      "month": 3,
+      "day": 31,
+      "shift": "出勤"
+    },
+    {
+      "id": 20093,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 1,
+      "shift": "休假"
+    },
+    {
+      "id": 20094,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 2,
+      "shift": "休假"
+    },
+    {
+      "id": 20095,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 3,
+      "shift": "休假"
+    },
+    {
+      "id": 20096,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 4,
+      "shift": "上午班"
+    },
+    {
+      "id": 20097,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 5,
+      "shift": "休假"
+    },
+    {
+      "id": 20098,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 6,
+      "shift": "出勤"
+    },
+    {
+      "id": 20099,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 7,
+      "shift": "休假"
+    },
+    {
+      "id": 20100,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 8,
+      "shift": "休假"
+    },
+    {
+      "id": 20101,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 9,
+      "shift": "休假"
+    },
+    {
+      "id": 20102,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 10,
+      "shift": "休假"
+    },
+    {
+      "id": 20103,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 11,
+      "shift": "上午班"
+    },
+    {
+      "id": 20104,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 12,
+      "shift": "休假"
+    },
+    {
+      "id": 20105,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 13,
+      "shift": "出勤"
+    },
+    {
+      "id": 20106,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 14,
+      "shift": "休假"
+    },
+    {
+      "id": 20107,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 15,
+      "shift": "休假"
+    },
+    {
+      "id": 20108,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 16,
+      "shift": "休假"
+    },
+    {
+      "id": 20109,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 17,
+      "shift": "休假"
+    },
+    {
+      "id": 20110,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 18,
+      "shift": "上午班"
+    },
+    {
+      "id": 20111,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 19,
+      "shift": "休假"
+    },
+    {
+      "id": 20112,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 20,
+      "shift": "出勤"
+    },
+    {
+      "id": 20113,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 21,
+      "shift": "休假"
+    },
+    {
+      "id": 20114,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 22,
+      "shift": "休假"
+    },
+    {
+      "id": 20115,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 23,
+      "shift": "休假"
+    },
+    {
+      "id": 20116,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 24,
+      "shift": "休假"
+    },
+    {
+      "id": 20117,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 25,
+      "shift": "上午班"
+    },
+    {
+      "id": 20118,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 26,
+      "shift": "休假"
+    },
+    {
+      "id": 20119,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 27,
+      "shift": "出勤"
+    },
+    {
+      "id": 20120,
+      "empId": 4,
+      "year": 2026,
+      "month": 3,
+      "day": 28,
+      "shift": "休假"
+    },
+    {
+      "id": 20121,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 1,
+      "shift": "休假"
+    },
+    {
+      "id": 20122,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 2,
+      "shift": "出勤"
+    },
+    {
+      "id": 20123,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 3,
+      "shift": "出勤"
+    },
+    {
+      "id": 20124,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 4,
+      "shift": "出勤"
+    },
+    {
+      "id": 20125,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 5,
+      "shift": "休假"
+    },
+    {
+      "id": 20126,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 6,
+      "shift": "出勤"
+    },
+    {
+      "id": 20127,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 7,
+      "shift": "休假"
+    },
+    {
+      "id": 20128,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 8,
+      "shift": "休假"
+    },
+    {
+      "id": 20129,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 9,
+      "shift": "出勤"
+    },
+    {
+      "id": 20130,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 10,
+      "shift": "出勤"
+    },
+    {
+      "id": 20131,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 11,
+      "shift": "出勤"
+    },
+    {
+      "id": 20132,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 12,
+      "shift": "出勤"
+    },
+    {
+      "id": 20133,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 13,
+      "shift": "出勤"
+    },
+    {
+      "id": 20134,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 14,
+      "shift": "休假"
+    },
+    {
+      "id": 20135,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 15,
+      "shift": "休假"
+    },
+    {
+      "id": 20136,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 16,
+      "shift": "出勤"
+    },
+    {
+      "id": 20137,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 17,
+      "shift": "出勤"
+    },
+    {
+      "id": 20138,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 18,
+      "shift": "出勤"
+    },
+    {
+      "id": 20139,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 19,
+      "shift": "出勤"
+    },
+    {
+      "id": 20140,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 20,
+      "shift": "出勤"
+    },
+    {
+      "id": 20141,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 21,
+      "shift": "休假"
+    },
+    {
+      "id": 20142,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 22,
+      "shift": "休假"
+    },
+    {
+      "id": 20143,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 23,
+      "shift": "出勤"
+    },
+    {
+      "id": 20144,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 24,
+      "shift": "休假"
+    },
+    {
+      "id": 20145,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 25,
+      "shift": "出勤"
+    },
+    {
+      "id": 20146,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 26,
+      "shift": "出勤"
+    },
+    {
+      "id": 20147,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 27,
+      "shift": "出勤"
+    },
+    {
+      "id": 20148,
+      "empId": 5,
+      "year": 2026,
+      "month": 3,
+      "day": 28,
+      "shift": "出勤"
+    }
+  ],
+  "newEmployee": {
+    "id": 6,
+    "name": "庭瑜",
+    "role": "兼職",
+    "email": "",
+    "phone": ""
+  }
+}

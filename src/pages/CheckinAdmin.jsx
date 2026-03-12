@@ -4,6 +4,12 @@ import { Plus, Trash2, Edit3, Check, X, Lock, LogOut } from 'lucide-react'
 import logo from '../assets/logo.jpeg'
 
 const ADMIN_PASSWORD = 'admin1234'
+
+const resolveEmpName = (name, employees) => {
+  if (!name) return name
+  const emp = employees.find(e => e.name === name || e.name.includes(name) || name.includes(e.name))
+  return emp?.name || name
+}
 const PUNCH_TYPES = ['上班', '下班', '加班開始', '加班結束']
 const TYPE_STYLE = {
   '上班':   { color: '#3a6d31', bg: '#edf2ea' },
@@ -193,7 +199,7 @@ export default function CheckinAdmin() {
                     return (
                       <tr key={c.id} style={{ borderBottom: '1px solid #ede5d8', backgroundColor: isEditing ? '#fffef2' : 'transparent' }}>
                         {/* 姓名 */}
-                        <td style={{ padding: '10px 16px', fontWeight: '600', color: '#2c1a0e', whiteSpace: 'nowrap' }}>{c.empName}</td>
+                        <td style={{ padding: '10px 16px', fontWeight: '600', color: '#2c1a0e', whiteSpace: 'nowrap' }}>{resolveEmpName(c.empName, data.employees)}</td>
 
                         {/* 日期 */}
                         <td style={{ padding: '10px 16px', color: '#7a6050', whiteSpace: 'nowrap' }}>
