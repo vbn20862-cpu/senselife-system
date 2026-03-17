@@ -1,3 +1,18 @@
+import { useState, useEffect } from 'react'
+
+// 響應式 hook — 768px 以下為手機
+export function useIsMobile() {
+  const [m, setM] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const h = (e) => setM(e.matches)
+    setM(mq.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  return m
+}
+
 // 深活共構 大地色系 共用樣式
 export const E = {
   // 顏色

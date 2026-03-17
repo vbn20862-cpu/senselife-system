@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
-import { Plus, Trash2, Phone, Mail, User, Pencil, Shield, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { Plus, Trash2, Phone, Mail, User, Pencil, Shield, Eye, EyeOff, KeyRound, Download } from 'lucide-react'
 import Modal from '../components/Modal'
-import { E, STATUS } from '../styles/earth'
+import { E, STATUS, useIsMobile } from '../styles/earth'
+import { exportHR } from '../utils/exportExcel'
+import { downloadCsv } from '../utils/exportCsv'
 
 const MONTHS = ['一','二','三','四','五','六','七','八','九','十','十一','十二']
 
@@ -87,7 +89,7 @@ function computeAllTimeEarned(empId, data) {
 }
 
 // 出勤統計列（展開細節）
-function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, textMuted, sandLight, card }) {
+function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, textMuted, sandLight, card, mob }) {
   const [open, setOpen] = useState(false)
   const hrs = parseFloat(s.totalHours)
   const pct = Math.min(100, (hrs / 200) * 100) // 200h = full month reference
@@ -129,7 +131,7 @@ function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, tex
       {/* 每日明細（展開） */}
       {open && s.dayDetails.length > 0 && (
         <div style={{ marginTop: '12px', borderTop: `1px solid ${divider}`, paddingTop: '10px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px' }}>
             {s.dayDetails.map(d => (
               <div key={d.date} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', backgroundColor: d.isCompLeave ? '#f0ebf5' : sandLight, borderRadius: '8px', fontSize: '12px' }}>
                 <span style={{ color: textSecond, fontWeight: '600', minWidth: '58px' }}>{d.date.slice(5)}</span>
@@ -170,6 +172,7 @@ const EMPTY_ACC = { username: '', name: '', email: '', role: 'employee', passwor
 export default function HR() {
   const { data, update, addItem, updateItem, deleteItem, logEdit } = useApp()
   const { currentUser, isAdmin, accounts, addAccount, updateAccount, deleteAccount } = useAuth()
+  const mob = useIsMobile()
   const [tab, setTab] = useState('schedule')
   const [scheduleMonth, setScheduleMonth] = useState(() => {
     const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() + 1 }
@@ -256,11 +259,121 @@ export default function HR() {
     setEditAcc(null); setAccMsg('')
   }
 
+  // === CSV 匯出 ===
+  function exportSchedule() {
+    const d = daysInMonth(year, month)
+    const dayHeaders = Array.from({ length: d }, (_, i) => ({
+      label: String(i + 1),
+      value: (row) => row.shifts[i] || ''
+    }))
+    const headers = [{ label: '員工', value: (row) => row.name }, ...dayHeaders]
+    const rows = data.employees.map(emp => ({
+      name: emp.name,
+      shifts: Array.from({ length: d }, (_, i) => getSchedule(emp.id, i + 1))
+    }))
+    downloadCsv(`排班表_${year}年${month}月.csv`, headers, rows)
+  }
+
+  function exportAttendance() {
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`
+    const monthClockins = data.clockins.filter(c => c.date && c.date.startsWith(monthStr))
+    const allClockinNames = [...new Set(data.clockins.map(c => c.empName).filter(Boolean))]
+    const govtInfo = GOVT_WORK_DAYS[monthStr]
+    const expectedHours = govtInfo?.hours || 0
+
+    const headers = [
+      { label: '員工', value: r => r.name },
+      { label: '應出勤(時)', value: r => r.expected },
+      { label: '實際出勤(時)', value: r => r.actual },
+      { label: '加班(時)', value: r => r.ot },
+      { label: '請假(天)', value: r => r.leave },
+    ]
+    const rows = allClockinNames.map(name => {
+      const emp = data.employees.find(e => e.name === name || e.name.includes(name) || name.includes(e.name))
+      const myClockins = monthClockins.filter(c => c.empName === name)
+      const workDays = new Set(myClockins.filter(c => c.type === '上班').map(c => c.date))
+      let totalMinutes = 0, totalOTMinutes = 0
+      const compLeaveForMonth = emp ? (data.compLeaveRecords || []).filter(r => r.empId === emp.id && r.date?.startsWith(monthStr)) : []
+      const allDates = [...new Set([...myClockins.map(c => c.date), ...compLeaveForMonth.map(r => r.date)])].sort()
+
+      allDates.forEach(date => {
+        const dayRecs = myClockins.filter(c => c.date === date).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+        const ins = dayRecs.filter(c => c.type === '上班')
+        const outs = dayRecs.filter(c => c.type === '下班')
+        let dayMin = 0
+        if (ins.length > 0 && outs.length > 0 && ins[0].time && outs[outs.length - 1].time) {
+          const [ih, im] = ins[0].time.split(':').map(Number)
+          const [oh, om] = outs[outs.length - 1].time.split(':').map(Number)
+          dayMin = Math.max(0, (oh * 60 + om) - (ih * 60 + im))
+          if (dayMin >= 300) dayMin = Math.max(0, dayMin - 60)
+        }
+        const cl = compLeaveForMonth.find(r => r.date === date)
+        dayMin += cl ? Number(cl.hours) * 60 : 0
+
+        const otStart = dayRecs.filter(c => c.type === '加班開始')
+        const otEnd = dayRecs.filter(c => c.type === '加班結束')
+        if (otStart.length > 0 && otEnd.length > 0 && otStart[0].time && otEnd[otEnd.length - 1].time) {
+          const [sh, sm] = otStart[0].time.split(':').map(Number)
+          const [eh, em] = otEnd[otEnd.length - 1].time.split(':').map(Number)
+          totalOTMinutes += Math.max(0, (eh * 60 + em) - (sh * 60 + sm))
+        }
+        totalMinutes += dayMin
+      })
+
+      const leaveDays = data.schedules.filter(s => s.empId === emp?.id && s.year === year && s.month === month && s.shift === '休假').length
+      return {
+        name: emp?.name || name,
+        expected: expectedHours,
+        actual: roundHours(totalMinutes),
+        ot: roundHours(totalOTMinutes),
+        leave: leaveDays,
+      }
+    }).filter(r => r.actual > 0)
+    downloadCsv(`工時統計_${year}年${month}月.csv`, headers, rows)
+  }
+
+  function exportEmployees() {
+    const headers = [
+      { label: '姓名', key: 'name' },
+      { label: '職務', key: 'role' },
+      { label: 'Email', key: 'email' },
+      { label: '電話', key: 'phone' },
+    ]
+    downloadCsv('員工名冊.csv', headers, data.employees)
+  }
+
+  function exportClockIn() {
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`
+    const filtered = visibleClockins
+      .filter(c => c.date && c.date.startsWith(monthStr))
+      .sort((a, b) => {
+        const d = (a.date || '').localeCompare(b.date || '')
+        return d !== 0 ? d : (a.time || '').localeCompare(b.time || '')
+      })
+    // Group by date+employee to pair clock-in/out
+    const headers = [
+      { label: '日期', key: 'date' },
+      { label: '員工', value: r => resolveEmpName(r.empName, data.employees) },
+      { label: '上班打卡', value: r => r.type === '上班' ? r.time : '' },
+      { label: '下班打卡', value: r => r.type === '下班' ? r.time : '' },
+      { label: '備註', value: r => r.type !== '上班' && r.type !== '下班' ? r.type : '' },
+    ]
+    downloadCsv(`打卡記錄_${year}年${month}月.csv`, headers, filtered)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>人事管理</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>人事管理</h1>
+        {isAdmin && (
+          <button onClick={() => exportHR(data)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '10px', border: '1px solid #d8cbb8', backgroundColor: '#fdfaf5', color: '#5a3a1a', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+            <Download size={14} /> 匯出 Excel
+          </button>
+        )}
+      </div>
 
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {TABS.map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab === key), flexShrink: 0 }}>{label}</button>
         ))}
@@ -275,6 +388,9 @@ export default function HR() {
             <span style={{ fontWeight: '700', fontSize: '15px', color: E.textPrimary }}>{year} 年 {MONTHS[month-1]} 月</span>
             <button onClick={() => setScheduleMonth(p => p.month === 12 ? { year: p.year+1, month: 1 } : { year: p.year, month: p.month+1 })}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: E.textSecond, fontSize: '18px', padding: '0 4px' }}>▶</button>
+            <button onClick={exportSchedule} style={{ ...E.btnGhost, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+              <Download size={13} /> 匯出
+            </button>
             <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexWrap: 'wrap' }}>
               {SHIFTS.map(s => (
                 <span key={s.code} style={{ fontSize: '11px', padding: '3px 12px', borderRadius: '999px', backgroundColor: s.bg, color: s.color, fontWeight: '600' }}>
@@ -451,6 +567,9 @@ export default function HR() {
               <span style={{ fontWeight: '700', fontSize: '15px', color: E.textPrimary }}>{attYear} 年 {MONTHS[attMonth-1]} 月 工時統計</span>
               <button onClick={() => setScheduleMonth(p => p.month === 12 ? { year: p.year+1, month: 1 } : { year: p.year, month: p.month+1 })}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: E.textSecond, fontSize: '18px', padding: '0 4px' }}>▶</button>
+              <button onClick={exportAttendance} style={{ ...E.btnGhost, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                <Download size={13} /> 匯出
+              </button>
               <span style={{ fontSize: '12px', color: E.textMuted, marginLeft: 'auto' }}>
                 共 {monthClockins.length} 筆打卡紀錄
               </span>
@@ -464,7 +583,7 @@ export default function HR() {
               stats.map(s => (
                 <AttendanceRow key={s.name} s={s} divider={E.divider} green={E.green} coffee={E.coffee}
                   textPrimary={E.textPrimary} textSecond={E.textSecond} textMuted={E.textMuted}
-                  sandLight={E.sandLight} card={E.card} />
+                  sandLight={E.sandLight} card={E.card} mob={mob} />
               ))
             )}
           </div>
@@ -474,10 +593,13 @@ export default function HR() {
       {/* 員工 */}
       {tab === 'employees' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <button onClick={exportEmployees} style={{ ...E.btnGhost, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+              <Download size={13} /> 匯出
+            </button>
             <button onClick={() => setShowAddEmployee(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={15} />新增員工</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
             {data.employees.map(emp => (
               <div key={emp.id} style={E.card}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -526,6 +648,9 @@ export default function HR() {
                 {isAdmin ? `共 ${data.clockins.length} 筆記錄` : `${currentUser?.name} 的打卡記錄（${visibleClockins.length} 筆）`}
               </span>
               <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={exportClockIn} style={{ ...E.btnGhost, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                  <Download size={13} /> 匯出
+                </button>
                 <a href="/checkin" target="_blank" rel="noreferrer"
                   style={{ ...E.btnGhost, textDecoration: 'none', fontSize: '13px' }}>
                   📱 員工打卡頁
@@ -657,8 +782,8 @@ export default function HR() {
             {logs.length === 0 ? (
               <div style={{ ...E.card, textAlign: 'center', color: E.textMuted, fontSize: '13px', padding: '40px' }}>尚無操作記錄</div>
             ) : (
-              <div style={{ ...E.card, padding: 0, overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <div style={{ ...E.card, padding: 0, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: mob ? '600px' : undefined }}>
                   <thead style={{ backgroundColor: E.sandLight }}>
                     <tr>
                       {['時間','操作者','動作','類型','名稱','摘要'].map(h => (

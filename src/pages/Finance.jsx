@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
-import { Plus, Trash2, Search, CreditCard, ChevronLeft, Pencil } from 'lucide-react'
+import { Plus, Trash2, Search, CreditCard, ChevronLeft, Pencil, Download, Receipt, Filter } from 'lucide-react'
 import Modal from '../components/Modal'
-import { E, STATUS } from '../styles/earth'
+import { E, STATUS, useIsMobile } from '../styles/earth'
+import { exportFinance } from '../utils/exportExcel'
 
 const CHART_COLORS = ['#4d8843','#5b7ec9','#c89040','#8a5cb0','#c04030','#3a9080','#b06030','#607060']
 
@@ -85,6 +86,7 @@ function DonutChart({ slices, size = 120 }) {
 export default function Finance() {
   const { data, addItem, updateItem, deleteItem, logEdit, generateSerial } = useApp()
   const { isAdmin, currentUser } = useAuth()
+  const mob = useIsMobile()
   const [tab, setTab] = useState('reimburse')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
@@ -111,6 +113,10 @@ export default function Finance() {
   const [editExp, setEditExp] = useState(null)
   const EMPTY_EXP = { date: '', direction: '支出', project: '', category: '', account: '', amount: '', vendor: '', method: '現金', receiptNo: '', note: '', linkedSerial: '' }
   const [newExp, setNewExp] = useState(EMPTY_EXP)
+  const [expDirFilter, setExpDirFilter] = useState('all')
+  const [expProjFilter, setExpProjFilter] = useState('all')
+  const [expCatFilter, setExpCatFilter] = useState('all')
+  const [showExpFilters, setShowExpFilters] = useState(false)
 
   // 薪資管理 state
   const now = new Date()
@@ -122,37 +128,57 @@ export default function Finance() {
   const [salaryEditEmp, setSalaryEditEmp] = useState(null)
   const [compLeaveForm, setCompLeaveForm] = useState({ empId: null, date: '', hours: 4, note: '' })
   const [salaryExpandedEmp, setSalaryExpandedEmp] = useState(null)
+  // 統編發票
+  const [showAddInv, setShowAddInv] = useState(false)
+  const [editInv, setEditInv] = useState(null)
+  const EMPTY_INV = { date: '', amount: '', issuer: '', purpose: '', note: '' }
+  const [newInv, setNewInv] = useState(EMPTY_INV)
+  const invoices = useMemo(() =>
+    (data.invoices || []).sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    [data.invoices])
 
-  const expFiltered = [...data.expenses]
-    .filter(e => !search || e.vendor?.includes(search) || e.project?.includes(search) || e.account?.includes(search))
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  const expProjects = useMemo(() => [...new Set(data.expenses.map(e => e.project).filter(Boolean))].sort(), [data.expenses])
+  const expCategories = useMemo(() => [...new Set(data.expenses.map(e => e.category).filter(Boolean))].sort(), [data.expenses])
+  const expFiltered = useMemo(() =>
+    [...data.expenses]
+      .filter(e => !search || e.vendor?.includes(search) || e.project?.includes(search) || e.account?.includes(search))
+      .filter(e => expDirFilter === 'all' || (e.direction || '支出') === expDirFilter)
+      .filter(e => expProjFilter === 'all' || e.project === expProjFilter)
+      .filter(e => expCatFilter === 'all' || e.category === expCatFilter)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    [data.expenses, search, expDirFilter, expProjFilter, expCatFilter])
 
-  const allVisibleReimbursements = (isAdmin
-    ? data.reimbursements
-    : data.reimbursements.filter(r => r.person === currentUser?.name)
-  ).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  const visibleReimbursements = allVisibleReimbursements.filter(r => r.status !== '已還款')
-  const paidReimbursements = allVisibleReimbursements.filter(r => r.status === '已還款')
+  const allVisibleReimbursements = useMemo(() =>
+    (isAdmin ? data.reimbursements : data.reimbursements.filter(r => r.person === currentUser?.name))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    [data.reimbursements, isAdmin, currentUser?.name])
+  const visibleReimbursements = useMemo(() => allVisibleReimbursements.filter(r => r.status !== '已還款'), [allVisibleReimbursements])
+  const paidReimbursements = useMemo(() => allVisibleReimbursements.filter(r => r.status === '已還款'), [allVisibleReimbursements])
 
-  const visiblePurchaseRequests = isAdmin
-    ? data.purchaseRequests
-    : data.purchaseRequests.filter(p => p.person === currentUser?.name)
+  const visiblePurchaseRequests = useMemo(() =>
+    isAdmin ? data.purchaseRequests : data.purchaseRequests.filter(p => p.person === currentUser?.name),
+    [data.purchaseRequests, isAdmin, currentUser?.name])
 
-  const filteredBankAccounts = (data.bankAccounts || [])
-    .filter(b => bankFilter === 'all' || b.type === bankFilter)
-    .sort((a, b) => {
-      if (bankSort === 'name') return (a.name || '').localeCompare(b.name || '', 'zh-TW')
-      return (a.bank || '').localeCompare(b.bank || '', 'zh-TW')
-    })
+  const filteredBankAccounts = useMemo(() =>
+    (data.bankAccounts || [])
+      .filter(b => bankFilter === 'all' || b.type === bankFilter)
+      .sort((a, b) => {
+        if (bankSort === 'name') return (a.name || '').localeCompare(b.name || '', 'zh-TW')
+        return (a.bank || '').localeCompare(b.bank || '', 'zh-TW')
+      }),
+    [data.bankAccounts, bankFilter, bankSort])
 
-  const payables = data.payables || []
-  const today = new Date().toISOString().split('T')[0]
-  const pendingPayables = payables.filter(p => p.status === '待付')
-  const paidPayables = payables.filter(p => p.status === '已付').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
-  const overduePayables = pendingPayables.filter(p => p.dueDate && p.dueDate < today)
-  const totalPending = pendingPayables.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+  const { payables, pendingPayables, paidPayables, overduePayables, totalPending } = useMemo(() => {
+    const payables = data.payables || []
+    const today = new Date().toISOString().split('T')[0]
+    const pendingPayables = payables.filter(p => p.status === '待付')
+    const paidPayables = payables.filter(p => p.status === '已付').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+    const overduePayables = pendingPayables.filter(p => p.dueDate && p.dueDate < today)
+    const totalPending = pendingPayables.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    return { payables, pendingPayables, paidPayables, overduePayables, totalPending }
+  }, [data.payables])
 
-  const ALL_TABS = [['reimburse','代墊申請'],['purchase','採購申請'],['payable','應付款項'],['expenses','帳目查詢'],['budget','預算總覽'],['bank','匯款帳戶'],['payroll','薪資管理']]
+  const ALL_TABS = [['reimburse','代墊申請'],['purchase','採購申請'],['payable','應付款項'],['invoice','統編發票'],['expenses','帳目查詢'],['budget','預算總覽'],['bank','匯款帳戶'],['payroll','薪資管理']]
   const TABS = isAdmin ? ALL_TABS : [['reimburse','代墊申請'],['purchase','採購申請'],['payroll','薪資管理']]
 
   function stChip(s) {
@@ -236,10 +262,18 @@ export default function Finance() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>財務管理</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>財務管理</h1>
+        {isAdmin && (
+          <button onClick={() => exportFinance(data)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '10px', border: '1px solid #d8cbb8', backgroundColor: '#fdfaf5', color: '#5a3a1a', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+            <Download size={14} /> 匯出 Excel
+          </button>
+        )}
+      </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {TABS.map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab === key), flexShrink: 0 }}>{label}</button>
         ))}
@@ -281,7 +315,7 @@ export default function Finance() {
                 </div>
                 {/* 各員工待還卡片 */}
                 {persons.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: mob ? 'repeat(auto-fill, minmax(130px, 1fr))' : 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
                     {persons.map(([person, stat]) => (
                       <div key={person} style={{ ...E.card, padding: '12px 16px', borderLeft: `3px solid ${E.coffee}` }}>
                         <div style={{ fontSize: '13px', fontWeight: '700', color: E.textPrimary, marginBottom: '6px' }}>{person}</div>
@@ -403,7 +437,6 @@ export default function Finance() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '14px', fontWeight: '600', color: E.textPrimary }}>{p.description || '採購申請'}</span>
                     <span style={stChip(p.status)}>{p.status}</span>
-                    {p.serialNo && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: '#e8f0e4', color: '#3a6d31', fontWeight: '600', letterSpacing: '0.5px' }}>{p.serialNo}</span>}
                   </div>
                   <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '4px' }}>{p.date} · {p.person} · {p.project}</div>
                   {p.updatedBy && <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '4px', fontStyle: 'italic' }}>最後編輯：{p.updatedBy} · {p.updatedAt}</div>}
@@ -513,7 +546,15 @@ export default function Finance() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary }}>{pay.vendor}</span>
-                      <span style={stChip('已付')}>已付</span>
+                      <button onClick={() => {
+                        const now = new Date().toISOString().slice(0,16).replace('T',' ')
+                        const who = currentUser?.name || currentUser?.username || '未知'
+                        updateItem('payables', pay.id, { status: '待付', updatedBy: who, updatedAt: now })
+                        logEdit({ user: who, action: '改回待付', entityType: '應付款項', entityName: pay.vendor, summary: `NT$${Number(pay.amount).toLocaleString()}` })
+                      }} style={{ ...stChip('已付'), cursor: 'pointer', border: 'none', transition: 'opacity 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+                        onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                        title="點擊改回待付">已付</button>
                     </div>
                     <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '4px' }}>
                       應付日：{pay.dueDate || '未設定'}
@@ -537,19 +578,178 @@ export default function Finance() {
         </div>
       )}
 
+      {/* 統編發票 */}
+      {tab === 'invoice' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* 統計 */}
+          <div style={{ ...E.card, display: 'flex', gap: '28px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>發票筆數</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: E.textPrimary }}>{invoices.length}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>總金額</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: '#c08a30' }}>
+                NT${invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0).toLocaleString()}
+              </div>
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <button onClick={() => { setNewInv(EMPTY_INV); setEditInv(null); setShowAddInv(true) }}
+                style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 16px', fontSize: '13px' }}>
+                <Plus size={14} /> 新增發票
+              </button>
+            </div>
+          </div>
+
+          {/* 說明 */}
+          <div style={{ fontSize: '12px', color: E.textMuted, backgroundColor: '#f8f2e8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #ede5d8' }}>
+            <Receipt size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} />
+            此區紀錄「非公司付款、但開立公司統編」的發票，用於報稅登記。
+          </div>
+
+          {/* 列表 */}
+          {invoices.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: E.textMuted, fontSize: '14px' }}>尚無發票紀錄</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {invoices.map(inv => (
+                <div key={inv.id} style={{ ...E.card, display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}
+                  onClick={() => { setEditInv(inv); setNewInv({ date: inv.date, amount: inv.amount, issuer: inv.issuer, purpose: inv.purpose, note: inv.note || '' }); setShowAddInv(true) }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#f5ecd8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Receipt size={18} style={{ color: '#c08a30' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: E.textPrimary }}>{inv.issuer || '未填'}</div>
+                    <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '2px' }}>{inv.purpose || '—'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#c08a30' }}>NT${Number(inv.amount || 0).toLocaleString()}</div>
+                    <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '2px' }}>{inv.date}</div>
+                  </div>
+                  {isAdmin && (
+                    <button onClick={e => { e.stopPropagation(); if (confirm('確定刪除此筆發票？')) deleteItem('invoices', inv.id) }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0a090', padding: '4px' }}>
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 新增/編輯 Modal */}
+          {showAddInv && (
+            <Modal title={editInv ? '編輯發票' : '新增統編發票'} onClose={() => { setShowAddInv(false); setEditInv(null) }} size="sm">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {[
+                  { label: '日期', key: 'date', type: 'date' },
+                  { label: '金額', key: 'amount', type: 'number', placeholder: '發票金額' },
+                  { label: '開票人 / 店家', key: 'issuer', type: 'text', placeholder: '例：全聯、統一超商' },
+                  { label: '用途', key: 'purpose', type: 'text', placeholder: '例：文具、交通、餐費' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label style={{ fontSize: '12px', color: '#7a6050', display: 'block', marginBottom: '4px' }}>{f.label}</label>
+                    <input type={f.type} value={newInv[f.key]} onChange={e => setNewInv(p => ({ ...p, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder || ''}
+                      style={{ ...E.input, boxSizing: 'border-box' }} />
+                  </div>
+                ))}
+                <div>
+                  <label style={{ fontSize: '12px', color: '#7a6050', display: 'block', marginBottom: '4px' }}>備註</label>
+                  <textarea value={newInv.note} onChange={e => setNewInv(p => ({ ...p, note: e.target.value }))}
+                    placeholder="選填"
+                    rows={2}
+                    style={{ ...E.input, resize: 'vertical', lineHeight: '1.5', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <button onClick={() => {
+                if (!newInv.date || !newInv.amount) return
+                if (editInv) {
+                  updateItem('invoices', editInv.id, { ...newInv, amount: Number(newInv.amount) })
+                } else {
+                  addItem('invoices', { ...newInv, id: Date.now(), amount: Number(newInv.amount) })
+                }
+                setShowAddInv(false); setEditInv(null); setNewInv(EMPTY_INV)
+              }} style={{ ...E.btnPrimary, width: '100%', marginTop: '14px', padding: '10px', fontSize: '14px', fontWeight: '600' }}>
+                {editInv ? '儲存' : '新增'}
+              </button>
+            </Modal>
+          )}
+        </div>
+      )}
+
       {/* 帳目查詢 */}
       {tab === 'expenses' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: mob ? 'wrap' : 'nowrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: mob ? '100%' : '180px' }}>
               <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: E.textMuted }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜尋廠商、專案、科目..."
                 style={{ ...E.input, paddingLeft: '36px' }} />
             </div>
+            <button onClick={() => setShowExpFilters(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', cursor: 'pointer',
+                backgroundColor: showExpFilters || expDirFilter !== 'all' || expProjFilter !== 'all' || expCatFilter !== 'all' ? E.sandLight : 'transparent',
+                border: `1px solid ${showExpFilters ? E.coffee : E.divider}`, color: showExpFilters ? E.coffee : E.textSecond }}>
+              <Filter size={14} />篩選
+              {(expDirFilter !== 'all' || expProjFilter !== 'all' || expCatFilter !== 'all') && (
+                <span style={{ fontSize: '10px', backgroundColor: E.coffee, color: '#fff', borderRadius: '999px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
+                  {[expDirFilter, expProjFilter, expCatFilter].filter(f => f !== 'all').length}
+                </span>
+              )}
+            </button>
             <button onClick={() => setShowAddExp(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <Plus size={15} />新增帳目
             </button>
           </div>
+          {showExpFilters && (
+            <div style={{ ...E.card, padding: mob ? '12px' : '14px 18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: E.textSecond }}>篩選條件</span>
+                {(expDirFilter !== 'all' || expProjFilter !== 'all' || expCatFilter !== 'all') && (
+                  <button onClick={() => { setExpDirFilter('all'); setExpProjFilter('all'); setExpCatFilter('all') }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: E.coffee, padding: 0 }}>
+                    清除全部
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: mob ? '8px' : '14px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: mob ? '100%' : '140px' }}>
+                  <span style={{ fontSize: '11px', color: E.textMuted }}>收支類型</span>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {['all','支出','收入','稅抵用'].map(d => (
+                      <button key={d} onClick={() => setExpDirFilter(d)}
+                        style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '999px', border: `1px solid ${expDirFilter === d ? E.coffee : E.divider}`,
+                          backgroundColor: expDirFilter === d ? E.coffee : 'transparent', color: expDirFilter === d ? '#fff' : E.textSecond,
+                          cursor: 'pointer', fontWeight: expDirFilter === d ? '600' : '400' }}>
+                        {d === 'all' ? '全部' : d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: mob ? '100%' : '160px' }}>
+                  <span style={{ fontSize: '11px', color: E.textMuted }}>專案</span>
+                  <select value={expProjFilter} onChange={e => setExpProjFilter(e.target.value)}
+                    style={{ ...E.input, fontSize: '12px', padding: '5px 10px' }}>
+                    <option value="all">全部專案</option>
+                    {expProjects.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: mob ? '100%' : '140px' }}>
+                  <span style={{ fontSize: '11px', color: E.textMuted }}>類別</span>
+                  <select value={expCatFilter} onChange={e => setExpCatFilter(e.target.value)}
+                    style={{ ...E.input, fontSize: '12px', padding: '5px 10px' }}>
+                    <option value="all">全部類別</option>
+                    {expCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ fontSize: '11px', color: E.textMuted }}>
+                共 {expFiltered.length} 筆結果
+                {expFiltered.length > 0 && <>　·　合計 <span style={{ fontWeight: '600', color: E.coffee }}>NT${expFiltered.reduce((s, e) => s + ((e.direction === '收入' ? 1 : -1) * (Number(e.amount) || 0)), 0).toLocaleString()}</span></>}
+              </div>
+            </div>
+          )}
           <div style={{ ...E.card, padding: 0, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -853,7 +1053,7 @@ export default function Finance() {
           </div>
 
           {/* 帳戶卡片 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
             {filteredBankAccounts.length === 0
               ? <div style={{ ...E.card, textAlign: 'center', color: E.textMuted, fontSize: '13px', padding: '32px', gridColumn: '1/-1' }}>無符合條件的帳戶</div>
               : filteredBankAccounts.map(b => (
@@ -935,7 +1135,7 @@ export default function Finance() {
               </select>
             </div>
           </div>
-          <button onClick={() => { if (!newP.date||!newP.person||!newP.amount) return; addItem('purchaseRequests',{id:Date.now(),...newP,amount:Number(newP.amount),serialNo:generateSerial()}); setNewP({date:'',person:'',project:'',amount:'',description:'',status:'待審核'}); setShowAdd(false) }}
+          <button onClick={() => { if (!newP.date||!newP.person||!newP.amount) return; addItem('purchaseRequests',{id:Date.now(),...newP,amount:Number(newP.amount)}); setNewP({date:'',person:'',project:'',amount:'',description:'',status:'待審核'}); setShowAdd(false) }}
             style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>送出申請</button>
         </Modal>
       )}
@@ -948,7 +1148,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>廠商 / 收款方 *</label>
               <input value={newPayable.vendor} onChange={e => setNewPayable(p => ({ ...p, vendor: e.target.value }))} placeholder="廠商名稱" style={E.input} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>金額 *</label>
                 <input type="number" value={newPayable.amount} onChange={e => setNewPayable(p => ({ ...p, amount: e.target.value }))} placeholder="0" style={E.input} />
@@ -1091,7 +1291,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>廠商 / 收款方</label>
               <input value={editPayable.vendor ?? ''} onChange={e => setEditPayable(p => ({ ...p, vendor: e.target.value }))} style={E.input} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>金額</label>
                 <input type="number" value={editPayable.amount ?? ''} onChange={e => setEditPayable(p => ({ ...p, amount: e.target.value }))} style={E.input} />
@@ -1342,7 +1542,7 @@ export default function Finance() {
                   <div style={{ marginTop:'16px', borderTop:`1px solid ${E.divider}`, paddingTop:'16px', display:'flex', flexDirection:'column', gap:'14px' }}>
                     <div>
                       <div style={{ fontSize:'11px', fontWeight:'700', color:E.textSecond, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>工時</div>
-                      <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'8px' }}>
+                      <div style={{ display:'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(2, 1fr)', gap:'8px' }}>
                         {[['應上時數', govtHrs > 0 ? `${govtHrs}h` : '—'],['打卡時數',`${clockHrs}h`],['本月轉補休',`+${earnedThisMonth}h`],['補休餘額',`${balance}h`]].map(([label, value]) => (
                           <div key={label} style={{ backgroundColor:E.sandLight, borderRadius:'8px', padding:'10px 12px' }}>
                             <div style={{ fontSize:'11px', color:E.textMuted }}>{label}</div>
@@ -1616,7 +1816,7 @@ export default function Finance() {
                   <span style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary }}>{sl.empName}</span>
                   <span style={{ fontSize:'13px', color:E.textMuted }}>{sl.payType === 'hourly' ? `${sl.hoursWorked}h 時薪制` : '月薪制'}</span>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+                <div style={{ display:'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap:'8px' }}>
                   {[
                     ['底薪', 'baseSalary', true],
                     ['伙食津貼', 'mealAllowance', false],
@@ -1714,7 +1914,7 @@ export default function Finance() {
       {showAddExp && (
         <Modal title="新增帳目" onClose={() => { setShowAddExp(false); setNewExp(EMPTY_EXP) }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>交易日期 *</label>
                 <input type="date" value={newExp.date} onChange={e => setNewExp(p => ({ ...p, date: e.target.value }))} style={E.input} />
@@ -1732,7 +1932,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>廠商／受款人 *</label>
               <input value={newExp.vendor} onChange={e => setNewExp(p => ({ ...p, vendor: e.target.value }))} placeholder="廠商或受款人名稱" style={E.input} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>金額 *</label>
                 <input type="number" value={newExp.amount} onChange={e => setNewExp(p => ({ ...p, amount: e.target.value }))} placeholder="0" style={E.input} />
@@ -1751,7 +1951,7 @@ export default function Finance() {
                 {data.projects.map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
               </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案支出類別</label>
                 <input value={newExp.category} onChange={e => setNewExp(p => ({ ...p, category: e.target.value }))} placeholder="如：印刷、活動執行、餐費…" style={E.input} />
@@ -1805,7 +2005,7 @@ export default function Finance() {
       {editExp && (
         <Modal title="編輯帳目" onClose={() => setEditExp(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>交易日期 *</label>
                 <input type="date" value={editExp.date} onChange={e => setEditExp(p => ({ ...p, date: e.target.value }))} style={E.input} />
@@ -1823,7 +2023,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>廠商／受款人 *</label>
               <input value={editExp.vendor} onChange={e => setEditExp(p => ({ ...p, vendor: e.target.value }))} placeholder="廠商或受款人名稱" style={E.input} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>金額 *</label>
                 <input type="number" value={editExp.amount} onChange={e => setEditExp(p => ({ ...p, amount: e.target.value }))} placeholder="0" style={E.input} />
@@ -1842,7 +2042,7 @@ export default function Finance() {
                 {data.projects.map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
               </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案支出類別</label>
                 <input value={editExp.category || ''} onChange={e => setEditExp(p => ({ ...p, category: e.target.value }))} placeholder="如：印刷、活動執行、餐費…" style={E.input} />

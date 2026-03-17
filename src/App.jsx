@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AppProvider } from './context/AppContext'
+import { AppProvider, useApp } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -15,6 +15,31 @@ import History from './pages/History'
 import Announcements from './pages/Announcements'
 import Documents from './pages/Documents'
 import Import from './pages/Import'
+
+// Loading 畫面
+function LoadingScreen() {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: '100vh', background: '#f5f0eb', color: '#5c4b3a', fontFamily: 'sans-serif',
+    }}>
+      <div style={{
+        width: 40, height: 40, border: '4px solid #d4c5b0', borderTopColor: '#8b7355',
+        borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+      }} />
+      <p style={{ marginTop: 16, fontSize: 15 }}>載入資料中...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
+}
+
+// 等待資料載入完成
+function WaitForData({ children }) {
+  const { loading } = useApp()
+  const { authLoading } = useAuth()
+  if (loading || authLoading) return <LoadingScreen />
+  return children
+}
 
 // 已登入才能進入的頁面
 function RequireAuth({ children }) {
@@ -43,38 +68,40 @@ export default function App() {
     <BrowserRouter>
       <AppProvider>
         <AuthProvider>
-          <Routes>
-            {/* 登入頁 */}
-            <Route path="/login" element={<LoginPage />} />
+          <WaitForData>
+            <Routes>
+              {/* 登入頁 */}
+              <Route path="/login" element={<LoginPage />} />
 
-            {/* 員工打卡 — 不需登入（kiosk 模式） */}
-            <Route path="/checkin" element={<Checkin />} />
+              {/* 員工打卡 — 不需登入（kiosk 模式） */}
+              <Route path="/checkin" element={<Checkin />} />
 
-            {/* 打卡後台 — 需要管理員登入 */}
-            <Route path="/checkin-admin" element={
-              <RequireAdmin><CheckinAdmin /></RequireAdmin>
-            } />
+              {/* 打卡後台 — 需要管理員登入 */}
+              <Route path="/checkin-admin" element={
+                <RequireAdmin><CheckinAdmin /></RequireAdmin>
+              } />
 
-            {/* 主系統 — 需要登入 */}
-            <Route path="*" element={
-              <RequireAuth>
-                <Layout>
-                  <Routes>
-                    <Route path="/"             element={<Dashboard />} />
-                    <Route path="/projects"     element={<Projects />} />
-                    <Route path="/design"       element={<Design />} />
-                    <Route path="/finance"      element={<Finance />} />
-                    <Route path="/hr"           element={<HR />} />
-                    <Route path="/assets"       element={<Assets />} />
-                    <Route path="/history"       element={<History />} />
-                    <Route path="/announcements" element={<Announcements />} />
-                    <Route path="/documents"    element={<Documents />} />
-                    <Route path="/import"       element={<Import />} />
-                  </Routes>
-                </Layout>
-              </RequireAuth>
-            } />
-          </Routes>
+              {/* 主系統 — 需要登入 */}
+              <Route path="*" element={
+                <RequireAuth>
+                  <Layout>
+                    <Routes>
+                      <Route path="/"             element={<Dashboard />} />
+                      <Route path="/projects"     element={<Projects />} />
+                      <Route path="/design"       element={<Design />} />
+                      <Route path="/finance"      element={<Finance />} />
+                      <Route path="/hr"           element={<HR />} />
+                      <Route path="/assets"       element={<Assets />} />
+                      <Route path="/history"       element={<History />} />
+                      <Route path="/announcements" element={<Announcements />} />
+                      <Route path="/documents"    element={<Documents />} />
+                      <Route path="/import"       element={<Import />} />
+                    </Routes>
+                  </Layout>
+                </RequireAuth>
+              } />
+            </Routes>
+          </WaitForData>
         </AuthProvider>
       </AppProvider>
     </BrowserRouter>

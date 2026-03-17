@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { Plus, Trash2, Edit3, Check, X, Lock, LogOut } from 'lucide-react'
+import { useIsMobile } from '../styles/earth'
 import logo from '../assets/logo.jpeg'
 
 const ADMIN_PASSWORD = 'admin1234'
@@ -33,6 +34,7 @@ const BTN_SM = (variant) => ({
 
 export default function CheckinAdmin() {
   const { data, addItem, updateItem, deleteItem } = useApp()
+  const mob = useIsMobile()
   const [authed, setAuthed]   = useState(false)
   const [pw, setPw]           = useState('')
   const [pwErr, setPwErr]     = useState(false)
@@ -109,7 +111,7 @@ export default function CheckinAdmin() {
       <div style={{ maxWidth: '960px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
         {/* 標題列 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           <img src={logo} alt="深活共構" style={{ height: '38px', filter: 'invert(1)', mixBlendMode: 'screen' }} />
           <div style={{ flex: 1 }}>
             <div style={{ color: '#c8b88a', fontSize: '17px', fontWeight: '700' }}>打卡後台管理</div>
@@ -124,7 +126,7 @@ export default function CheckinAdmin() {
         </div>
 
         {/* 篩選列 + 補登按鈕 */}
-        <div style={{ backgroundColor: '#fdfaf5', borderRadius: '14px', padding: '14px 18px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.22)' }}>
+        <div style={{ backgroundColor: '#fdfaf5', borderRadius: '14px', padding: mob ? '12px 14px' : '14px 18px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.22)' }}>
           <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)} style={INPUT}>
             <option value="">全部員工</option>
             {data.employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}

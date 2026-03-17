@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
+import { useIsMobile } from '../styles/earth'
 import logo from '../assets/logo.jpeg'
 
 const PUNCH_TYPES = [
@@ -11,6 +12,7 @@ const PUNCH_TYPES = [
 
 export default function Checkin() {
   const { data, addItem } = useApp()
+  const mob = useIsMobile()
   const [selectedEmp, setSelectedEmp] = useState('')
   const [now, setNow] = useState(new Date())
   const [lastPunch, setLastPunch] = useState(null)
@@ -89,7 +91,7 @@ export default function Checkin() {
         {selectedEmp && (
           <>
             <div style={{ fontSize: '12px', color: '#7a6050', fontWeight: '600' }}>選擇打卡類型</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               {PUNCH_TYPES.map(({ type, emoji, color, bg, desc }) => (
                 <button key={type} onClick={() => handlePunch(type)} style={{
                   backgroundColor: bg, border: `2px solid ${color}20`,

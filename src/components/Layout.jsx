@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History, MessageSquarePlus, Bug, Lightbulb, HelpCircle, Send } from 'lucide-react'
 import logo from '../assets/logo.jpeg'
 import { useAuth } from '../context/AuthContext'
+import { useApp } from '../context/AppContext'
 
 const NAV_MAIN = [
   { to: '/',         icon: LayoutDashboard, label: '儀表板' },
@@ -15,8 +16,6 @@ const NAV_MAIN = [
 
 const NAV_EXPAND = [
   { to: '/history',       icon: History,        label: '歷年紀錄' },
-  { to: '/announcements', icon: Megaphone,      label: '公告欄' },
-  { to: '/documents',     icon: FolderOpen,     label: '文件庫' },
 ]
 
 const NAV_SYSTEM = [
@@ -56,11 +55,41 @@ function NavItem({ to, icon: Icon, label, end, size = 16, fontSize = '14px', fon
   )
 }
 
+const FB_TYPES = [
+  { value: 'Bug', label: 'Bug 回報', icon: Bug, color: '#c04030' },
+  { value: '建議', label: '功能建議', icon: Lightbulb, color: '#c08a30' },
+  { value: '其他', label: '其他', icon: HelpCircle, color: '#7a8a6a' },
+]
+
 export default function Layout({ children }) {
   const [open, setOpen]           = useState(false)
   const [expandOpen, setExpandOpen] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [fbType, setFbType] = useState('Bug')
+  const [fbMsg, setFbMsg] = useState('')
+  const [fbSent, setFbSent] = useState(false)
   const { currentUser, isAdmin, logout } = useAuth()
+  const { addItem } = useApp()
   const navigate = useNavigate()
+
+  function handleFeedbackSubmit() {
+    if (!fbMsg.trim()) return
+    const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    addItem('feedbacks', {
+      id: Date.now(),
+      type: fbType,
+      message: fbMsg.trim(),
+      reporter: currentUser?.name || currentUser?.username || '未知',
+      createdAt: now,
+    })
+    setFbSent(true)
+    setTimeout(() => {
+      setShowFeedback(false)
+      setFbMsg('')
+      setFbType('Bug')
+      setFbSent(false)
+    }, 1200)
+  }
 
   function handleLogout() {
     logout()
@@ -151,6 +180,22 @@ export default function Layout({ children }) {
           )}
         </nav>
 
+        {/* 回報問題按鈕 */}
+        <div style={{ padding: '0 14px 4px' }}>
+          <button onClick={() => setShowFeedback(true)} style={{
+            display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+            padding: '8px 10px', borderRadius: '8px', border: `1px solid rgba(200,184,138,0.15)`,
+            backgroundColor: 'rgba(200,184,138,0.06)', cursor: 'pointer',
+            fontSize: '12px', color: 'rgba(200,184,138,0.55)', fontWeight: '500',
+            transition: 'all 0.15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(200,184,138,0.12)'; e.currentTarget.style.color = 'rgba(200,184,138,0.8)' }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(200,184,138,0.06)'; e.currentTarget.style.color = 'rgba(200,184,138,0.55)' }}>
+            <MessageSquarePlus size={14} />
+            回報問題 / 建議
+          </button>
+        </div>
+
         {/* 底部：使用者資訊 + 登出 */}
         <div style={{ borderTop: `1px solid ${C.sidebarBorder}`, padding: '12px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -198,6 +243,88 @@ export default function Layout({ children }) {
           {children}
         </main>
       </div>
+
+      {/* 回報 Modal */}
+      {showFeedback && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={() => { setShowFeedback(false); setFbSent(false) }} style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+          <div style={{
+            position: 'relative', backgroundColor: '#fdfaf5', borderRadius: '16px',
+            padding: '28px', width: '400px', maxWidth: '92vw',
+            boxShadow: '0 20px 60px rgba(60,30,0,0.25)',
+          }}>
+            {fbSent ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <div style={{ fontSize: '36px', marginBottom: '12px' }}>&#10003;</div>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#3a6d31' }}>感謝你的回報！</div>
+                <div style={{ fontSize: '12px', color: '#8a7a6a', marginTop: '6px' }}>我們會盡快處理</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                  <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#3e2e1e', margin: 0 }}>回報問題 / 建議</h2>
+                  <button onClick={() => setShowFeedback(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b0a090', fontSize: '18px', padding: '2px' }}>✕</button>
+                </div>
+
+                {/* 類型選擇 */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                  {FB_TYPES.map(ft => {
+                    const Icon = ft.icon
+                    const active = fbType === ft.value
+                    return (
+                      <button key={ft.value} onClick={() => setFbType(ft.value)} style={{
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                        padding: '10px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                        border: active ? `2px solid ${ft.color}` : '2px solid #ede5d8',
+                        backgroundColor: active ? `${ft.color}12` : '#fff',
+                        color: active ? ft.color : '#8a7a6a',
+                      }}>
+                        <Icon size={14} />
+                        {ft.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* 描述 */}
+                <textarea
+                  value={fbMsg}
+                  onChange={e => setFbMsg(e.target.value)}
+                  placeholder="請描述你遇到的問題或建議..."
+                  rows={4}
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: '10px',
+                    border: '1.5px solid #ede5d8', backgroundColor: '#fff',
+                    fontSize: '13px', color: '#3e2e1e', resize: 'vertical',
+                    outline: 'none', fontFamily: 'inherit', lineHeight: 1.6,
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = '#c8b88a'}
+                  onBlur={e => e.currentTarget.style.borderColor = '#ede5d8'}
+                />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px' }}>
+                  <span style={{ fontSize: '11px', color: '#b0a090' }}>
+                    回報人：{currentUser?.name || currentUser?.username}
+                  </span>
+                  <button onClick={handleFeedbackSubmit} disabled={!fbMsg.trim()} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '9px 20px', borderRadius: '10px', border: 'none',
+                    fontSize: '13px', fontWeight: '600', cursor: fbMsg.trim() ? 'pointer' : 'not-allowed',
+                    backgroundColor: fbMsg.trim() ? '#3a6d31' : '#d8d0c4',
+                    color: fbMsg.trim() ? '#f2f7f0' : '#a09888',
+                    transition: 'all 0.15s',
+                  }}>
+                    <Send size={13} />
+                    送出
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

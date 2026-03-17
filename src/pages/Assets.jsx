@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { Plus, Trash2, Package, ArrowUpRight, ArrowDownLeft, Pencil } from 'lucide-react'
 import Modal from '../components/Modal'
-import { E, STATUS } from '../styles/earth'
+import { E, STATUS, useIsMobile } from '../styles/earth'
 
 const CATEGORIES = ['3C','攝影器材','辦公家具','交通工具','活動器材','其他']
 
@@ -16,6 +16,7 @@ export default function Assets() {
   const [editAsset, setEditAsset] = useState(null)
   const [newAsset, setNewAsset] = useState({ name: '', category: '3C', quantity: 1, purchaseDate: '', status: '正常', note: '', location: '' })
   const [newLoan, setNewLoan] = useState({ borrower: '', purpose: '', expectedReturn: '' })
+  const mob = useIsMobile()
 
   function addAsset() {
     if (!newAsset.name.trim()) return
@@ -46,14 +47,14 @@ export default function Assets() {
         <button onClick={() => setShowAdd(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={15} />新增財產</button>
       </div>
 
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}` }}>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {[['list','財產清單'],['loans','借出記錄']].map(([key,label]) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab===key), flex: 1 }}>{label}</button>
         ))}
       </div>
 
       {tab === 'list' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
           {data.assets.length === 0 && (
             <div style={{ ...E.card, textAlign: 'center', color: E.textMuted, fontSize: '13px', padding: '32px', gridColumn: '1/-1' }}>尚無財產記錄</div>
           )}
@@ -125,7 +126,7 @@ export default function Assets() {
         <Modal title="新增公司財產" onClose={() => setShowAdd(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <input value={newAsset.name} onChange={e => setNewAsset(p => ({ ...p, name: e.target.value }))} placeholder="財產名稱 *" style={E.input} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>類別</label>
                 <select value={newAsset.category} onChange={e => setNewAsset(p => ({ ...p, category: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
@@ -166,7 +167,7 @@ export default function Assets() {
         <Modal title="編輯財產資訊" onClose={() => setEditAsset(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <input value={editAsset.name} onChange={e => setEditAsset(p => ({ ...p, name: e.target.value }))} placeholder="財產名稱 *" style={E.input} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>類別</label>
                 <select value={editAsset.category} onChange={e => setEditAsset(p => ({ ...p, category: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>

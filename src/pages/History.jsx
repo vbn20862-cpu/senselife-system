@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { ChevronLeft, ChevronRight, Archive } from 'lucide-react'
-import { E, STATUS } from '../styles/earth'
+import { E, STATUS, useIsMobile } from '../styles/earth'
 
 const CHART_COLORS = ['#4d8843','#5b7ec9','#c89040','#8a5cb0','#c04030','#3a9080','#b06030','#607060']
 
@@ -34,6 +34,7 @@ function stChip(s) {
 
 export default function HistoryPage() {
   const { data } = useApp()
+  const mob = useIsMobile()
   const [selected, setSelected] = useState(null)
 
   // 取得所有結案案件
@@ -63,7 +64,10 @@ export default function HistoryPage() {
               const exps = data.expenses.filter(e => e.project === p.id)
               const spent = exps.reduce((s, e) => s + (e.amount || 0), 0)
               const reimbs = data.reimbursements.filter(r => r.project === p.id)
-              const tasks = data.designTasks.filter(t => t.project === p.id)
+              const tasks = (data.subTasks || []).filter(t => {
+                const wi = (data.workItems || []).find(w => w.id === t.workItemId)
+                return wi && wi.projectId === p.id
+              })
               const pct = p.budget > 0 ? Math.min((spent / p.budget) * 100, 100) : 0
 
               return (
@@ -130,7 +134,10 @@ export default function HistoryPage() {
   const spent = exps.reduce((s, e) => s + (e.amount || 0), 0)
   const pct = p.budget > 0 ? Math.min((spent / p.budget) * 100, 100) : 0
   const reimbs = data.reimbursements.filter(r => r.project === p.id)
-  const tasks = data.designTasks.filter(t => t.project === p.id)
+  const tasks = (data.subTasks || []).filter(t => {
+                const wi = (data.workItems || []).find(w => w.id === t.workItemId)
+                return wi && wi.projectId === p.id
+              })
 
   // 依類別分組
   const byCategory = {}

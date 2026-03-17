@@ -1,7 +1,8 @@
-import { E } from '../styles/earth'
+import { E, useIsMobile } from '../styles/earth'
 import { FolderOpen } from 'lucide-react'
 
 export default function Documents() {
+  const mob = useIsMobile()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

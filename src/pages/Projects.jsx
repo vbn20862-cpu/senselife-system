@@ -1,19 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
-import { Plus, ArrowLeft, Trash2, FileText, ExternalLink, Pencil } from 'lucide-react'
+import { Plus, ArrowLeft, Trash2, ExternalLink, Pencil, Search, ChevronDown, ChevronUp, X } from 'lucide-react'
 import Modal from '../components/Modal'
-import { E, STATUS } from '../styles/earth'
+import { E, STATUS, useIsMobile } from '../styles/earth'
 
 /* ══════════ 常數 ══════════ */
-const STATUS_OPTIONS  = ['企劃中', '執行中', '結案', '長期', '暫停', '提案中']
+const STATUS_OPTIONS  = ['執行中', '結案', '長期', '暫停']
 const TASK_STATUS     = ['待開始', '進行中', '完成', '暫停']
 const TASK_TYPES      = ['設計', '行銷', '行政', '採購', '活動']
 const PRIORITIES      = ['高', '中', '低']
 const HEALTH_OPTS     = ['正常', '延遲', '危險']
-const DEFAULT_PHASES  = ['開案', '執行', '結案']
 const COLORS          = ['#4d8843', '#8f5b38', '#c89a62', '#5a7a9a', '#8a5890', '#c04040', '#3a8a7a', '#8a8030']
 const DEFAULT_TYPES   = ['展覽', '活動', '教育', '市集', '行銷', '其他']
+const DEFAULT_MILESTONES = ['簽約', '提企劃', '送審', '執行', '期中報告', '驗收', '結案']
 
 const TYPE_COLORS = {
   '展覽': '#4d8843', '活動': '#c89a62', '教育': '#5a7a9a',
@@ -37,6 +38,8 @@ const HEALTH_STYLE = {
 }
 const PRIORITY_ORDER = { '高': 0, '中': 1, '低': 2 }
 
+const STATUS_FILTERS = ['全部', '執行中', '結案', '長期', '暫停']
+
 function statusChip(status) {
   const s = STATUS[status] || { bg: '#eee', color: '#666' }
   return { display: 'inline-block', padding: '2px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: '600', backgroundColor: s.bg, color: s.color }
@@ -51,17 +54,24 @@ function getBudgetWarning(pct) {
   return { emoji: '🟢', color: '#3a6d31', barColor: '#4d8843' }
 }
 
+function createDefaultMilestones() {
+  return DEFAULT_MILESTONES.map((name, index) => ({
+    id: Date.now() + index,
+    name,
+    date: '',
+    done: false,
+  }))
+}
+
 /* ══════════ 列表卡片 ══════════ */
 function ProjectCard({ project, onClick }) {
   const { data } = useApp()
-  const spent = data.expenses.filter(e => e.project === project.id && e.direction !== '稅抵用').reduce((s, e) => s + (e.amount || 0), 0)
-  const cA = Number(project.contractAmount) || 0
-  const dA = Number(project.deductionAmount) || 0
-  const effectiveBudget = cA > 0 ? cA - dA : Number(project.budget) || 0
-  const pct = effectiveBudget > 0 ? Math.min((spent / effectiveBudget) * 100, 100) : 0
-  const taskCount = (data.workItems || []).filter(w => w.projectId === project.id).length
+  const items = (data.workItems || []).filter(w => w.projectId === project.id)
+  const doneCount = items.filter(w => w.status === '完成').length
+  const totalCount = items.length
+  const completionPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : -1
+  const taskCount = totalCount
   const dl = daysLeft(project.deadline)
-  const bw = getBudgetWarning(pct)
   const health = project.health
   const hs = health ? HEALTH_STYLE[health] : null
   const dotColor = TYPE_COLORS[project.type] || project.color
@@ -92,20 +102,22 @@ function ProjectCard({ project, onClick }) {
         </div>
       </div>
 
-      {effectiveBudget > 0 && (
-        <div style={{ marginTop: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '5px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: E.textPrimary }}>NT${spent.toLocaleString()}</span>
-            <span style={{ fontSize: '11px', color: E.textMuted }}>
-              / NT${effectiveBudget.toLocaleString()}
-              <span style={{ marginLeft: '4px', fontWeight: '700', color: bw.color }}>{bw.emoji} {pct.toFixed(1)}%</span>
-            </span>
+      {/* Completion percentage */}
+      <div style={{ marginTop: '12px' }}>
+        {completionPct >= 0 ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '11px', color: E.textSecond }}>完成度</span>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: completionPct === 100 ? E.green : E.textPrimary }}>{completionPct}%</span>
+            </div>
+            <div style={{ height: '4px', backgroundColor: '#ede5d8', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: '999px', backgroundColor: completionPct === 100 ? E.green : '#c89a62', width: `${completionPct}%`, transition: 'width 0.3s' }} />
+            </div>
           </div>
-          <div style={{ height: '5px', backgroundColor: '#ede5d8', borderRadius: '999px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: '999px', backgroundColor: bw.barColor, width: `${pct}%` }} />
-          </div>
-        </div>
-      )}
+        ) : (
+          <div style={{ fontSize: '11px', color: E.textMuted }}>尚無工項</div>
+        )}
+      </div>
 
       <div style={{ display: 'flex', gap: '12px', marginTop: '10px', fontSize: '11px', flexWrap: 'wrap' }}>
         {dl !== null && (
@@ -120,10 +132,11 @@ function ProjectCard({ project, onClick }) {
 }
 
 /* ══════════ 案件詳細 ══════════ */
-function ProjectDetail({ project, onBack }) {
+function ProjectDetail({ project, onBack, initialTab }) {
   const { data, updateItem, deleteItem, addItem, update } = useApp()
   const { currentUser } = useAuth()
-  const [tab, setTab] = useState('tasks')
+  const mob = useIsMobile()
+  const [tab, setTab] = useState(initialTab || 'tasks')
 
   // 編輯 Modal
   const [showEditModal, setShowEditModal] = useState(false)
@@ -137,31 +150,39 @@ function ProjectDetail({ project, onBack }) {
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [editTaskVals, setEditTaskVals]   = useState({})
 
-  // Checklist
-  const [activePhase, setActivePhase]   = useState(0)
-  const [newCheckItem, setNewCheckItem] = useState('')
-
-  // 文件
-  const [newDoc, setNewDoc]           = useState({ title: '', url: '' })
-  const [showDocForm, setShowDocForm] = useState(false)
-
-  // 會議記錄
-  const [newMeeting, setNewMeeting]             = useState({ date: '', summary: '', decisions: '' })
-  const [showMeetingForm, setShowMeetingForm]   = useState(false)
+  // 案件流程 - milestone date editing
+  const [editingMilestoneDate, setEditingMilestoneDate] = useState(null)
+  const [newMilestoneName, setNewMilestoneName] = useState('')
+  const [showAddMilestone, setShowAddMilestone] = useState(false)
+  const [editingMilestoneName, setEditingMilestoneName] = useState(null)
+  const [editMilestoneNameVal, setEditMilestoneNameVal] = useState('')
 
   /* ── 計算 ── */
   const projectTypes  = data.projectTypes || DEFAULT_TYPES
-  const phases        = project.checklistPhases || DEFAULT_PHASES
-  const workItems     = (data.workItems || [])
-    .filter(w => w.projectId === project.id)
-    .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3))
-  const allChecklists = data.projectDocs.filter(d => d.type === 'checklist' && d.project === project.id)
-  const phaseItems    = phases.map((_, i) => allChecklists.filter(d => (d.phase ?? 0) === i))
-  const phasePcts     = phaseItems.map(items => items.length === 0 ? 0 : Math.round(items.filter(i => i.done).length / items.length * 100))
-  const docs          = data.projectDocs.filter(d => d.type === 'doc'       && d.project === project.id)
-  const meetings      = data.meetings.filter(m => m.project === project.id)
+  const milestones    = project.milestones || []
 
-  const spent          = data.expenses.filter(e => e.project === project.id && e.direction !== '稅抵用').reduce((s, e) => s + (e.amount || 0), 0)
+  // 舊案件自動初始化預設流程節點
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!project.milestones || project.milestones.length === 0) {
+        updateItem('projects', project.id, { milestones: createDefaultMilestones() })
+      }
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [project.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const workItems = useMemo(() =>
+    (data.workItems || [])
+      .filter(w => w.projectId === project.id)
+      .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3)),
+    [data.workItems, project.id])
+
+  const doneWorkItems = workItems.filter(w => w.status === '完成').length
+  const completionPct = workItems.length > 0 ? ((doneWorkItems / workItems.length) * 100).toFixed(1) : 0
+
+  const spent = useMemo(() =>
+    data.expenses.filter(e => e.project === project.id && e.direction !== '稅抵用').reduce((s, e) => s + (e.amount || 0), 0),
+    [data.expenses, project.id])
   const cA             = Number(project.contractAmount) || 0
   const dA             = Number(project.deductionAmount) || 0
   const effectiveBudget = cA > 0 ? cA - dA : Number(project.budget) || 0
@@ -185,10 +206,10 @@ function ProjectDetail({ project, onBack }) {
       deadline:         project.deadline || '',
       note:             project.note || '',
       color:            project.color,
-      checklistPhases:  project.checklistPhases ? [...project.checklistPhases] : [...DEFAULT_PHASES],
       contractAmount:   project.contractAmount || '',
       deductionAmount:  project.deductionAmount || '',
       budget:           project.budget || '',
+      driveUrl:         project.driveUrl || '',
     })
     setShowEditModal(true)
   }
@@ -206,10 +227,10 @@ function ProjectDetail({ project, onBack }) {
       deadline:         editForm.deadline,
       note:             editForm.note,
       color:            autoColor,
-      checklistPhases:  editForm.checklistPhases,
       contractAmount:   Number(editForm.contractAmount) || 0,
       deductionAmount:  Number(editForm.deductionAmount) || 0,
       budget:           Number(editForm.budget) || 0,
+      driveUrl:         editForm.driveUrl || '',
       updatedBy:        currentUser?.name || currentUser?.username || '未知',
       updatedAt:        now,
     })
@@ -225,12 +246,44 @@ function ProjectDetail({ project, onBack }) {
     setShowAddType(false)
   }
 
+  /* ── Milestone 函式 ── */
+  function toggleMilestone(msId) {
+    const updated = milestones.map(m => m.id === msId ? { ...m, done: !m.done } : m)
+    updateItem('projects', project.id, { milestones: updated })
+  }
+
+  function setMilestoneDate(msId, date) {
+    const updated = milestones.map(m => m.id === msId ? { ...m, date } : m)
+    updateItem('projects', project.id, { milestones: updated })
+    setEditingMilestoneDate(null)
+  }
+
+  function deleteMilestone(msId) {
+    const updated = milestones.filter(m => m.id !== msId)
+    updateItem('projects', project.id, { milestones: updated })
+  }
+
+  function addMilestone() {
+    if (!newMilestoneName.trim()) return
+    const updated = [...milestones, { id: Date.now(), name: newMilestoneName.trim(), date: '', done: false }]
+    updateItem('projects', project.id, { milestones: updated })
+    setNewMilestoneName('')
+    setShowAddMilestone(false)
+  }
+
+  function renameMilestone(msId, newName) {
+    const updated = milestones.map(m => m.id === msId ? { ...m, name: newName } : m)
+    updateItem('projects', project.id, { milestones: updated })
+    setEditingMilestoneName(null)
+  }
+
   const TABS = [
-    { key: 'tasks',     label: '工項',      count: workItems.length },
-    { key: 'checklist', label: 'Checklist', count: allChecklists.length },
-    { key: 'docs',      label: '文件',      count: docs.length },
-    { key: 'meetings',  label: '會議記錄',  count: meetings.length },
+    { key: 'tasks', label: '工項', count: workItems.length },
+    { key: 'flow',  label: '案件流程', count: milestones.filter(m => m.done).length + '/' + milestones.length },
   ]
+
+  // Find current step (first not-done)
+  const currentStepIndex = milestones.findIndex(m => !m.done)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -276,7 +329,7 @@ function ProjectDetail({ project, onBack }) {
         </div>
 
         {/* 資訊格 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px 24px', marginBottom: effectiveBudget > 0 ? '16px' : '0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px 24px', marginBottom: '16px' }}>
           {project.client && (
             <div>
               <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>委託單位</div>
@@ -310,27 +363,35 @@ function ProjectDetail({ project, onBack }) {
           )}
         </div>
 
-        {/* 預算區塊 */}
+        {/* 雲端資料夾連結 */}
+        <div style={{ marginBottom: '16px' }}>
+          {project.driveUrl ? (
+            <a href={project.driveUrl} target="_blank" rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: E.green, textDecoration: 'none', fontWeight: '600', padding: '6px 12px', backgroundColor: E.greenLight, borderRadius: '8px', transition: 'opacity 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}>
+              <span>📁</span> 案件雲端資料夾 <ExternalLink size={12} />
+            </a>
+          ) : (
+            <span style={{ fontSize: '12px', color: E.textMuted, fontStyle: 'italic' }}>尚未設定雲端連結</span>
+          )}
+        </div>
+
+        {/* 預算區塊 - simplified */}
         {effectiveBudget > 0 && (
           <div style={{ borderTop: `1px solid ${E.divider}`, paddingTop: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: E.textSecond }}>預算使用</span>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: bw.color }}>{bw.emoji} {pct.toFixed(1)}%</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 16px', marginBottom: '10px' }}>
-              {[
-                { label: '預算總額', value: `NT$${effectiveBudget.toLocaleString()}`, color: E.textPrimary },
-                { label: '已使用',   value: `NT$${spent.toLocaleString()}`,            color: E.textPrimary },
-                { label: '剩餘',     value: `NT$${(effectiveBudget - spent).toLocaleString()}`, color: pct >= 90 ? '#c04030' : pct >= 70 ? '#a07020' : E.green },
-              ].map(item => (
-                <div key={item.label}>
-                  <div style={{ fontSize: '10px', color: E.textMuted, marginBottom: '2px' }}>{item.label}</div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: item.color }}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ height: '7px', backgroundColor: '#ede5d8', borderRadius: '999px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', borderRadius: '999px', backgroundColor: bw.barColor, width: `${pct}%`, transition: 'width 0.3s' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', color: E.textSecond, fontWeight: '600' }}>預算使用</span>
+              <span style={{ fontSize: '12px', color: E.textPrimary }}>
+                預算總額 <strong>NT${effectiveBudget.toLocaleString()}</strong>
+              </span>
+              <span style={{ fontSize: '12px', color: E.textPrimary }}>
+                已使用 <strong>NT${spent.toLocaleString()}</strong>
+              </span>
+              <span style={{ fontSize: '12px', color: pct >= 90 ? '#c04030' : pct >= 70 ? '#a07020' : E.green }}>
+                剩餘 <strong>NT${(effectiveBudget - spent).toLocaleString()}</strong>
+              </span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: bw.color }}>{bw.emoji} {pct.toFixed(1)}%</span>
             </div>
           </div>
         )}
@@ -345,11 +406,11 @@ function ProjectDetail({ project, onBack }) {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {TABS.map(({ key, label, count }) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab === key), display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             {label}
-            {count > 0 && <span style={{ fontSize: '10px', backgroundColor: tab === key ? 'rgba(255,255,255,0.25)' : E.greenLight, color: tab === key ? '#f2f7f0' : E.green, borderRadius: '999px', padding: '1px 6px', fontWeight: '700' }}>{count}</span>}
+            {count !== undefined && <span style={{ fontSize: '10px', backgroundColor: tab === key ? 'rgba(255,255,255,0.25)' : E.greenLight, color: tab === key ? '#f2f7f0' : E.green, borderRadius: '999px', padding: '1px 6px', fontWeight: '700' }}>{count}</span>}
           </button>
         ))}
       </div>
@@ -360,7 +421,11 @@ function ProjectDetail({ project, onBack }) {
         {/* ── 工項 ── */}
         {tab === 'tasks' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>
+                工項 {doneWorkItems}/{workItems.length} 完成
+                {workItems.length > 0 && <span style={{ color: E.textSecond, fontWeight: '500' }}> ({completionPct}%)</span>}
+              </span>
               <button onClick={() => setShowAddTask(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                 <Plus size={14} />新增工項
               </button>
@@ -486,109 +551,133 @@ function ProjectDetail({ project, onBack }) {
           </div>
         )}
 
-        {/* ── Checklist（三階段）── */}
-        {tab === 'checklist' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* 階段選擇器 */}
-            <div style={{ display: 'flex', gap: '6px', borderBottom: `1px solid ${E.divider}`, paddingBottom: '12px' }}>
-              {phases.map((phaseName, idx) => {
-                const phasePct = phasePcts[idx]
-                const isActive = activePhase === idx
-                const isDone   = phasePct === 100 && phaseItems[idx].length > 0
-                return (
-                  <button key={idx} onClick={() => setActivePhase(idx)} style={{
-                    flex: 1, padding: '10px 8px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                    backgroundColor: isActive ? E.green : isDone ? '#edf2ea' : E.sandLight,
-                    color: isActive ? '#f2f7f0' : isDone ? '#3a6d31' : E.textSecond,
-                    fontWeight: '600', fontSize: '12px', transition: 'all 0.15s', textAlign: 'center',
-                  }}>
-                    <div>{isDone && !isActive ? '✓ ' : ''}{phaseName}</div>
-                    <div style={{ fontSize: '10px', fontWeight: '500', marginTop: '3px', opacity: 0.8 }}>{phasePct}%</div>
-                  </button>
-                )
-              })}
+        {/* ── 案件流程 (Project Flow) ── */}
+        {tab === 'flow' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>案件流程</span>
+              <button onClick={() => setShowAddMilestone(true)} style={{ ...E.btnGhost, fontSize: '12px' }}>
+                <Plus size={13} />新增節點
+              </button>
             </div>
 
-            {/* 當前階段項目 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {phaseItems[activePhase].length === 0 && (
-                <div style={{ fontSize: '12px', color: E.textMuted, textAlign: 'center', padding: '12px' }}>
-                  尚無「{phases[activePhase]}」項目
-                </div>
-              )}
-              {phaseItems[activePhase].map(item => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="checkbox" checked={item.done} onChange={() => updateItem('projectDocs', item.id, { done: !item.done })}
-                    style={{ width: '15px', height: '15px', accentColor: E.green, cursor: 'pointer' }} />
-                  <span style={{ fontSize: '13px', flex: 1, color: item.done ? E.textMuted : E.textPrimary, textDecoration: item.done ? 'line-through' : 'none' }}>{item.text}</span>
-                  <button onClick={() => deleteItem('projectDocs', item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={12} /></button>
-                </div>
-              ))}
-            </div>
-
-            {/* 新增項目 */}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              <input value={newCheckItem} onChange={e => setNewCheckItem(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && newCheckItem.trim()) { addItem('projectDocs', { id: Date.now(), type: 'checklist', project: project.id, text: newCheckItem.trim(), done: false, phase: activePhase }); setNewCheckItem('') } }}
-                placeholder={`新增「${phases[activePhase]}」項目（按 Enter）`} style={{ ...E.input, flex: 1 }} />
-              <button onClick={() => { if (!newCheckItem.trim()) return; addItem('projectDocs', { id: Date.now(), type: 'checklist', project: project.id, text: newCheckItem.trim(), done: false, phase: activePhase }); setNewCheckItem('') }}
-                style={{ ...E.btnPrimary, padding: '8px 14px' }}><Plus size={14} /></button>
-            </div>
-          </div>
-        )}
-
-        {/* ── 文件 ── */}
-        {tab === 'docs' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {docs.length === 0 && <div style={{ fontSize: '12px', color: E.textMuted, textAlign: 'center', padding: '16px' }}>尚無文件</div>}
-            {docs.map(doc => (
-              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: E.sandLight, borderRadius: '8px', padding: '8px 12px' }}>
-                <FileText size={13} style={{ color: E.textMuted }} />
-                <span style={{ fontSize: '13px', color: E.textPrimary, flex: 1 }}>{doc.title}</span>
-                {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" style={{ color: E.green }}><ExternalLink size={13} /></a>}
-                <button onClick={() => deleteItem('projectDocs', doc.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={12} /></button>
+            {milestones.length === 0 && !showAddMilestone && (
+              <div style={{ textAlign: 'center', color: E.textMuted, fontSize: '13px', padding: '28px' }}>
+                尚無流程節點
               </div>
-            ))}
-            {!showDocForm
-              ? <button onClick={() => setShowDocForm(true)} style={{ ...E.btnGhost, fontSize: '12px' }}><Plus size={13} />新增文件連結</button>
-              : <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <input value={newDoc.title} onChange={e => setNewDoc(p => ({ ...p, title: e.target.value }))} placeholder="文件名稱 *" style={E.input} />
-                  <input value={newDoc.url}   onChange={e => setNewDoc(p => ({ ...p, url: e.target.value }))}   placeholder="連結（可選）" style={E.input} />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => { if (!newDoc.title.trim()) return; addItem('projectDocs', { id: Date.now(), type: 'doc', project: project.id, ...newDoc }); setNewDoc({ title: '', url: '' }); setShowDocForm(false) }} style={E.btnPrimary}>新增</button>
-                    <button onClick={() => setShowDocForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: E.textSecond, fontSize: '13px' }}>取消</button>
-                  </div>
-                </div>
-            }
-          </div>
-        )}
+            )}
 
-        {/* ── 會議記錄 ── */}
-        {tab === 'meetings' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {meetings.length === 0 && <div style={{ fontSize: '12px', color: E.textMuted, textAlign: 'center', padding: '16px' }}>尚無會議記錄</div>}
-            {meetings.map(m => (
-              <div key={m.id} style={{ backgroundColor: E.sandLight, borderRadius: '10px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '11px', color: E.textMuted }}>{m.date}</span>
-                  <button onClick={() => deleteItem('meetings', m.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={12} /></button>
+            {/* Horizontal Timeline */}
+            {milestones.length > 0 && (
+              <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', minWidth: milestones.length * 110, padding: '10px 0' }}>
+                  {milestones.map((ms, idx) => {
+                    const isDone = ms.done
+                    const isCurrent = idx === currentStepIndex
+                    const nodeColor = isDone ? '#4d8843' : isCurrent ? '#c89a62' : '#d8cbb8'
+                    const nodeSize = isCurrent ? 28 : 22
+                    return (
+                      <div key={ms.id} style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minWidth: '100px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative' }}>
+                          {/* Line before */}
+                          {idx > 0 && (
+                            <div style={{
+                              position: 'absolute', top: isCurrent ? '14px' : '11px', right: '50%', left: '-50%',
+                              height: '3px', backgroundColor: milestones[idx - 1].done ? '#4d8843' : '#d8cbb8', zIndex: 0,
+                            }} />
+                          )}
+                          {/* Node circle */}
+                          <div
+                            onClick={() => toggleMilestone(ms.id)}
+                            style={{
+                              width: nodeSize + 'px', height: nodeSize + 'px', borderRadius: '50%',
+                              backgroundColor: isDone ? nodeColor : 'transparent',
+                              border: `3px solid ${nodeColor}`,
+                              cursor: 'pointer', zIndex: 1, position: 'relative',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'all 0.2s',
+                              boxShadow: isCurrent ? `0 0 0 4px ${nodeColor}33` : 'none',
+                            }}
+                          >
+                            {isDone && <span style={{ color: '#fff', fontSize: '12px', fontWeight: '700' }}>✓</span>}
+                          </div>
+                          {/* Name */}
+                          <div style={{ marginTop: '8px', textAlign: 'center', position: 'relative' }}>
+                            {editingMilestoneName === ms.id ? (
+                              <input
+                                value={editMilestoneNameVal}
+                                onChange={e => setEditMilestoneNameVal(e.target.value)}
+                                onBlur={() => { renameMilestone(ms.id, editMilestoneNameVal) }}
+                                onKeyDown={e => { if (e.key === 'Enter') renameMilestone(ms.id, editMilestoneNameVal); if (e.key === 'Escape') setEditingMilestoneName(null) }}
+                                autoFocus
+                                style={{ ...E.input, fontSize: '11px', padding: '2px 4px', width: '80px', textAlign: 'center' }}
+                              />
+                            ) : (
+                              <div
+                                onClick={e => { e.stopPropagation(); setEditingMilestoneName(ms.id); setEditMilestoneNameVal(ms.name) }}
+                                style={{
+                                  fontSize: '12px', fontWeight: isCurrent ? '700' : '600',
+                                  color: isDone ? '#4d8843' : isCurrent ? '#c89a62' : E.textSecond,
+                                  cursor: 'pointer', whiteSpace: 'nowrap',
+                                }}
+                                title="點擊編輯名稱"
+                              >
+                                {ms.name}
+                              </div>
+                            )}
+                          </div>
+                          {/* Date */}
+                          <div style={{ marginTop: '4px', textAlign: 'center' }}>
+                            {editingMilestoneDate === ms.id ? (
+                              <input
+                                type="date"
+                                value={ms.date || ''}
+                                onChange={e => setMilestoneDate(ms.id, e.target.value)}
+                                onBlur={() => setEditingMilestoneDate(null)}
+                                autoFocus
+                                style={{ ...E.input, fontSize: '10px', padding: '2px 4px', width: '110px' }}
+                              />
+                            ) : (
+                              <div
+                                onClick={e => { e.stopPropagation(); setEditingMilestoneDate(ms.id) }}
+                                style={{ fontSize: '10px', color: ms.date ? E.textMuted : '#d0c8b8', cursor: 'pointer' }}
+                                title="點擊設定日期"
+                              >
+                                {ms.date || '設定日期'}
+                              </div>
+                            )}
+                          </div>
+                          {/* Delete button */}
+                          <button
+                            onClick={e => { e.stopPropagation(); deleteMilestone(ms.id) }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8', marginTop: '4px', padding: '2px', lineHeight: 1 }}
+                            title="刪除節點"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary, marginTop: '4px' }}>{m.summary}</div>
-                {m.decisions && <div style={{ fontSize: '12px', color: E.textSecond, marginTop: '4px', whiteSpace: 'pre-wrap' }}>{m.decisions}</div>}
               </div>
-            ))}
-            {!showMeetingForm
-              ? <button onClick={() => setShowMeetingForm(true)} style={{ ...E.btnGhost, fontSize: '12px' }}><Plus size={13} />新增會議記錄</button>
-              : <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <input type="date" value={newMeeting.date}    onChange={e => setNewMeeting(p => ({ ...p, date: e.target.value }))}    style={E.input} />
-                  <input value={newMeeting.summary}             onChange={e => setNewMeeting(p => ({ ...p, summary: e.target.value }))} placeholder="會議摘要" style={E.input} />
-                  <textarea value={newMeeting.decisions}        onChange={e => setNewMeeting(p => ({ ...p, decisions: e.target.value }))} placeholder="決議事項（每行一項）" rows={3} style={{ ...E.input, resize: 'none', lineHeight: '1.5' }} />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => { if (!newMeeting.date || !newMeeting.summary.trim()) return; addItem('meetings', { id: Date.now(), project: project.id, ...newMeeting }); setNewMeeting({ date: '', summary: '', decisions: '' }); setShowMeetingForm(false) }} style={E.btnPrimary}>新增</button>
-                    <button onClick={() => setShowMeetingForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: E.textSecond, fontSize: '13px' }}>取消</button>
-                  </div>
-                </div>
-            }
+            )}
+
+            {/* Add milestone form */}
+            {showAddMilestone && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  value={newMilestoneName}
+                  onChange={e => setNewMilestoneName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addMilestone() }}
+                  placeholder="新節點名稱"
+                  autoFocus
+                  style={{ ...E.input, flex: 1, fontSize: '13px' }}
+                />
+                <button onClick={addMilestone} style={{ ...E.btnPrimary, padding: '8px 14px' }}>新增</button>
+                <button onClick={() => { setShowAddMilestone(false); setNewMilestoneName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: E.textSecond, fontSize: '13px' }}>取消</button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -605,7 +694,7 @@ function ProjectDetail({ project, onBack }) {
             </div>
 
             {/* 類型 + 狀態 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案類型</label>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -634,7 +723,7 @@ function ProjectDetail({ project, onBack }) {
             </div>
 
             {/* 委託單位 + 負責人 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>委託單位</label>
                 <input value={editForm.client} onChange={e => setEditForm(p => ({ ...p, client: e.target.value }))} style={E.input} />
@@ -649,7 +738,7 @@ function ProjectDetail({ project, onBack }) {
             </div>
 
             {/* 健康度 + 截止日 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>健康度</label>
                 <select value={editForm.health} onChange={e => setEditForm(p => ({ ...p, health: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
@@ -662,22 +751,10 @@ function ProjectDetail({ project, onBack }) {
               </div>
             </div>
 
-            {/* Checklist 階段名稱 */}
+            {/* 雲端資料夾連結 */}
             <div>
-              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>
-                Checklist 階段名稱 <span style={{ color: E.textMuted, fontWeight: '400' }}>（可自訂）</span>
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {(editForm.checklistPhases || DEFAULT_PHASES).map((name, i) => (
-                  <input key={i} value={name}
-                    onChange={e => {
-                      const arr = [...(editForm.checklistPhases || DEFAULT_PHASES)]
-                      arr[i] = e.target.value
-                      setEditForm(p => ({ ...p, checklistPhases: arr }))
-                    }}
-                    style={{ ...E.input, flex: 1, fontSize: '13px' }} placeholder={DEFAULT_PHASES[i]} />
-                ))}
-              </div>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>雲端資料夾連結</label>
+              <input value={editForm.driveUrl} onChange={e => setEditForm(p => ({ ...p, driveUrl: e.target.value }))} style={E.input} placeholder="https://drive.google.com/..." />
             </div>
 
             {/* 顏色 */}
@@ -713,16 +790,48 @@ function ProjectDetail({ project, onBack }) {
 export default function Projects() {
   const { data, addItem } = useApp()
   const { currentUser } = useAuth()
-  const [selectedId, setSelectedId] = useState(null)
+  const mob = useIsMobile()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedId, setSelectedId] = useState(searchParams.get('detail') || null)
+  const [initialTab] = useState(searchParams.get('tab') === 'workItems' ? 'tasks' : null)
   const [showAdd, setShowAdd]       = useState(false)
   const [showClosed, setShowClosed] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('全部')
+  const [searchText, setSearchText] = useState('')
+  const [codeTableOpen, setCodeTableOpen] = useState(false)
   const [newProject, setNewProject] = useState({
     name: '', code: '', client: '', budget: '', deadline: '', note: '',
-    status: '企劃中', color: '#4d8843', type: '', manager: '', health: '正常',
+    status: '執行中', color: '#4d8843', type: '', manager: '', health: '正常',
   })
 
   const projectTypes    = data.projectTypes || DEFAULT_TYPES
   const selectedProject = data.projects.find(p => p.id === selectedId)
+
+  /* ── 統計 ── */
+  const statusCounts = useMemo(() => {
+    const counts = {}
+    data.projects.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1 })
+    return counts
+  }, [data.projects])
+
+  /* ── 過濾 ── */
+  const filteredProjects = useMemo(() => {
+    const searchLower = searchText.toLowerCase()
+    return data.projects.filter(p => {
+      if (statusFilter === '全部') {
+        if (p.status === '結案') return false
+      } else {
+        if (p.status !== statusFilter) return false
+      }
+      if (searchText) {
+        const nameMatch = (p.name || '').toLowerCase().includes(searchLower)
+        const clientMatch = (p.client || '').toLowerCase().includes(searchLower)
+        const codeMatch = (p.code || p.id || '').toLowerCase().includes(searchLower)
+        if (!nameMatch && !clientMatch && !codeMatch) return false
+      }
+      return true
+    })
+  }, [data.projects, statusFilter, searchText])
 
   function handleAdd() {
     if (!newProject.name.trim()) return
@@ -733,16 +842,17 @@ export default function Projects() {
       id: codeVal, code: codeVal, ...newProject,
       budget: Number(newProject.budget) || 0,
       color: autoColor,
-      checklistPhases: [...DEFAULT_PHASES],
+      milestones: createDefaultMilestones(),
+      driveUrl: '',
       createdBy: currentUser?.name || currentUser?.username || '未知',
       createdAt: now,
     })
-    setNewProject({ name: '', code: '', client: '', budget: '', deadline: '', note: '', status: '企劃中', color: '#4d8843', type: '', manager: '', health: '正常' })
+    setNewProject({ name: '', code: '', client: '', budget: '', deadline: '', note: '', status: '執行中', color: '#4d8843', type: '', manager: '', health: '正常' })
     setShowAdd(false)
   }
 
   if (selectedProject) {
-    return <ProjectDetail project={selectedProject} onBack={() => setSelectedId(null)} />
+    return <ProjectDetail project={selectedProject} initialTab={initialTab} onBack={() => { setSelectedId(null); setSearchParams({}) }} />
   }
 
   return (
@@ -754,72 +864,129 @@ export default function Projects() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
-        {data.projects.filter(p => p.status !== '結案').map(p => <ProjectCard key={p.id} project={p} onClick={() => setSelectedId(p.id)} />)}
+      {/* 統計列 */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', fontWeight: '600', color: E.textPrimary }}>
+          共 {data.projects.length} 案
+        </span>
+        {['執行中', '結案', '長期', '暫停'].map(st => {
+          const cnt = statusCounts[st]
+          if (!cnt) return null
+          const s = STATUS[st] || { bg: '#eee', color: '#666' }
+          return (
+            <span key={st} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: s.bg, color: s.color, fontWeight: '500' }}>
+              {st} {cnt}
+            </span>
+          )
+        })}
       </div>
 
-      {/* 案件代碼對照表 */}
-      <div style={{ ...E.card, padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px 10px', borderBottom: `1px solid ${E.divider}` }}>
-          <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>案件代碼對照表</span>
-          <span style={{ fontSize: '11px', color: E.textMuted, marginLeft: '8px' }}>供採購申請、代墊填寫時參考</span>
+      {/* 狀態篩選 + 搜尋 */}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '10px', padding: '3px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+          {STATUS_FILTERS.map(f => (
+            <button key={f} onClick={() => setStatusFilter(f)} style={{
+              padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: statusFilter === f ? '600' : '500',
+              backgroundColor: statusFilter === f ? E.green : 'transparent',
+              color: statusFilter === f ? '#f2f7f0' : E.textSecond,
+              border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+            }}>
+              {f}
+            </button>
+          ))}
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr style={{ backgroundColor: E.sandLight }}>
-              <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond, width: '160px' }}>代碼</th>
-              <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond }}>案件全名</th>
-              <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond }}>委託單位</th>
-              <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond, width: '80px' }}>狀態</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.projects.filter(p => p.status !== '結案').map((p, i) => {
-              const c = STATUS[p.status] || { bg: '#eee', color: '#666' }
-              return (
-                <tr key={p.id} style={{ borderTop: `1px solid ${E.divider}`, backgroundColor: i % 2 === 0 ? 'transparent' : '#faf7f2', cursor: 'pointer' }}
-                  onClick={() => setSelectedId(p.id)}>
-                  <td style={{ padding: '10px 18px' }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: '13px', color: E.coffee, backgroundColor: '#f5ede0', padding: '2px 8px', borderRadius: '6px', letterSpacing: '0.03em' }}>
-                      {p.code || p.id}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 18px', fontWeight: '600', color: E.textPrimary }}>{p.name}</td>
-                  <td style={{ padding: '10px 18px', color: E.textSecond }}>{p.client || '—'}</td>
-                  <td style={{ padding: '10px 18px' }}>
-                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: c.bg, color: c.color, fontWeight: '600' }}>{p.status}</span>
-                  </td>
-                </tr>
-              )
-            })}
-            {data.projects.some(p => p.status === '結案') && (
-              <tr style={{ borderTop: `1px solid ${E.divider}`, backgroundColor: '#f5f0ea', cursor: 'pointer' }}
-                onClick={() => setShowClosed(v => !v)}>
-                <td colSpan={4} style={{ padding: '8px 18px', fontSize: '12px', color: E.textMuted, userSelect: 'none' }}>
-                  {showClosed ? '▲' : '▼'} 結案案件（{data.projects.filter(p => p.status === '結案').length} 個）
-                </td>
+        <div style={{ position: 'relative', flex: 1, minWidth: '180px', maxWidth: '320px' }}>
+          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: E.textMuted }} />
+          <input
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            placeholder="搜尋案件名稱、委託單位、代碼..."
+            style={{ ...E.input, paddingLeft: '32px', fontSize: '12px' }}
+          />
+        </div>
+      </div>
+
+      {/* 案件卡片列表 */}
+      <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
+        {filteredProjects.map(p => <ProjectCard key={p.id} project={p} onClick={() => setSelectedId(p.id)} />)}
+      </div>
+      {filteredProjects.length === 0 && (
+        <div style={{ textAlign: 'center', color: E.textMuted, fontSize: '13px', padding: '28px' }}>
+          {searchText ? '查無符合條件的案件' : '此狀態下無案件'}
+        </div>
+      )}
+
+      {/* 案件代碼對照表 - collapsible */}
+      <div style={{ ...E.card, padding: 0, overflow: 'hidden' }}>
+        <div
+          onClick={() => setCodeTableOpen(v => !v)}
+          style={{ padding: '14px 18px 10px', borderBottom: codeTableOpen ? `1px solid ${E.divider}` : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}>
+          <div>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>案件代碼對照表</span>
+            <span style={{ fontSize: '11px', color: E.textMuted, marginLeft: '8px' }}>供採購申請、代墊填寫時參考</span>
+          </div>
+          {codeTableOpen ? <ChevronUp size={16} style={{ color: E.textMuted }} /> : <ChevronDown size={16} style={{ color: E.textMuted }} />}
+        </div>
+        {codeTableOpen && (
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ backgroundColor: E.sandLight }}>
+                <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond, width: '160px' }}>代碼</th>
+                <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond }}>案件全名</th>
+                <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond }}>委託單位</th>
+                <th style={{ textAlign: 'left', padding: '8px 18px', fontSize: '11px', fontWeight: '600', color: E.textSecond, width: '80px' }}>狀態</th>
               </tr>
-            )}
-            {showClosed && data.projects.filter(p => p.status === '結案').map((p, i) => {
-              const c = STATUS[p.status] || { bg: '#eee', color: '#666' }
-              return (
-                <tr key={p.id} style={{ borderTop: `1px solid ${E.divider}`, backgroundColor: i % 2 === 0 ? '#fdf8f3' : '#f7f2eb', cursor: 'pointer' }}
-                  onClick={() => setSelectedId(p.id)}>
-                  <td style={{ padding: '10px 18px' }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: '13px', color: E.coffee, backgroundColor: '#f5ede0', padding: '2px 8px', borderRadius: '6px', letterSpacing: '0.03em' }}>
-                      {p.code || p.id}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 18px', fontWeight: '600', color: E.textPrimary }}>{p.name}</td>
-                  <td style={{ padding: '10px 18px', color: E.textSecond }}>{p.client || '—'}</td>
-                  <td style={{ padding: '10px 18px' }}>
-                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: c.bg, color: c.color, fontWeight: '600' }}>{p.status}</span>
+            </thead>
+            <tbody>
+              {data.projects.filter(p => p.status !== '結案').map((p, i) => {
+                const c = STATUS[p.status] || { bg: '#eee', color: '#666' }
+                return (
+                  <tr key={p.id} style={{ borderTop: `1px solid ${E.divider}`, backgroundColor: i % 2 === 0 ? 'transparent' : '#faf7f2', cursor: 'pointer' }}
+                    onClick={() => setSelectedId(p.id)}>
+                    <td style={{ padding: '10px 18px' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '13px', color: E.coffee, backgroundColor: '#f5ede0', padding: '2px 8px', borderRadius: '6px', letterSpacing: '0.03em' }}>
+                        {p.code || p.id}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 18px', fontWeight: '600', color: E.textPrimary }}>{p.name}</td>
+                    <td style={{ padding: '10px 18px', color: E.textSecond }}>{p.client || '—'}</td>
+                    <td style={{ padding: '10px 18px' }}>
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: c.bg, color: c.color, fontWeight: '600' }}>{p.status}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+              {data.projects.some(p => p.status === '結案') && (
+                <tr style={{ borderTop: `1px solid ${E.divider}`, backgroundColor: '#f5f0ea', cursor: 'pointer' }}
+                  onClick={() => setShowClosed(v => !v)}>
+                  <td colSpan={4} style={{ padding: '8px 18px', fontSize: '12px', color: E.textMuted, userSelect: 'none' }}>
+                    {showClosed ? '▲' : '▼'} 結案案件（{data.projects.filter(p => p.status === '結案').length} 個）
                   </td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              )}
+              {showClosed && data.projects.filter(p => p.status === '結案').map((p, i) => {
+                const c = STATUS[p.status] || { bg: '#eee', color: '#666' }
+                return (
+                  <tr key={p.id} style={{ borderTop: `1px solid ${E.divider}`, backgroundColor: i % 2 === 0 ? '#fdf8f3' : '#f7f2eb', cursor: 'pointer' }}
+                    onClick={() => setSelectedId(p.id)}>
+                    <td style={{ padding: '10px 18px' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '13px', color: E.coffee, backgroundColor: '#f5ede0', padding: '2px 8px', borderRadius: '6px', letterSpacing: '0.03em' }}>
+                        {p.code || p.id}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 18px', fontWeight: '600', color: E.textPrimary }}>{p.name}</td>
+                    <td style={{ padding: '10px 18px', color: E.textSecond }}>{p.client || '—'}</td>
+                    <td style={{ padding: '10px 18px' }}>
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: c.bg, color: c.color, fontWeight: '600' }}>{p.status}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          </div>
+        )}
       </div>
 
       {/* 新增案件 Modal */}
@@ -834,7 +1001,7 @@ export default function Projects() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>案件代碼 <span style={{ color: E.textMuted, fontWeight: '400' }}>（留空自動產生）</span></label>
               <input value={newProject.code} onChange={e => setNewProject(p => ({ ...p, code: e.target.value }))} style={E.input} placeholder="例：PW_sl" />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案類型</label>
                 <select value={newProject.type} onChange={e => setNewProject(p => ({ ...p, type: e.target.value, color: TYPE_COLORS[e.target.value] || p.color }))} style={{ ...E.input, cursor: 'pointer' }}>
@@ -849,7 +1016,7 @@ export default function Projects() {
                 </select>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>委託單位</label>
                 <input value={newProject.client} onChange={e => setNewProject(p => ({ ...p, client: e.target.value }))} style={E.input} />
@@ -862,7 +1029,7 @@ export default function Projects() {
                 </select>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>核定預算 NT$</label>
                 <input type="number" value={newProject.budget} onChange={e => setNewProject(p => ({ ...p, budget: e.target.value }))} style={E.input} placeholder="0" />
