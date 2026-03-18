@@ -139,6 +139,7 @@ export default function Finance() {
 
   const expProjects = useMemo(() => [...new Set(data.expenses.map(e => e.project).filter(Boolean))].sort(), [data.expenses])
   const expCategories = useMemo(() => [...new Set(data.expenses.map(e => e.category).filter(Boolean))].sort(), [data.expenses])
+  const expAccounts = useMemo(() => [...new Set(data.expenses.map(e => e.account).filter(Boolean))].sort(), [data.expenses])
   const expFiltered = useMemo(() =>
     [...data.expenses]
       .filter(e => !search || e.vendor?.includes(search) || e.project?.includes(search) || e.account?.includes(search))
@@ -1954,11 +1955,33 @@ export default function Finance() {
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案支出類別</label>
-                <input value={newExp.category} onChange={e => setNewExp(p => ({ ...p, category: e.target.value }))} placeholder="如：印刷、活動執行、餐費…" style={E.input} />
+                {newExp._catCustom ? (
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input value={newExp.category} onChange={e => setNewExp(p => ({ ...p, category: e.target.value }))} placeholder="輸入新類別名稱" style={{ ...E.input, flex: 1 }} autoFocus />
+                    <button type="button" onClick={() => setNewExp(p => ({ ...p, _catCustom: false, category: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
+                  </div>
+                ) : (
+                  <select value={newExp.category} onChange={e => { if (e.target.value === '__custom__') setNewExp(p => ({ ...p, _catCustom: true, category: '' })); else setNewExp(p => ({ ...p, category: e.target.value })) }} style={E.input}>
+                    <option value="">— 請選擇 —</option>
+                    {expCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="__custom__">＋ 自訂新類別</option>
+                  </select>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
-                <input value={newExp.account} onChange={e => setNewExp(p => ({ ...p, account: e.target.value }))} placeholder="如：業務推廣費、雜項支出…" style={E.input} />
+                {newExp._accCustom ? (
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input value={newExp.account} onChange={e => setNewExp(p => ({ ...p, account: e.target.value }))} placeholder="輸入新科目名稱" style={{ ...E.input, flex: 1 }} autoFocus />
+                    <button type="button" onClick={() => setNewExp(p => ({ ...p, _accCustom: false, account: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
+                  </div>
+                ) : (
+                  <select value={newExp.account} onChange={e => { if (e.target.value === '__custom__') setNewExp(p => ({ ...p, _accCustom: true, account: '' })); else setNewExp(p => ({ ...p, account: e.target.value })) }} style={E.input}>
+                    <option value="">— 請選擇 —</option>
+                    {expAccounts.map(a => <option key={a} value={a}>{a}</option>)}
+                    <option value="__custom__">＋ 自訂新科目</option>
+                  </select>
+                )}
               </div>
             </div>
             <div>
@@ -1989,7 +2012,8 @@ export default function Finance() {
                 const maxId = (data.expenses || []).filter(e => e.id?.startsWith('slm')).length + 1
                 const id = `slm26-${String(maxId).padStart(3, '0')}`
                 const serialNo = newExp.linkedSerial || generateSerial()
-                addItem('expenses', { id, ...newExp, amount: Number(newExp.amount), serialNo })
+                const { _catCustom, _accCustom, ...cleanExp } = newExp
+                addItem('expenses', { id, ...cleanExp, amount: Number(newExp.amount), serialNo })
                 logEdit({ user: who, action: '新增', entityType: '帳目', entityName: newExp.vendor, summary: `${newExp.project} NT$${Number(newExp.amount).toLocaleString()}` })
                 setNewExp(EMPTY_EXP)
                 setShowAddExp(false)
@@ -2045,11 +2069,33 @@ export default function Finance() {
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案支出類別</label>
-                <input value={editExp.category || ''} onChange={e => setEditExp(p => ({ ...p, category: e.target.value }))} placeholder="如：印刷、活動執行、餐費…" style={E.input} />
+                {editExp._catCustom ? (
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input value={editExp.category || ''} onChange={e => setEditExp(p => ({ ...p, category: e.target.value }))} placeholder="輸入新類別名稱" style={{ ...E.input, flex: 1 }} autoFocus />
+                    <button type="button" onClick={() => setEditExp(p => ({ ...p, _catCustom: false, category: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
+                  </div>
+                ) : (
+                  <select value={editExp.category || ''} onChange={e => { if (e.target.value === '__custom__') setEditExp(p => ({ ...p, _catCustom: true, category: '' })); else setEditExp(p => ({ ...p, category: e.target.value })) }} style={E.input}>
+                    <option value="">— 請選擇 —</option>
+                    {expCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="__custom__">＋ 自訂新類別</option>
+                  </select>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
-                <input value={editExp.account || ''} onChange={e => setEditExp(p => ({ ...p, account: e.target.value }))} placeholder="如：業務推廣費、雜項支出…" style={E.input} />
+                {editExp._accCustom ? (
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input value={editExp.account || ''} onChange={e => setEditExp(p => ({ ...p, account: e.target.value }))} placeholder="輸入新科目名稱" style={{ ...E.input, flex: 1 }} autoFocus />
+                    <button type="button" onClick={() => setEditExp(p => ({ ...p, _accCustom: false, account: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
+                  </div>
+                ) : (
+                  <select value={editExp.account || ''} onChange={e => { if (e.target.value === '__custom__') setEditExp(p => ({ ...p, _accCustom: true, account: '' })); else setEditExp(p => ({ ...p, account: e.target.value })) }} style={E.input}>
+                    <option value="">— 請選擇 —</option>
+                    {expAccounts.map(a => <option key={a} value={a}>{a}</option>)}
+                    <option value="__custom__">＋ 自訂新科目</option>
+                  </select>
+                )}
               </div>
             </div>
             <div>
@@ -2064,7 +2110,8 @@ export default function Finance() {
               onClick={() => {
                 if (!editExp.date || !editExp.vendor || !editExp.amount) return
                 const who = currentUser?.name || currentUser?.username || '未知'
-                updateItem('expenses', editExp.id, { ...editExp, amount: Number(editExp.amount) })
+                const { _catCustom: _c, _accCustom: _a, ...cleanEdit } = editExp
+                updateItem('expenses', editExp.id, { ...cleanEdit, amount: Number(editExp.amount) })
                 logEdit({ user: who, action: '編輯', entityType: '帳目', entityName: editExp.vendor, summary: `${editExp.project} NT$${Number(editExp.amount).toLocaleString()}` })
                 setEditExp(null)
               }}
