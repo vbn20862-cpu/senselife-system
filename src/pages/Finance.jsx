@@ -169,15 +169,15 @@ export default function Finance() {
       }),
     [data.bankAccounts, bankFilter, bankSort])
 
+  const today = new Date().toISOString().split('T')[0]
   const { payables, pendingPayables, paidPayables, overduePayables, totalPending } = useMemo(() => {
     const payables = data.payables || []
-    const today = new Date().toISOString().split('T')[0]
     const pendingPayables = payables.filter(p => p.status === '待付')
     const paidPayables = payables.filter(p => p.status === '已付').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
     const overduePayables = pendingPayables.filter(p => p.dueDate && p.dueDate < today)
     const totalPending = pendingPayables.reduce((s, p) => s + (Number(p.amount) || 0), 0)
     return { payables, pendingPayables, paidPayables, overduePayables, totalPending }
-  }, [data.payables])
+  }, [data.payables, today])
 
   const ALL_TABS = [['reimburse','代墊申請'],['purchase','採購申請'],['payable','應付款項'],['invoice','統編發票'],['expenses','帳目查詢'],['budget','預算總覽'],['bank','匯款帳戶'],['payroll','薪資管理']]
   const TABS = isAdmin ? ALL_TABS : [['reimburse','代墊申請'],['purchase','採購申請'],['payroll','薪資管理']]
