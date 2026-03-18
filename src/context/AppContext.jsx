@@ -4,6 +4,24 @@ import { ref, onValue, set } from 'firebase/database'
 
 const AppContext = createContext(null)
 
+// Firebase 連線狀態 hook
+export function useFirebaseConnection() {
+  const [connected, setConnected] = useState(true)
+  const [lastConnected, setLastConnected] = useState(null)
+
+  useEffect(() => {
+    const connRef = ref(db, '.info/connected')
+    const unsub = onValue(connRef, (snap) => {
+      const isConnected = snap.val() === true
+      setConnected(isConnected)
+      if (isConnected) setLastConnected(new Date())
+    })
+    return () => unsub()
+  }, [])
+
+  return { connected, lastConnected }
+}
+
 const DATA_VERSION = 15
 
 const INITIAL_DATA = {

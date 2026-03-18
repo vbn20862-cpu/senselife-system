@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History, MessageSquarePlus, Bug, Lightbulb, HelpCircle, Send } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History, MessageSquarePlus, Bug, Lightbulb, HelpCircle, Send, WifiOff, Wifi } from 'lucide-react'
 import logo from '../assets/logo.jpeg'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
+import { useFirebaseConnection } from '../context/AppContext'
 
 const NAV_MAIN = [
   { to: '/',         icon: LayoutDashboard, label: '儀表板' },
@@ -71,6 +72,20 @@ export default function Layout({ children }) {
   const { currentUser, isAdmin, logout } = useAuth()
   const { addItem } = useApp()
   const navigate = useNavigate()
+  const { connected } = useFirebaseConnection()
+  const [showReconnected, setShowReconnected] = useState(false)
+  const [wasDisconnected, setWasDisconnected] = useState(false)
+
+  // 斷線 → 重連時短暫顯示「已重新連線」
+  useEffect(() => {
+    if (!connected) {
+      setWasDisconnected(true)
+    } else if (wasDisconnected) {
+      setShowReconnected(true)
+      const t = setTimeout(() => { setShowReconnected(false); setWasDisconnected(false) }, 3000)
+      return () => clearTimeout(t)
+    }
+  }, [connected, wasDisconnected])
 
   function handleFeedbackSubmit() {
     if (!fbMsg.trim()) return
@@ -238,6 +253,30 @@ export default function Layout({ children }) {
           </button>
           <span className="font-semibold" style={{ color: C.mobileTxt }}>深活共構管理系統</span>
         </header>
+
+        {/* 連線狀態提示 */}
+        {!connected && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            padding: '8px 16px', backgroundColor: '#fef3cd', borderBottom: '1px solid #f0d78c',
+            fontSize: '13px', color: '#856404', fontWeight: '500',
+          }}>
+            <WifiOff size={14} />
+            <span>網路連線中斷，資料暫時無法同步...</span>
+          </div>
+        )}
+        {showReconnected && connected && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            padding: '8px 16px', backgroundColor: '#d4edda', borderBottom: '1px solid #b0d9b8',
+            fontSize: '13px', color: '#155724', fontWeight: '500',
+            animation: 'fadeOut 3s forwards',
+          }}>
+            <Wifi size={14} />
+            <span>已重新連線</span>
+            <style>{`@keyframes fadeOut { 0%,70% { opacity:1 } 100% { opacity:0 } }`}</style>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {children}

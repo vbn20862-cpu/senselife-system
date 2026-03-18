@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Projects from './pages/Projects'
@@ -85,18 +86,20 @@ export default function App() {
               <Route path="*" element={
                 <RequireAuth>
                   <Layout>
-                    <Routes>
-                      <Route path="/"             element={<Dashboard />} />
-                      <Route path="/projects"     element={<Projects />} />
-                      <Route path="/design"       element={<Design />} />
-                      <Route path="/finance"      element={<Finance />} />
-                      <Route path="/hr"           element={<HR />} />
-                      <Route path="/assets"       element={<Assets />} />
-                      <Route path="/history"       element={<History />} />
-                      <Route path="/announcements" element={<Announcements />} />
-                      <Route path="/documents"    element={<Documents />} />
-                      <Route path="/import"       element={<Import />} />
-                    </Routes>
+                    <ErrorBoundary>
+                      <Routes>
+                        <Route path="/"             element={<Dashboard />} />
+                        <Route path="/projects"     element={<Projects />} />
+                        <Route path="/design"       element={<Design />} />
+                        <Route path="/finance"      element={<Finance />} />
+                        <Route path="/hr"           element={<HR />} />
+                        <Route path="/assets"       element={<Assets />} />
+                        <Route path="/history"       element={<History />} />
+                        <Route path="/announcements" element={<Announcements />} />
+                        <Route path="/documents"    element={<Documents />} />
+                        <Route path="/import"       element={<Import />} />
+                      </Routes>
+                    </ErrorBoundary>
                   </Layout>
                 </RequireAuth>
               } />
