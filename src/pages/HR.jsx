@@ -51,6 +51,7 @@ const roundHours = (minutes) => Math.floor((minutes / 60) * 2) / 2
 // 計算員工某月純打卡時數（含休息扣除，不含補休）
 function computeEmpMonthClockHours(emp, yr, mo, data) {
   const monthStr = `${yr}-${String(mo).padStart(2,'0')}`
+  const todayStr = new Date().toISOString().split('T')[0]
   const myClockins = data.clockins.filter(c =>
     c.empName && c.date?.startsWith(monthStr) &&
     (c.empName === emp.name || emp.name.includes(c.empName) || c.empName.includes(emp.name))
@@ -65,6 +66,13 @@ function computeEmpMonthClockHours(emp, yr, mo, data) {
       const [ih, im] = ins[0].time.split(':').map(Number)
       const [oh, om] = outs[outs.length-1].time.split(':').map(Number)
       let dayMin = Math.max(0, (oh*60+om) - (ih*60+im))
+      if (dayMin >= 300) dayMin = Math.max(0, dayMin - 60)
+      totalMinutes += dayMin
+    } else if (ins.length > 0 && outs.length === 0 && ins[0].time && date === todayStr) {
+      // 今天有上班沒下班：用目前時間計算
+      const [ih, im] = ins[0].time.split(':').map(Number)
+      const now = new Date()
+      let dayMin = Math.max(0, (now.getHours() * 60 + now.getMinutes()) - (ih * 60 + im))
       if (dayMin >= 300) dayMin = Math.max(0, dayMin - 60)
       totalMinutes += dayMin
     }
@@ -133,17 +141,31 @@ function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, tex
         <div style={{ marginTop: '12px', borderTop: `1px solid ${divider}`, paddingTop: '10px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px' }}>
             {s.dayDetails.map(d => (
-              <div key={d.date} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', backgroundColor: d.isCompLeave ? '#f0ebf5' : sandLight, borderRadius: '8px', fontSize: '12px' }}>
+              <div key={d.date} style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px',
+                backgroundColor: d.isMissingOut ? '#fde8e6' : d.isOngoing ? '#e8f4e6' : d.isCompLeave ? '#f0ebf5' : sandLight,
+                borderRadius: '8px', fontSize: '12px',
+              }}>
                 <span style={{ color: textSecond, fontWeight: '600', minWidth: '58px' }}>{d.date.slice(5)}</span>
                 {d.isCompLeave ? (
                   <span style={{ color: '#6a3a80', fontWeight: '600', fontSize: '11px' }}>補休 {d.clockOut}</span>
+                ) : d.isMissingOut ? (
+                  <span style={{ color: '#c04030' }}>
+                    {d.clockIn} → <span style={{ fontSize: '11px', fontWeight: '600' }}>未打下班卡</span>
+                  </span>
+                ) : d.isOngoing ? (
+                  <span style={{ color: '#3a6d31' }}>
+                    {d.clockIn} → <span style={{ fontSize: '11px', fontWeight: '600' }}>🟢 上班中</span>
+                  </span>
                 ) : (
                   <span style={{ color: textPrimary }}>
                     {d.clockIn || '--'} → {d.clockOut || '--'}
                   </span>
                 )}
                 {d.dayMin > 0 && (
-                  <span style={{ marginLeft: 'auto', fontWeight: '700', color: d.isCompLeave ? '#6a3a80' : green }}>{roundHours(d.dayMin)}h</span>
+                  <span style={{ marginLeft: 'auto', fontWeight: '700', color: d.isOngoing ? '#3a6d31' : d.isCompLeave ? '#6a3a80' : green }}>
+                    {d.isOngoing ? '~' : ''}{roundHours(d.dayMin)}h
+                  </span>
                 )}
                 {d.otMin > 0 && (
                   <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '600' }}>+{roundHours(d.otMin)}h OT</span>
@@ -471,21 +493,23 @@ export default function HR() {
         const [attYear, setAttYear] = [scheduleMonth.year, (y) => setScheduleMonth(p => ({...p, year: y}))]
         const [attMonth, setAttMonth] = [scheduleMonth.month, (m) => setScheduleMonth(p => ({...p, month: m}))]
 
-        // Get unique employee names from clockins
-        const allClockinNames = [...new Set(data.clockins.map(c => c.empName).filter(Boolean))]
-
-        // Filter clockins for selected month
+        // Filter clockins for selected month, resolve empName to full name
         const monthStr = `${attYear}-${String(attMonth).padStart(2,'0')}`
-        const monthClockins = data.clockins.filter(c => c.date && c.date.startsWith(monthStr))
+        const monthClockins = data.clockins
+          .filter(c => c.date && c.date.startsWith(monthStr))
+          .map(c => ({ ...c, _resolvedName: resolveEmpName(c.empName, data.employees) || c.empName }))
+
+        // Get unique resolved employee names
+        const allClockinNames = [...new Set(monthClockins.map(c => c._resolvedName).filter(Boolean))]
 
         // Per-employee stats
         const stats = allClockinNames.map(name => {
-          const myClockins = monthClockins.filter(c => c.empName === name)
+          const myClockins = monthClockins.filter(c => c._resolvedName === name)
           const workDays = new Set(myClockins.filter(c => c.type === '上班').map(c => c.date))
           let totalMinutes = 0
           let totalOTMinutes = 0
           const dayDetails = []
-          const emp = data.employees.find(e => e.name === name || e.name.includes(name) || name.includes(e.name))
+          const emp = data.employees.find(e => e.name === name)
 
           // Include dates from comp leave records
           const compLeaveForMonth = emp
@@ -502,6 +526,10 @@ export default function HR() {
 
             let dayMin = 0
             let pairCount = 0
+            let isMissingOut = false
+            let isOngoing = false
+            const todayStr = new Date().toISOString().split('T')[0]
+
             if (clockInRecs.length > 0 && clockOutRecs.length > 0) {
               const inTime  = clockInRecs[0].time
               const outTime = clockOutRecs[clockOutRecs.length - 1].time
@@ -510,6 +538,23 @@ export default function HR() {
                 const [oh, om] = outTime.split(':').map(Number)
                 dayMin = Math.max(0, (oh * 60 + om) - (ih * 60 + im))
                 pairCount = 1
+              }
+            } else if (clockInRecs.length > 0 && clockOutRecs.length === 0) {
+              // 有上班沒下班
+              const inTime = clockInRecs[0].time
+              if (inTime) {
+                const [ih, im] = inTime.split(':').map(Number)
+                if (date === todayStr) {
+                  // 今天：用目前時間即時計算
+                  const now = new Date()
+                  const nowMin = now.getHours() * 60 + now.getMinutes()
+                  dayMin = Math.max(0, nowMin - (ih * 60 + im))
+                  pairCount = 1
+                  isOngoing = true
+                } else {
+                  // 過去日期：忘記打下班，標記但不計算
+                  isMissingOut = true
+                }
               }
             }
 
@@ -520,7 +565,6 @@ export default function HR() {
             const cl = compLeaveForMonth.find(r => r.date === date)
             const clMin = cl ? Number(cl.hours) * 60 : 0
             dayMin += clMin
-            if (clMin > 0) workDays.add(date)
 
             let otMin = 0
             if (otStart.length > 0 && otEnd.length > 0) {
@@ -535,12 +579,15 @@ export default function HR() {
             totalMinutes += dayMin
             totalOTMinutes += otMin
             const isCompLeaveOnly = clMin > 0 && pairCount === 0
+            if (pairCount > 0 || clMin > 0) workDays.add(date)
             dayDetails.push({
               date, dayMin, otMin,
               clockIn: isCompLeaveOnly ? '補休' : (clockInRecs[0]?.time || ''),
-              clockOut: isCompLeaveOnly ? `${cl.hours}h` : (clockOutRecs[clockOutRecs.length - 1]?.time || ''),
+              clockOut: isCompLeaveOnly ? `${cl.hours}h` : isOngoing ? '進行中' : (clockOutRecs[clockOutRecs.length - 1]?.time || ''),
               hasPair: pairCount > 0 || clMin > 0,
               isCompLeave: isCompLeaveOnly,
+              isMissingOut,
+              isOngoing,
             })
           })
 
