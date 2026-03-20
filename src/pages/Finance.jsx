@@ -1111,7 +1111,25 @@ export default function Finance() {
               </select>
             </div>
           </div>
-          <button onClick={() => { if (!newR.date||!newR.person||!newR.amount) return; addItem('reimbursements',{id:Date.now(),...newR,amount:Number(newR.amount),status:'待還款',serialNo:generateSerial()}); setNewR({date:'',person:'',project:'',amount:'',description:'',method:'現金',receiptNo:''}); setShowAdd(false) }}
+          <button onClick={() => {
+            if (!newR.date||!newR.person||!newR.amount) return
+            const serial = generateSerial()
+            const rId = Date.now()
+            // 1. 新增代墊紀錄
+            addItem('reimbursements', { id: rId, ...newR, amount: Number(newR.amount), status: '待還款', serialNo: serial })
+            // 2. 自動新增對應帳目（代墊類別）
+            const maxNum = (data.expenses || []).reduce((mx, e) => { const m = e.id?.match?.(/(\d+)$/); return m ? Math.max(mx, parseInt(m[1])) : mx }, 0)
+            const expId = `slm26-${String(maxNum + 1).padStart(3, '0')}`
+            addItem('expenses', {
+              id: expId, date: newR.date, direction: '支出', project: newR.project,
+              category: '代墊', account: '', amount: Number(newR.amount),
+              vendor: newR.person, method: newR.method || '現金', receiptNo: newR.receiptNo || '',
+              note: newR.description || '', serialNo: serial, linkedReimbursementId: rId,
+            })
+            logEdit({ user: who, action: '新增', entityType: '代墊', entityName: newR.person, summary: `${newR.project} NT$${Number(newR.amount).toLocaleString()} → 已自動連動帳目` })
+            setNewR({ date:'',person:'',project:'',amount:'',description:'',method:'現金',receiptNo:'' })
+            setShowAdd(false)
+          }}
             style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>送出申請</button>
         </Modal>
       )}
