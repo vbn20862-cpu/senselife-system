@@ -1107,7 +1107,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
               <select value={newR.project} onChange={e => setNewR(p => ({ ...p, project: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
                 <option value="">請選擇</option>
-                {data.projects.map(p => <option key={p.id} value={p.id}>[{p.code || p.id}] {p.name}</option>)}
+                {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.code || p.id}] {p.name}</option>)}
               </select>
             </div>
           </div>
@@ -1150,7 +1150,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
               <select value={newP.project} onChange={e => setNewP(p => ({ ...p, project: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
                 <option value="">請選擇</option>
-                {data.projects.map(p => <option key={p.id} value={p.id}>[{p.code || p.id}] {p.name}</option>)}
+                {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.code || p.id}] {p.name}</option>)}
               </select>
             </div>
           </div>
@@ -1185,7 +1185,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
               <select value={newPayable.project} onChange={e => setNewPayable(p => ({ ...p, project: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
                 <option value="">請選擇</option>
-                {data.projects.map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
+                {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
               </select>
             </div>
             <div>
@@ -1254,7 +1254,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
               <select value={editR.project} onChange={e => setEditR(p => ({ ...p, project: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
                 <option value="">請選擇</option>
-                {data.projects.map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
+                {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
               </select>
             </div>
           </div>
@@ -1288,7 +1288,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
               <select value={editP.project} onChange={e => setEditP(p => ({ ...p, project: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
                 <option value="">請選擇</option>
-                {data.projects.map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
+                {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
               </select>
             </div>
           </div>
@@ -1334,7 +1334,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
               <select value={editPayable.project ?? ''} onChange={e => setEditPayable(p => ({ ...p, project: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
                 <option value="">請選擇</option>
-                {data.projects.map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
+                {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.id}] {p.name}</option>)}
               </select>
             </div>
             <div>
@@ -1967,7 +1967,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>案件</label>
               <select value={newExp.project} onChange={e => setNewExp(p => ({ ...p, project: e.target.value }))} style={E.input}>
                 <option value="">— 請選擇 —</option>
-                {data.projects.map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
+                {data.projects.filter(pr => pr.status === '執行中' || pr.status === '長期').map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
@@ -2081,7 +2081,7 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>案件</label>
               <select value={editExp.project || ''} onChange={e => setEditExp(p => ({ ...p, project: e.target.value }))} style={E.input}>
                 <option value="">— 請選擇 —</option>
-                {data.projects.map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
+                {data.projects.filter(pr => pr.status === '執行中' || pr.status === '長期').map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
