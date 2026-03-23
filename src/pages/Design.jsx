@@ -727,7 +727,7 @@ export default function Design() {
               </span>
             ))}
           </div>
-          {projects.filter(p => workItems.some(wi => wi.projectId === p.id)).map(proj => (
+          {projects.filter(p => p.status !== '結案' && workItems.some(wi => wi.projectId === p.id)).map(proj => (
             <ProjectOverviewCard
               key={proj.id}
               project={proj}
