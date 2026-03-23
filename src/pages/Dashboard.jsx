@@ -140,8 +140,10 @@ export default function Dashboard() {
     const workItems = data.workItems || []
     const wiMap = Object.fromEntries(workItems.map(w => [w.id, w]))
 
-    // 工項
+    // 工項（排除結案案件）
+    const activeProjectIds = new Set(projects.filter(p => p.status !== '結案').map(p => p.id))
     for (const wi of workItems) {
+      if (!activeProjectIds.has(wi.projectId)) continue
       const d = daysUntil(wi.dueDate)
       if (d !== null && d >= 0 && d <= 5 && wi.status !== '完成') {
         const proj = projMap[wi.projectId]
@@ -149,12 +151,13 @@ export default function Dashboard() {
       }
     }
 
-    // 子任務 + 孫任務
+    // 子任務 + 孫任務（排除結案案件）
     for (const st of (data.subTasks || [])) {
       const d = daysUntil(st.dueDate)
       if (d !== null && d >= 0 && d <= 5 && st.status !== '完成') {
         const wi = wiMap[st.workItemId]
         const proj = wi ? projMap[wi.projectId] : null
+        if (proj && !activeProjectIds.has(wi.projectId)) continue
         result.push({ id: `st-${st.id}`, title: st.title, project: proj?.name || '', dueDate: st.dueDate, days: d, assignee: st.assignee, color: proj?.color })
       }
     }
@@ -173,15 +176,16 @@ export default function Dashboard() {
     s => s.year === ty && s.month === tm && s.day === td && s.shift !== '休假'
   )
 
-  // ── ④ 我的任務 ──
+  // ── ④ 我的任務（排除結案案件）──
   const myTasks = useMemo(() => {
     const result = []
     const projects = data.projects || []
     const projMap = Object.fromEntries(projects.map(p => [p.id, p]))
+    const activeIds = new Set(projects.filter(p => p.status !== '結案').map(p => p.id))
     const wiMap = Object.fromEntries((data.workItems || []).map(w => [w.id, w]))
 
     for (const wi of (data.workItems || [])) {
-      if (wi.assignee === myName) {
+      if (wi.assignee === myName && activeIds.has(wi.projectId)) {
         const proj = projMap[wi.projectId]
         result.push({ type: 'workItem', id: wi.id, title: wi.title, status: wi.status, dueDate: wi.dueDate, project: proj?.name || '', color: proj?.color })
       }
@@ -189,6 +193,7 @@ export default function Dashboard() {
     for (const st of (data.subTasks || [])) {
       if (st.assignee === myName) {
         const wi = wiMap[st.workItemId]
+        if (wi && !activeIds.has(wi.projectId)) continue
         const proj = wi ? projMap[wi.projectId] : null
         result.push({ type: 'subTask', id: st.id, title: st.title, status: st.status, dueDate: st.dueDate, project: proj?.name || '', color: proj?.color, category: st.category })
       }
