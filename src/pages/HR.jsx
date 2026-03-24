@@ -442,6 +442,28 @@ export default function HR() {
                 </tr>
               </thead>
               <tbody>
+                {/* 活動備註列 */}
+                <tr style={{ borderBottom: `1px solid ${E.divider}`, backgroundColor: '#f5f0e8' }}>
+                  <td style={{ padding: '4px 14px', fontWeight: '600', color: E.coffee, position: 'sticky', left: 0, backgroundColor: '#f5f0e8', borderRight: `1px solid ${E.divider}`, fontSize: '10px', whiteSpace: 'nowrap' }}>活動備註</td>
+                  {Array.from({ length: days }, (_, i) => i+1).map(d => {
+                    const noteKey = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+                    const noteVal = (data.scheduleNotes || {})[noteKey] || ''
+                    return (
+                      <td key={d} style={{ padding: '2px 1px', textAlign: 'center' }}>
+                        <input
+                          value={noteVal}
+                          onChange={e => {
+                            const notes = { ...(data.scheduleNotes || {}), [noteKey]: e.target.value }
+                            update('scheduleNotes', notes)
+                          }}
+                          placeholder="·"
+                          style={{ width: '34px', height: '22px', border: 'none', borderRadius: '4px', fontSize: '9px', textAlign: 'center', backgroundColor: noteVal ? '#fff3cd' : 'transparent', color: E.textPrimary, outline: 'none', padding: '0 1px' }}
+                        />
+                      </td>
+                    )
+                  })}
+                  <td />
+                </tr>
                 {data.employees.map((emp, ri) => (
                   <tr key={emp.id} style={{ borderBottom: `1px solid ${E.divider}`, backgroundColor: ri % 2 === 0 ? 'transparent' : '#faf7f2' }}>
                     <td style={{ padding: '8px 14px', fontWeight: '600', color: E.textPrimary, position: 'sticky', left: 0, backgroundColor: ri % 2 === 0 ? '#fdfaf5' : '#faf7f2', borderRight: `1px solid ${E.divider}` }}>{emp.name}</td>
