@@ -250,7 +250,7 @@ export default function HR() {
 
   const TABS = [
     ['schedule',  '排班表'],
-    ...(isAdmin ? [['attendance', '工時統計']] : []),
+    ['attendance', '工時統計'],
     ['clockin',   '打卡記錄'],
     ...(isAdmin ? [['employees', '員工']] : []),
     ...(isAdmin ? [['accounts', '帳號管理']] : []),
@@ -521,8 +521,9 @@ export default function HR() {
           .filter(c => c.date && c.date.startsWith(monthStr))
           .map(c => ({ ...c, _resolvedName: resolveEmpName(c.empName, data.employees) || c.empName }))
 
-        // Get unique resolved employee names
+        // Get unique resolved employee names — 非管理員只看自己
         const allClockinNames = [...new Set(monthClockins.map(c => c._resolvedName).filter(Boolean))]
+          .filter(name => isAdmin || name === currentUser?.name || currentUser?.name?.includes(name) || name?.includes(currentUser?.name))
 
         // Per-employee stats
         const stats = allClockinNames.map(name => {
