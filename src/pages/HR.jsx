@@ -126,6 +126,11 @@ function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, tex
               <span style={{ fontSize: '11px', color: textMuted }}> h</span>
             </div>
           )}
+          {s.missingAllCount > 0 && (
+            <div style={{ backgroundColor: '#fde0dc', padding: '2px 10px', borderRadius: '999px' }}>
+              <span style={{ fontSize: '11px', color: '#c04030', fontWeight: '700' }}>⚠ 未打卡 {s.missingAllCount} 天</span>
+            </div>
+          )}
         </div>
         {/* 展開按鈕 */}
         <span style={{ fontSize: '16px', color: textMuted, userSelect: 'none' }}>{open ? '▲' : '▼'}</span>
@@ -143,11 +148,13 @@ function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, tex
             {s.dayDetails.map(d => (
               <div key={d.date} style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px',
-                backgroundColor: d.isMissingOut ? '#fde8e6' : d.isOngoing ? '#e8f4e6' : d.isCompLeave ? '#f0ebf5' : sandLight,
+                backgroundColor: d.isMissingAll ? '#fde0dc' : d.isMissingOut ? '#fde8e6' : d.isOngoing ? '#e8f4e6' : d.isCompLeave ? '#f0ebf5' : sandLight,
                 borderRadius: '8px', fontSize: '12px',
               }}>
                 <span style={{ color: textSecond, fontWeight: '600', minWidth: '58px' }}>{d.date.slice(5)}</span>
-                {d.isCompLeave ? (
+                {d.isMissingAll ? (
+                  <span style={{ color: '#c04030', fontWeight: '700', fontSize: '11px' }}>⚠ 排班出勤未打卡</span>
+                ) : d.isCompLeave ? (
                   <span style={{ color: '#6a3a80', fontWeight: '600', fontSize: '11px' }}>補休 {d.clockOut}</span>
                 ) : d.isMissingOut ? (
                   <span style={{ color: '#c04030' }}>
@@ -521,8 +528,15 @@ export default function HR() {
           .filter(c => c.date && c.date.startsWith(monthStr))
           .map(c => ({ ...c, _resolvedName: resolveEmpName(c.empName, data.employees) || c.empName }))
 
-        // Get unique resolved employee names — 非管理員只看自己
-        const allClockinNames = [...new Set(monthClockins.map(c => c._resolvedName).filter(Boolean))]
+        // Get unique employee names：打卡紀錄 + 排班表有出勤的員工
+        const scheduledEmpNames = (data.schedules || [])
+          .filter(s => s.year === attYear && s.month === attMonth && (s.shift === '出勤' || s.shift === 'W'))
+          .map(s => { const emp = data.employees.find(e => e.id === s.empId); return emp?.name })
+          .filter(Boolean)
+        const allClockinNames = [...new Set([
+          ...monthClockins.map(c => c._resolvedName).filter(Boolean),
+          ...scheduledEmpNames,
+        ])]
           .filter(name => isAdmin || name === currentUser?.name || currentUser?.name?.includes(name) || name?.includes(currentUser?.name))
 
         // Per-employee stats
@@ -538,7 +552,15 @@ export default function HR() {
           const compLeaveForMonth = emp
             ? (data.compLeaveRecords || []).filter(r => r.empId === emp.id && r.date?.startsWith(monthStr))
             : []
-          const allDates = [...new Set([...myClockins.map(c => c.date), ...compLeaveForMonth.map(r => r.date)])].sort()
+
+          // 排班「出勤」但完全沒打卡的日期也要列出
+          const scheduledWorkDates = emp
+            ? (data.schedules || [])
+                .filter(s => s.empId === emp.id && s.year === attYear && s.month === attMonth && (s.shift === '出勤' || s.shift === 'W'))
+                .map(s => `${attYear}-${String(attMonth).padStart(2,'0')}-${String(s.day).padStart(2,'0')}`)
+            : []
+
+          const allDates = [...new Set([...myClockins.map(c => c.date), ...compLeaveForMonth.map(r => r.date), ...scheduledWorkDates])].sort()
 
           allDates.forEach(date => {
             const dayRecs = myClockins.filter(c => c.date === date).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
@@ -551,7 +573,9 @@ export default function HR() {
             let pairCount = 0
             let isMissingOut = false
             let isOngoing = false
+            let isMissingAll = false
             const todayStr = new Date().toISOString().split('T')[0]
+            const isScheduledWork = scheduledWorkDates.includes(date)
 
             if (clockInRecs.length > 0 && clockOutRecs.length > 0) {
               const inTime  = clockInRecs[0].time
@@ -579,6 +603,9 @@ export default function HR() {
                   isMissingOut = true
                 }
               }
+            } else if (clockInRecs.length === 0 && clockOutRecs.length === 0 && isScheduledWork && date < todayStr) {
+              // 排班出勤但完全沒打卡（不含今天和未來）
+              isMissingAll = true
             }
 
             // 工時達5小時自動扣1小時休息
@@ -610,12 +637,14 @@ export default function HR() {
               hasPair: pairCount > 0 || clMin > 0,
               isCompLeave: isCompLeaveOnly,
               isMissingOut,
+              isMissingAll,
               isOngoing,
             })
           })
 
           const totalHours   = roundHours(totalMinutes)
           const totalOTHours = roundHours(totalOTMinutes)
+          const missingAllCount = dayDetails.filter(d => d.isMissingAll).length
           return {
             name: emp?.name || name,
             workDays: workDays.size,
@@ -625,8 +654,9 @@ export default function HR() {
             totalOTMinutes,
             dayDetails,
             hasOT: totalOTMinutes > 0,
+            missingAllCount,
           }
-        }).filter(s => s.workDays > 0 || s.totalMinutes > 0)
+        }).filter(s => s.workDays > 0 || s.totalMinutes > 0 || s.missingAllCount > 0)
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

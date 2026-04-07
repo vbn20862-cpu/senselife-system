@@ -96,7 +96,7 @@ export default function Finance() {
   const [showClosedBudgets, setShowClosedBudgets] = useState(false)
   const currentYear = new Date().getFullYear()
   const [budgetYear, setBudgetYear] = useState(String(currentYear))
-  const [newR, setNewR] = useState({ date: '', person: '', project: '', amount: '', description: '', method: '現金', receiptNo: '' })
+  const [newR, setNewR] = useState({ date: '', person: '', project: '', amount: '', description: '', method: '現金', receiptNo: '', category: '' })
   const [newP, setNewP] = useState({ date: '', person: '', project: '', amount: '', description: '', status: '待審核' })
   const [newBank, setNewBank] = useState({ name: '', type: 'employee', bank: '', account: '', note: '' })
   const [newPayable, setNewPayable] = useState({ vendor: '', amount: '', invoiceNo: '', dueDate: '', project: '', status: '待付', note: '' })
@@ -111,7 +111,7 @@ export default function Finance() {
   const [showAddExp, setShowAddExp] = useState(false)
   const [viewExp, setViewExp] = useState(null)
   const [editExp, setEditExp] = useState(null)
-  const EMPTY_EXP = { date: '', direction: '支出', project: '', category: '', account: '', amount: '', vendor: '', method: '現金', receiptNo: '', note: '', linkedSerial: '' }
+  const EMPTY_EXP = { date: '', direction: '支出', project: '', category: '', amount: '', vendor: '', method: '現金', receiptNo: '', note: '', linkedSerial: '' }
   const [newExp, setNewExp] = useState(EMPTY_EXP)
   const [expDirFilter, setExpDirFilter] = useState('all')
   const [expProjFilter, setExpProjFilter] = useState('all')
@@ -139,10 +139,10 @@ export default function Finance() {
 
   const expProjects = useMemo(() => [...new Set(data.expenses.map(e => e.project).filter(Boolean))].sort(), [data.expenses])
   const expCategories = useMemo(() => [...new Set(data.expenses.map(e => e.category).filter(Boolean))].sort(), [data.expenses])
-  const expAccounts = useMemo(() => [...new Set(data.expenses.map(e => e.account).filter(Boolean))].sort(), [data.expenses])
+  const expAccounts = useMemo(() => [...new Set([...data.expenses.map(e => e.category), ...data.expenses.map(e => e.account)].filter(Boolean))].sort(), [data.expenses])
   const expFiltered = useMemo(() =>
     [...data.expenses]
-      .filter(e => !search || e.vendor?.includes(search) || e.project?.includes(search) || e.account?.includes(search))
+      .filter(e => !search || e.vendor?.includes(search) || e.project?.includes(search) || e.category?.includes(search))
       .filter(e => expDirFilter === 'all' || (e.direction || '支出') === expDirFilter)
       .filter(e => expProjFilter === 'all' || e.project === expProjFilter)
       .filter(e => expCatFilter === 'all' || e.category === expCatFilter)
@@ -737,10 +737,10 @@ export default function Finance() {
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: mob ? '100%' : '140px' }}>
-                  <span style={{ fontSize: '11px', color: E.textMuted }}>類別</span>
+                  <span style={{ fontSize: '11px', color: E.textMuted }}>科目</span>
                   <select value={expCatFilter} onChange={e => setExpCatFilter(e.target.value)}
                     style={{ ...E.input, fontSize: '12px', padding: '5px 10px' }}>
-                    <option value="all">全部類別</option>
+                    <option value="all">全部科目</option>
                     {expCategories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
@@ -756,7 +756,7 @@ export default function Finance() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ backgroundColor: E.sandLight, borderBottom: `1px solid ${E.divider}` }}>
-                    {['流水號','日期','收支','專案','類別','廠商','金額','操作'].map(h => (
+                    {['流水號','日期','收支','專案','科目','廠商','金額','操作'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: E.textSecond }}>{h}</th>
                     ))}
                   </tr>
@@ -970,7 +970,7 @@ export default function Finance() {
 
             {cats.length > 0 && (
               <div style={E.card}>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary, marginBottom: '14px' }}>支出類別</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary, marginBottom: '14px' }}>支出科目</div>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   <DonutChart slices={donutSlices} size={130} />
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px' }}>
@@ -1002,7 +1002,7 @@ export default function Finance() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
                     <tr style={{ backgroundColor: E.sandLight }}>
-                      {['流水號','日期','類別','廠商','金額','科目'].map(h => (
+                      {['流水號','日期','科目','廠商','金額'].map(h => (
                         <th key={h} style={{ textAlign: 'left', padding: '8px 14px', fontWeight: '600', color: E.textSecond }}>{h}</th>
                       ))}
                     </tr>
@@ -1019,7 +1019,6 @@ export default function Finance() {
                         <td style={{ padding: '9px 14px', color: E.textSecond }}>{e.category}</td>
                         <td style={{ padding: '9px 14px', fontWeight: '600', color: E.textPrimary }}>{e.vendor}</td>
                         <td style={{ padding: '9px 14px', fontWeight: '700', color: E.coffee }}>NT${e.amount.toLocaleString()}</td>
-                        <td style={{ padding: '9px 14px', color: E.textMuted }}>{e.account}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1110,6 +1109,13 @@ export default function Finance() {
                 {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.code || p.id}] {p.name}</option>)}
               </select>
             </div>
+            <div>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
+              <select value={newR.category} onChange={e => setNewR(p => ({ ...p, category: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
+                <option value="">請選擇</option>
+                {expAccounts.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
           <button onClick={() => {
             if (!newR.date||!newR.person||!newR.amount) return
@@ -1122,12 +1128,12 @@ export default function Finance() {
             const expId = `slm26-${String(maxNum + 1).padStart(3, '0')}`
             addItem('expenses', {
               id: expId, date: newR.date, direction: '支出', project: newR.project,
-              category: '代墊', account: '', amount: Number(newR.amount),
+              category: newR.category || '代墊', amount: Number(newR.amount),
               vendor: newR.person, method: newR.method || '現金', receiptNo: newR.receiptNo || '',
               note: newR.description || '', serialNo: serial, linkedReimbursementId: rId,
             })
             logEdit({ user: who, action: '新增', entityType: '代墊', entityName: newR.person, summary: `${newR.project} NT$${Number(newR.amount).toLocaleString()} → 已自動連動帳目` })
-            setNewR({ date:'',person:'',project:'',amount:'',description:'',method:'現金',receiptNo:'' })
+            setNewR({ date:'',person:'',project:'',amount:'',description:'',method:'現金',receiptNo:'',category:'' })
             setShowAdd(false)
           }}
             style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>送出申請</button>
@@ -1900,8 +1906,7 @@ export default function Finance() {
               ['金額',     `NT$${Number(viewExp.amount).toLocaleString()}`],
               ['付款方式', viewExp.method],
               ['案件',     viewExp.project],
-              ['類別',     viewExp.category],
-              ['會計科目', viewExp.account],
+              ['會計科目', viewExp.category || viewExp.account],
               ['憑證號碼', viewExp.receiptNo],
               ['備註',     viewExp.note],
             ].map(([label, val]) => val ? (
@@ -1970,37 +1975,20 @@ export default function Finance() {
                 {data.projects.filter(pr => pr.status === '執行中' || pr.status === '長期').map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
               </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案支出類別</label>
-                {newExp._catCustom ? (
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input value={newExp.category} onChange={e => setNewExp(p => ({ ...p, category: e.target.value }))} placeholder="輸入新類別名稱" style={{ ...E.input, flex: 1 }} autoFocus />
-                    <button type="button" onClick={() => setNewExp(p => ({ ...p, _catCustom: false, category: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
-                  </div>
-                ) : (
-                  <select value={newExp.category} onChange={e => { if (e.target.value === '__custom__') setNewExp(p => ({ ...p, _catCustom: true, category: '' })); else setNewExp(p => ({ ...p, category: e.target.value })) }} style={E.input}>
-                    <option value="">— 請選擇 —</option>
-                    {expCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                    <option value="__custom__">＋ 自訂新類別</option>
-                  </select>
-                )}
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
-                {newExp._accCustom ? (
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input value={newExp.account} onChange={e => setNewExp(p => ({ ...p, account: e.target.value }))} placeholder="輸入新科目名稱" style={{ ...E.input, flex: 1 }} autoFocus />
-                    <button type="button" onClick={() => setNewExp(p => ({ ...p, _accCustom: false, account: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
-                  </div>
-                ) : (
-                  <select value={newExp.account} onChange={e => { if (e.target.value === '__custom__') setNewExp(p => ({ ...p, _accCustom: true, account: '' })); else setNewExp(p => ({ ...p, account: e.target.value })) }} style={E.input}>
-                    <option value="">— 請選擇 —</option>
-                    {expAccounts.map(a => <option key={a} value={a}>{a}</option>)}
-                    <option value="__custom__">＋ 自訂新科目</option>
-                  </select>
-                )}
-              </div>
+            <div>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
+              {newExp._catCustom ? (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input value={newExp.category} onChange={e => setNewExp(p => ({ ...p, category: e.target.value }))} placeholder="輸入新科目名稱" style={{ ...E.input, flex: 1 }} autoFocus />
+                  <button type="button" onClick={() => setNewExp(p => ({ ...p, _catCustom: false, category: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
+                </div>
+              ) : (
+                <select value={newExp.category} onChange={e => { if (e.target.value === '__custom__') setNewExp(p => ({ ...p, _catCustom: true, category: '' })); else setNewExp(p => ({ ...p, category: e.target.value })) }} style={E.input}>
+                  <option value="">— 請選擇 —</option>
+                  {expAccounts.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__custom__">＋ 自訂新科目</option>
+                </select>
+              )}
             </div>
             <div>
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>憑證編號</label>
@@ -2030,7 +2018,7 @@ export default function Finance() {
                 const maxId = (data.expenses || []).filter(e => e.id?.startsWith('slm')).length + 1
                 const id = `slm26-${String(maxId).padStart(3, '0')}`
                 const serialNo = newExp.linkedSerial || generateSerial()
-                const { _catCustom, _accCustom, ...cleanExp } = newExp
+                const { _catCustom, ...cleanExp } = newExp
                 addItem('expenses', { id, ...cleanExp, amount: Number(newExp.amount), serialNo })
                 logEdit({ user: who, action: '新增', entityType: '帳目', entityName: newExp.vendor, summary: `${newExp.project} NT$${Number(newExp.amount).toLocaleString()}` })
                 setNewExp(EMPTY_EXP)
@@ -2084,37 +2072,20 @@ export default function Finance() {
                 {data.projects.filter(pr => pr.status === '執行中' || pr.status === '長期').map(pr => <option key={pr.id} value={pr.id}>{pr.id}｜{pr.name}</option>)}
               </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>專案支出類別</label>
-                {editExp._catCustom ? (
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input value={editExp.category || ''} onChange={e => setEditExp(p => ({ ...p, category: e.target.value }))} placeholder="輸入新類別名稱" style={{ ...E.input, flex: 1 }} autoFocus />
-                    <button type="button" onClick={() => setEditExp(p => ({ ...p, _catCustom: false, category: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
-                  </div>
-                ) : (
-                  <select value={editExp.category || ''} onChange={e => { if (e.target.value === '__custom__') setEditExp(p => ({ ...p, _catCustom: true, category: '' })); else setEditExp(p => ({ ...p, category: e.target.value })) }} style={E.input}>
-                    <option value="">— 請選擇 —</option>
-                    {expCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                    <option value="__custom__">＋ 自訂新類別</option>
-                  </select>
-                )}
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
-                {editExp._accCustom ? (
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input value={editExp.account || ''} onChange={e => setEditExp(p => ({ ...p, account: e.target.value }))} placeholder="輸入新科目名稱" style={{ ...E.input, flex: 1 }} autoFocus />
-                    <button type="button" onClick={() => setEditExp(p => ({ ...p, _accCustom: false, account: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
-                  </div>
-                ) : (
-                  <select value={editExp.account || ''} onChange={e => { if (e.target.value === '__custom__') setEditExp(p => ({ ...p, _accCustom: true, account: '' })); else setEditExp(p => ({ ...p, account: e.target.value })) }} style={E.input}>
-                    <option value="">— 請選擇 —</option>
-                    {expAccounts.map(a => <option key={a} value={a}>{a}</option>)}
-                    <option value="__custom__">＋ 自訂新科目</option>
-                  </select>
-                )}
-              </div>
+            <div>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
+              {editExp._catCustom ? (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input value={editExp.category || ''} onChange={e => setEditExp(p => ({ ...p, category: e.target.value }))} placeholder="輸入新科目名稱" style={{ ...E.input, flex: 1 }} autoFocus />
+                  <button type="button" onClick={() => setEditExp(p => ({ ...p, _catCustom: false, category: '' }))} style={{ ...E.input, width: 'auto', padding: '0 10px', cursor: 'pointer', color: E.textMuted, fontSize: '12px' }}>取消</button>
+                </div>
+              ) : (
+                <select value={editExp.category || ''} onChange={e => { if (e.target.value === '__custom__') setEditExp(p => ({ ...p, _catCustom: true, category: '' })); else setEditExp(p => ({ ...p, category: e.target.value })) }} style={E.input}>
+                  <option value="">— 請選擇 —</option>
+                  {expAccounts.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__custom__">＋ 自訂新科目</option>
+                </select>
+              )}
             </div>
             <div>
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>憑證編號</label>
@@ -2128,7 +2099,7 @@ export default function Finance() {
               onClick={() => {
                 if (!editExp.date || !editExp.vendor || !editExp.amount) return
                 const who = currentUser?.name || currentUser?.username || '未知'
-                const { _catCustom: _c, _accCustom: _a, ...cleanEdit } = editExp
+                const { _catCustom: _c, ...cleanEdit } = editExp
                 updateItem('expenses', editExp.id, { ...cleanEdit, amount: Number(editExp.amount) })
                 logEdit({ user: who, action: '編輯', entityType: '帳目', entityName: editExp.vendor, summary: `${editExp.project} NT$${Number(editExp.amount).toLocaleString()}` })
                 setEditExp(null)

@@ -651,33 +651,111 @@
       "note": ""
     },
     {
-      "id": "exp_51",
-      "date": "",
+      "id": "slm26-051",
+      "date": "2026-03-16",
       "direction": "支出",
       "project": "RME_sl",
       "category": "交通",
       "account": "旅費",
-      "amount": 0,
-      "vendor": "",
-      "method": "",
+      "amount": 300,
+      "vendor": "加油站",
+      "method": "現金",
       "receiptNo": "XA-22962665",
       "note": ""
     },
     {
-      "id": "exp_52",
-      "date": "",
+      "id": "slm26-052",
+      "date": "2026-03-16",
       "direction": "支出",
       "project": "RME_sl",
       "category": "交通",
       "account": "旅費",
-      "amount": 0,
-      "vendor": "",
-      "method": "",
+      "amount": 250,
+      "vendor": "加油站",
+      "method": "現金",
       "receiptNo": "WE-84090125",
       "note": ""
     },
     {
-      "id": "exp_53",
+      "id": "slm26-053",
+      "date": "2026-03-16",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "交通",
+      "account": "旅費",
+      "amount": 500,
+      "vendor": "加油站",
+      "method": "現金",
+      "receiptNo": "YW-99607469",
+      "note": ""
+    },
+    {
+      "id": "slm26-054",
+      "date": "2026-03-16",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 420,
+      "vendor": "採訪田調茶水",
+      "method": "現金",
+      "receiptNo": "統編：92170207",
+      "note": ""
+    },
+    {
+      "id": "slm26-055",
+      "date": "2026-03-16",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 339,
+      "vendor": "採訪田調茶水",
+      "method": "現金",
+      "receiptNo": "統編：62911788",
+      "note": ""
+    },
+    {
+      "id": "slm26-056",
+      "date": "2026-03-16",
+      "direction": "支出",
+      "project": "WTM_sl",
+      "category": "雜支",
+      "account": "雜項支出",
+      "amount": 80,
+      "vendor": "獎品郵寄費用",
+      "method": "現金",
+      "receiptNo": "憑證:929637 900006 70 80700 3",
+      "note": ""
+    },
+    {
+      "id": "slm26-057",
+      "date": "2026-03-16",
+      "direction": "支出",
+      "project": "WTM_sl",
+      "category": "印刷",
+      "account": "業務推廣費",
+      "amount": 1128,
+      "vendor": "複製基地",
+      "method": "現金",
+      "receiptNo": "統編:09047792",
+      "note": ""
+    },
+    {
+      "id": "slm2026/316-001",
+      "date": "",
+      "direction": "支出",
+      "project": "RME_sl",
+      "category": "活動執行",
+      "account": "業務推廣費",
+      "amount": 6160,
+      "vendor": "邦群商行",
+      "method": "現金",
+      "receiptNo": "統編:88496049",
+      "note": ""
+    },
+    {
+      "id": "exp_59",
       "date": "",
       "direction": "支出",
       "project": "",
@@ -1068,7 +1146,7 @@
       "project": "RME_sl",
       "amount": 300,
       "description": "去霧臺開會",
-      "status": "待還款",
+      "status": "已還款",
       "method": "現金",
       "receiptNo": "XA-22962665"
     },
@@ -1079,486 +1157,186 @@
       "project": "RME_sl",
       "amount": 250,
       "description": "去霧臺開會",
-      "status": "待還款",
+      "status": "已還款",
       "method": "現金",
       "receiptNo": "WE-84090125"
+    },
+    {
+      "id": 41,
+      "date": "2026-03-11",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 500,
+      "description": "去高雄食物模型廠商",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "YW-99607469"
+    },
+    {
+      "id": 42,
+      "date": "2026-03-12",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 420,
+      "description": "採訪田調茶水",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "統編：92170207"
+    },
+    {
+      "id": 43,
+      "date": "2026-03-12",
+      "person": "祖珠",
+      "project": "RME_sl",
+      "amount": 339,
+      "description": "採訪田調茶水",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "統編：62911788"
+    },
+    {
+      "id": 44,
+      "date": "2026-03-13",
+      "person": "宝琳",
+      "project": "",
+      "amount": 80,
+      "description": "獎品郵寄費用",
+      "status": "已還款",
+      "method": "現金",
+      "receiptNo": "憑證:929637 900006 70 80700 3"
     }
   ],
   "clockins": [
     {
       "id": 1,
       "empName": "宝琳",
-      "date": "2026-03-09",
-      "time": "09:58",
+      "date": "2026-03-16",
+      "time": "09:45",
       "type": "上班",
       "note": ""
     },
     {
       "id": 2,
       "empName": "祖珠",
-      "date": "2026-03-09",
-      "time": "08:56",
+      "date": "2026-03-16",
+      "time": "09:11",
       "type": "上班",
       "note": ""
     },
     {
       "id": 3,
-      "empName": "宝琳",
-      "date": "2026-03-06",
-      "time": "19:27",
-      "type": "下班",
+      "empName": "庭瑜",
+      "date": "2026-03-16",
+      "time": "08:52",
+      "type": "上班",
       "note": ""
     },
     {
       "id": 4,
-      "empName": "祖珠",
-      "date": "2026-03-06",
-      "time": "18:14",
+      "empName": "宝琳",
+      "date": "2026-03-13",
+      "time": "19:42",
       "type": "下班",
       "note": ""
     },
     {
       "id": 5,
-      "empName": "陳曦",
-      "date": "2026-03-06",
-      "time": "17:53",
+      "empName": "祖珠",
+      "date": "2026-03-13",
+      "time": "19:26",
       "type": "下班",
       "note": ""
     },
     {
       "id": 6,
-      "empName": "宝琳",
-      "date": "2026-03-06",
-      "time": "09:46",
-      "type": "上班",
+      "empName": "陳曦",
+      "date": "2026-03-13",
+      "time": "17:51",
+      "type": "下班",
       "note": ""
     },
     {
       "id": 7,
-      "empName": "陳曦",
-      "date": "2026-03-06",
-      "time": "08:46",
+      "empName": "宝琳",
+      "date": "2026-03-13",
+      "time": "11:02",
       "type": "上班",
       "note": ""
     },
     {
       "id": 8,
       "empName": "祖珠",
-      "date": "2026-03-05",
-      "time": "18:13",
-      "type": "下班",
+      "date": "2026-03-13",
+      "time": "09:34",
+      "type": "上班",
       "note": ""
     },
     {
       "id": 9,
-      "empName": "祖珠",
-      "date": "2026-03-05",
-      "time": "09:09",
+      "empName": "陳曦",
+      "date": "2026-03-13",
+      "time": "08:47",
       "type": "上班",
       "note": ""
     },
     {
       "id": 10,
       "empName": "宝琳",
-      "date": "2026-03-04",
-      "time": "22:40",
+      "date": "2026-03-12",
+      "time": "18:34",
       "type": "下班",
       "note": ""
     },
     {
       "id": 11,
-      "empName": "陳曦",
-      "date": "2026-03-04",
-      "time": "15:04",
+      "empName": "祖珠",
+      "date": "2026-03-12",
+      "time": "18:32",
       "type": "下班",
       "note": ""
     },
     {
       "id": 12,
-      "empName": "宝琳",
-      "date": "2026-03-04",
-      "time": "09:36",
-      "type": "上班",
+      "empName": "庭瑜",
+      "date": "2026-03-12",
+      "time": "18:11",
+      "type": "下班",
       "note": ""
     },
     {
       "id": 13,
-      "empName": "祖珠",
-      "date": "2026-03-04",
-      "time": "09:22",
+      "empName": "庭瑜",
+      "date": "2026-03-12",
+      "time": "13:56",
       "type": "上班",
       "note": ""
     },
     {
       "id": 14,
-      "empName": "陳曦",
-      "date": "2026-03-04",
-      "time": "08:54",
+      "empName": "宝琳",
+      "date": "2026-03-12",
+      "time": "09:49",
       "type": "上班",
       "note": ""
     },
     {
       "id": 15,
       "empName": "宝琳",
-      "date": "2026-03-03",
-      "time": "19:27",
+      "date": "2026-03-11",
+      "time": "18:36",
       "type": "下班",
       "note": ""
     },
     {
       "id": 16,
-      "empName": "祖珠",
-      "date": "2026-03-03",
-      "time": "18:06",
+      "empName": "陳曦",
+      "date": "2026-03-11",
+      "time": "14:21",
       "type": "下班",
       "note": ""
     },
     {
       "id": 17,
-      "empName": "宝琳",
-      "date": "2026-03-03",
-      "time": "09:45",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 18,
-      "empName": "祖珠",
-      "date": "2026-03-03",
-      "time": "08:41",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 19,
-      "empName": "宝琳",
-      "date": "2026-03-02",
-      "time": "18:51",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 20,
-      "empName": "祖珠",
-      "date": "2026-03-02",
-      "time": "18:20",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 21,
-      "empName": "祖珠",
-      "date": "2026-03-02",
-      "time": "09:07",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 22,
-      "empName": "宝琳",
-      "date": "2026-03-02",
-      "time": "09:03",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 23,
-      "empName": "祖珠",
-      "date": "2026-02-26",
-      "time": "17:48",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 24,
-      "empName": "宝琳",
-      "date": "2026-02-26",
-      "time": "09:25",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 25,
-      "empName": "祖珠",
-      "date": "2026-02-26",
-      "time": "08:42",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 26,
-      "empName": "祖珠",
-      "date": "2026-02-25",
-      "time": "18:28",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 27,
-      "empName": "宝琳",
-      "date": "2026-02-25",
-      "time": "18:28",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 28,
-      "empName": "陳曦",
-      "date": "2026-02-25",
-      "time": "14:03",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 29,
-      "empName": "宝琳",
-      "date": "2026-02-25",
-      "time": "09:46",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 30,
-      "empName": "祖珠",
-      "date": "2026-02-25",
-      "time": "08:59",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 31,
-      "empName": "陳曦",
-      "date": "2026-02-25",
-      "time": "08:53",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 32,
-      "empName": "宝琳",
-      "date": "2026-02-24",
-      "time": "18:08",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 33,
-      "empName": "祖珠",
-      "date": "2026-02-24",
-      "time": "17:55",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 34,
-      "empName": "祖珠",
-      "date": "2026-02-24",
-      "time": "09:01",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 35,
-      "empName": "祖珠",
-      "date": "2026-02-23",
-      "time": "22:26",
-      "type": "加班結束",
-      "note": "文件／計畫書撰寫"
-    },
-    {
-      "id": 36,
-      "empName": "祖珠",
-      "date": "2026-02-23",
-      "time": "20:55",
-      "type": "加班開始",
-      "note": "文件／計畫書撰寫"
-    },
-    {
-      "id": 37,
-      "empName": "祖珠",
-      "date": "2026-02-23",
-      "time": "09:05",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 38,
-      "empName": "祖珠",
-      "date": "2026-02-13",
-      "time": "18:30",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 39,
-      "empName": "陳曦",
-      "date": "2026-02-13",
-      "time": "18:28",
-      "type": "加班結束",
-      "note": "其他"
-    },
-    {
-      "id": 40,
-      "empName": "祖珠",
-      "date": "2026-02-13",
-      "time": "09:36",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 41,
-      "empName": "陳曦",
-      "date": "2026-02-13",
-      "time": "00:00",
-      "type": "加班結束",
-      "note": "臨時主管交辦"
-    },
-    {
-      "id": 42,
-      "empName": "陳曦",
-      "date": "2026-02-12",
-      "time": "23:31",
-      "type": "加班開始",
-      "note": "臨時主管交辦"
-    },
-    {
-      "id": 43,
-      "empName": "陳曦",
-      "date": "2026-02-12",
-      "time": "20:35",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 44,
-      "empName": "祖珠",
-      "date": "2026-02-12",
-      "time": "18:01",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 45,
-      "empName": "陳曦",
-      "date": "2026-02-12",
-      "time": "09:05",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 46,
-      "empName": "陳曦",
-      "date": "2026-02-11",
-      "time": "18:04",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 47,
-      "empName": "陳曦",
-      "date": "2026-02-11",
-      "time": "09:02",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 48,
-      "empName": "阿雯",
-      "date": "2026-02-09",
-      "time": "15:51",
-      "type": "加班開始",
-      "note": "活動支援／籌備"
-    },
-    {
-      "id": 49,
-      "empName": "阿慶",
-      "date": "2026-02-09",
-      "time": "15:30",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 50,
-      "empName": "阿慶",
-      "date": "2026-02-09",
-      "time": "15:22",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 51,
-      "empName": "庭瑜",
-      "date": "2026-03-09",
-      "time": "13:07",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 52,
-      "empName": "庭瑜",
-      "date": "2026-03-09",
-      "time": "18:10",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 53,
-      "empName": "祖珠",
-      "date": "2026-03-09",
-      "time": "18:15",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 54,
-      "empName": "祖珠",
-      "date": "2026-03-10",
-      "time": "09:10",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 55,
-      "empName": "宝琳",
-      "date": "2026-03-10",
-      "time": "09:38",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 56,
-      "empName": "祖珠",
-      "date": "2026-03-10",
-      "time": "18:42",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 57,
-      "empName": "宝琳",
-      "date": "2026-03-10",
-      "time": "19:00",
-      "type": "下班",
-      "note": ""
-    },
-    {
-      "id": 58,
-      "empName": "陳曦",
-      "date": "2026-03-11",
-      "time": "08:50",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 59,
-      "empName": "祖珠",
-      "date": "2026-03-11",
-      "time": "08:53",
-      "type": "上班",
-      "note": ""
-    },
-    {
-      "id": 60,
       "empName": "宝琳",
       "date": "2026-03-11",
       "time": "09:50",
@@ -1566,10 +1344,482 @@
       "note": ""
     },
     {
-      "id": 61,
+      "id": 18,
+      "empName": "祖珠",
+      "date": "2026-03-11",
+      "time": "08:53",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 19,
       "empName": "陳曦",
       "date": "2026-03-11",
-      "time": "14:21",
+      "time": "08:50",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 20,
+      "empName": "宝琳",
+      "date": "2026-03-10",
+      "time": "19:00",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 21,
+      "empName": "祖珠",
+      "date": "2026-03-10",
+      "time": "18:42",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 22,
+      "empName": "宝琳",
+      "date": "2026-03-10",
+      "time": "09:38",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 23,
+      "empName": "祖珠",
+      "date": "2026-03-10",
+      "time": "09:10",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 24,
+      "empName": "祖珠",
+      "date": "2026-03-09",
+      "time": "18:15",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 25,
+      "empName": "庭瑜",
+      "date": "2026-03-09",
+      "time": "18:10",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 26,
+      "empName": "庭瑜",
+      "date": "2026-03-09",
+      "time": "13:07",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 27,
+      "empName": "宝琳",
+      "date": "2026-03-09",
+      "time": "09:58",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 28,
+      "empName": "祖珠",
+      "date": "2026-03-09",
+      "time": "08:56",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 29,
+      "empName": "宝琳",
+      "date": "2026-03-06",
+      "time": "19:27",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 30,
+      "empName": "祖珠",
+      "date": "2026-03-06",
+      "time": "18:14",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 31,
+      "empName": "陳曦",
+      "date": "2026-03-06",
+      "time": "17:53",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 32,
+      "empName": "宝琳",
+      "date": "2026-03-06",
+      "time": "09:46",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 33,
+      "empName": "陳曦",
+      "date": "2026-03-06",
+      "time": "08:46",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 34,
+      "empName": "祖珠",
+      "date": "2026-03-05",
+      "time": "18:13",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 35,
+      "empName": "祖珠",
+      "date": "2026-03-05",
+      "time": "09:09",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 36,
+      "empName": "宝琳",
+      "date": "2026-03-04",
+      "time": "22:40",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 37,
+      "empName": "陳曦",
+      "date": "2026-03-04",
+      "time": "15:04",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 38,
+      "empName": "宝琳",
+      "date": "2026-03-04",
+      "time": "09:36",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 39,
+      "empName": "祖珠",
+      "date": "2026-03-04",
+      "time": "09:22",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 40,
+      "empName": "陳曦",
+      "date": "2026-03-04",
+      "time": "08:54",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 41,
+      "empName": "宝琳",
+      "date": "2026-03-03",
+      "time": "19:27",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 42,
+      "empName": "祖珠",
+      "date": "2026-03-03",
+      "time": "18:06",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 43,
+      "empName": "宝琳",
+      "date": "2026-03-03",
+      "time": "09:45",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 44,
+      "empName": "祖珠",
+      "date": "2026-03-03",
+      "time": "08:41",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 45,
+      "empName": "宝琳",
+      "date": "2026-03-02",
+      "time": "18:51",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 46,
+      "empName": "祖珠",
+      "date": "2026-03-02",
+      "time": "18:20",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 47,
+      "empName": "祖珠",
+      "date": "2026-03-02",
+      "time": "09:07",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 48,
+      "empName": "宝琳",
+      "date": "2026-03-02",
+      "time": "09:03",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 49,
+      "empName": "祖珠",
+      "date": "2026-02-26",
+      "time": "17:48",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 50,
+      "empName": "宝琳",
+      "date": "2026-02-26",
+      "time": "09:25",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 51,
+      "empName": "祖珠",
+      "date": "2026-02-26",
+      "time": "08:42",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 52,
+      "empName": "祖珠",
+      "date": "2026-02-25",
+      "time": "18:28",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 53,
+      "empName": "宝琳",
+      "date": "2026-02-25",
+      "time": "18:28",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 54,
+      "empName": "陳曦",
+      "date": "2026-02-25",
+      "time": "14:03",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 55,
+      "empName": "宝琳",
+      "date": "2026-02-25",
+      "time": "09:46",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 56,
+      "empName": "祖珠",
+      "date": "2026-02-25",
+      "time": "08:59",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 57,
+      "empName": "陳曦",
+      "date": "2026-02-25",
+      "time": "08:53",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 58,
+      "empName": "宝琳",
+      "date": "2026-02-24",
+      "time": "18:08",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 59,
+      "empName": "祖珠",
+      "date": "2026-02-24",
+      "time": "17:55",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 60,
+      "empName": "祖珠",
+      "date": "2026-02-24",
+      "time": "09:01",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 61,
+      "empName": "祖珠",
+      "date": "2026-02-23",
+      "time": "22:26",
+      "type": "加班結束",
+      "note": "文件／計畫書撰寫"
+    },
+    {
+      "id": 62,
+      "empName": "祖珠",
+      "date": "2026-02-23",
+      "time": "20:55",
+      "type": "加班開始",
+      "note": "文件／計畫書撰寫"
+    },
+    {
+      "id": 63,
+      "empName": "祖珠",
+      "date": "2026-02-23",
+      "time": "09:05",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 64,
+      "empName": "祖珠",
+      "date": "2026-02-13",
+      "time": "18:30",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 65,
+      "empName": "陳曦",
+      "date": "2026-02-13",
+      "time": "18:28",
+      "type": "加班結束",
+      "note": "其他"
+    },
+    {
+      "id": 66,
+      "empName": "祖珠",
+      "date": "2026-02-13",
+      "time": "09:36",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 67,
+      "empName": "陳曦",
+      "date": "2026-02-13",
+      "time": "00:00",
+      "type": "加班結束",
+      "note": "臨時主管交辦"
+    },
+    {
+      "id": 68,
+      "empName": "陳曦",
+      "date": "2026-02-12",
+      "time": "23:31",
+      "type": "加班開始",
+      "note": "臨時主管交辦"
+    },
+    {
+      "id": 69,
+      "empName": "陳曦",
+      "date": "2026-02-12",
+      "time": "20:35",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 70,
+      "empName": "祖珠",
+      "date": "2026-02-12",
+      "time": "18:01",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 71,
+      "empName": "陳曦",
+      "date": "2026-02-12",
+      "time": "09:05",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 72,
+      "empName": "陳曦",
+      "date": "2026-02-11",
+      "time": "18:04",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 73,
+      "empName": "陳曦",
+      "date": "2026-02-11",
+      "time": "09:02",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 74,
+      "empName": "阿雯",
+      "date": "2026-02-09",
+      "time": "15:51",
+      "type": "加班開始",
+      "note": "活動支援／籌備"
+    },
+    {
+      "id": 75,
+      "empName": "阿慶",
+      "date": "2026-02-09",
+      "time": "15:30",
+      "type": "下班",
+      "note": ""
+    },
+    {
+      "id": 76,
+      "empName": "阿慶",
+      "date": "2026-02-09",
+      "time": "15:22",
+      "type": "上班",
+      "note": ""
+    },
+    {
+      "id": 77,
+      "empName": "庭瑜",
+      "date": "2026-03-16",
+      "time": "18:08",
       "type": "下班",
       "note": ""
     }
@@ -2828,6 +3078,254 @@
       "month": 3,
       "day": 28,
       "shift": "出勤"
+    },
+    {
+      "id": 20149,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 1,
+      "shift": "休假"
+    },
+    {
+      "id": 20150,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 2,
+      "shift": "休假"
+    },
+    {
+      "id": 20151,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 3,
+      "shift": "休假"
+    },
+    {
+      "id": 20152,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 4,
+      "shift": "休假"
+    },
+    {
+      "id": 20153,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 5,
+      "shift": "休假"
+    },
+    {
+      "id": 20154,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 6,
+      "shift": "休假"
+    },
+    {
+      "id": 20155,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 7,
+      "shift": "休假"
+    },
+    {
+      "id": 20156,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 8,
+      "shift": "休假"
+    },
+    {
+      "id": 20157,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 9,
+      "shift": "出勤"
+    },
+    {
+      "id": 20158,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 10,
+      "shift": "休假"
+    },
+    {
+      "id": 20159,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 11,
+      "shift": "休假"
+    },
+    {
+      "id": 20160,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 12,
+      "shift": "上午班"
+    },
+    {
+      "id": 20161,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 13,
+      "shift": "休假"
+    },
+    {
+      "id": 20162,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 14,
+      "shift": "休假"
+    },
+    {
+      "id": 20163,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 15,
+      "shift": "休假"
+    },
+    {
+      "id": 20164,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 16,
+      "shift": "出勤"
+    },
+    {
+      "id": 20165,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 17,
+      "shift": "休假"
+    },
+    {
+      "id": 20166,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 18,
+      "shift": "休假"
+    },
+    {
+      "id": 20167,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 19,
+      "shift": "上午班"
+    },
+    {
+      "id": 20168,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 20,
+      "shift": "休假"
+    },
+    {
+      "id": 20169,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 21,
+      "shift": "休假"
+    },
+    {
+      "id": 20170,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 22,
+      "shift": "休假"
+    },
+    {
+      "id": 20171,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 23,
+      "shift": "出勤"
+    },
+    {
+      "id": 20172,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 24,
+      "shift": "休假"
+    },
+    {
+      "id": 20173,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 25,
+      "shift": "休假"
+    },
+    {
+      "id": 20174,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 26,
+      "shift": "上午班"
+    },
+    {
+      "id": 20175,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 27,
+      "shift": "休假"
+    },
+    {
+      "id": 20176,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 28,
+      "shift": "休假"
+    },
+    {
+      "id": 20177,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 29,
+      "shift": "休假"
+    },
+    {
+      "id": 20178,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 30,
+      "shift": "出勤"
+    },
+    {
+      "id": 20179,
+      "empId": 6,
+      "year": 2026,
+      "month": 3,
+      "day": 31,
+      "shift": "休假"
     }
   ],
   "newEmployee": {
