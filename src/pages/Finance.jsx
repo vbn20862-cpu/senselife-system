@@ -138,7 +138,7 @@ export default function Finance() {
     [data.invoices])
 
   const expProjects = useMemo(() => [...new Set(data.expenses.map(e => e.project).filter(Boolean))].sort(), [data.expenses])
-  const expCategories = useMemo(() => [...new Set(data.expenses.map(e => e.category).filter(Boolean))].sort(), [data.expenses])
+  const expCategories = useMemo(() => [...new Set(data.expenses.map(e => e.category).filter(Boolean))].filter(c => c !== '代墊').sort(), [data.expenses])
   const expAccounts = useMemo(() => [...new Set([...data.expenses.map(e => e.category), ...data.expenses.map(e => e.account)].filter(Boolean))].sort(), [data.expenses])
   const expFiltered = useMemo(() =>
     [...data.expenses]
