@@ -65,7 +65,7 @@ export function exportFinance(data) {
   XLSX.utils.book_append_sheet(wb, sheet(purchase.length  ? purchase  : [{ '提示': '尚無資料' }]), '採購申請')
   XLSX.utils.book_append_sheet(wb, sheet(payable.length   ? payable   : [{ '提示': '尚無資料' }]), '應付款項')
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Date().toLocaleDateString('sv-SE')
   downloadWorkbook(wb, `財務資料_${today}.xlsx`)
 }
 
@@ -114,6 +114,6 @@ export function exportHR(data) {
   XLSX.utils.book_append_sheet(wb, sheet(payrolls.length  ? payrolls  : [{ '提示': '尚無資料' }]), '薪資記錄')
   XLSX.utils.book_append_sheet(wb, sheet(leaves.length    ? leaves    : [{ '提示': '尚無資料' }]), '請假申請')
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Date().toLocaleDateString('sv-SE')
   downloadWorkbook(wb, `人事資料_${today}.xlsx`)
 }

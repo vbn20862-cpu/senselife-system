@@ -9,6 +9,9 @@ import Projects from './pages/Projects'
 import Design from './pages/Design'
 import Finance from './pages/Finance'
 import HR from './pages/HR'
+import Leave from './pages/Leave'
+import Dispatch from './pages/Dispatch'
+import Guide from './pages/Guide'
 import Assets from './pages/Assets'
 import Checkin from './pages/Checkin'
 import CheckinAdmin from './pages/CheckinAdmin'
@@ -91,8 +94,11 @@ export default function App() {
                         <Route path="/"             element={<Dashboard />} />
                         <Route path="/projects"     element={<Projects />} />
                         <Route path="/design"       element={<Design />} />
+                        <Route path="/dispatch"     element={<Dispatch />} />
                         <Route path="/finance"      element={<Finance />} />
                         <Route path="/hr"           element={<HR />} />
+                        <Route path="/leave"        element={<Leave />} />
+                        <Route path="/guide"        element={<Guide />} />
                         <Route path="/assets"       element={<Assets />} />
                         <Route path="/history"       element={<History />} />
                         <Route path="/announcements" element={<Announcements />} />

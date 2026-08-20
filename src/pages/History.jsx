@@ -43,10 +43,10 @@ export default function HistoryPage() {
   // ── 總覽畫面 ──────────────────────────────────────────
   if (!selected) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Archive size={20} style={{ color: E.textSecond }} />
-          <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>歷年紀錄</h1>
+          <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>歷年紀錄</h1>
           <span style={{ fontSize: '12px', color: E.textMuted, backgroundColor: E.sandLight, padding: '2px 10px', borderRadius: '999px', border: `1px solid ${E.divider}` }}>
             {closedProjects.length} 個結案
           </span>

@@ -26,12 +26,12 @@ export default function Assets() {
   }
   function submitLoan(assetId) {
     if (!newLoan.borrower.trim()) return
-    addItem('assetLoans', { id: Date.now(), assetId, assetName: data.assets.find(a => a.id === assetId)?.name, ...newLoan, loanDate: new Date().toISOString().split('T')[0], status: '借出中' })
+    addItem('assetLoans', { id: Date.now(), assetId, assetName: data.assets.find(a => a.id === assetId)?.name, ...newLoan, loanDate: new Date().toLocaleDateString('sv-SE'), status: '借出中' })
     updateItem('assets', assetId, { status: '借出' })
     setNewLoan({ borrower: '', purpose: '', expectedReturn: '' }); setShowLoan(null)
   }
   function returnAsset(loanId, assetId) {
-    updateItem('assetLoans', loanId, { status: '已歸還', returnDate: new Date().toISOString().split('T')[0] })
+    updateItem('assetLoans', loanId, { status: '已歸還', returnDate: new Date().toLocaleDateString('sv-SE') })
     updateItem('assets', assetId, { status: '正常' })
   }
 
@@ -41,13 +41,13 @@ export default function Assets() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>公司財產</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>公司財產</h1>
         <button onClick={() => setShowAdd(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={15} />新增財產</button>
       </div>
 
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: E.cardBg, borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {[['list','財產清單'],['loans','借出記錄']].map(([key,label]) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab===key), flex: 1 }}>{label}</button>
         ))}

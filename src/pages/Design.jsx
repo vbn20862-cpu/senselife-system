@@ -9,7 +9,7 @@ import { E, STATUS, useIsMobile } from '../styles/earth'
 /* ── 常數 ── */
 const STATUS_OPTIONS = ['待開始', '進行中', '待審核', '完成']
 const DESIGN_TYPES = ['海報', '社群貼文', 'Banner', 'DM / 傳單', '名片', '識別設計', '簡報', '其他']
-const TOP_TABS = ['總覽', '設計任務', '執行任務']
+const TOP_TABS = ['總覽', '到期追蹤', '設計任務', '執行任務']
 
 const EMPTY_DESIGN = {
   title: '', workItemId: '', category: '設計', status: '待開始', assignee: '',
@@ -307,7 +307,7 @@ function SubTaskDetail({ task, allSubTasks, onBack, onBackToList, projects, work
 
       <div style={{ ...E.card }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '12px' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>{task.title}</h1>
+          <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>{task.title}</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             {hasChildren && <MiniProgressBar done={stats?.done || 0} total={stats?.total || 0} />}
             <span style={{ ...E.chip(st.bg, st.color), fontSize: '12px', padding: '4px 14px' }}>{computedStatus}</span>
@@ -634,7 +634,7 @@ export default function Design() {
 
   function handleAdd() {
     if (!newTask.title.trim()) return
-    const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    const now = new Date().toLocaleString('sv-SE').slice(0, 16)
     addItem('subTasks', {
       id: Date.now(), ...newTask,
       createdBy: currentUser?.name || currentUser?.username || '未知',
@@ -673,6 +673,29 @@ export default function Design() {
     return map
   }, [workItems])
 
+  // 到期追蹤：即將到期工項（14天內）
+  const urgentWorkItems = useMemo(() => {
+    const today = new Date(); today.setHours(0,0,0,0)
+    const limit = new Date(today); limit.setDate(limit.getDate() + 14)
+    return workItems
+      .filter(wi => {
+        if (!wi.dueDate) return false
+        const d = new Date(wi.dueDate)
+        return d <= limit
+      })
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+  }, [workItems])
+
+  // 到期追蹤：未完成交付物
+  const incompleteDeliverables = useMemo(() => {
+    return workItems
+      .map(wi => {
+        const pending = (wi.deliverables || []).filter(d => !d.done)
+        return pending.length > 0 ? { wi, pending } : null
+      })
+      .filter(Boolean)
+  }, [workItems])
+
   // 詳細頁
   const selectedTask = taskStack.length > 0 ? taskStack[taskStack.length - 1] : null
   if (selectedTask) {
@@ -697,8 +720,8 @@ export default function Design() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>執行追蹤</h1>
+    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>執行追蹤</h1>
 
       {/* 頂層 Tab */}
       <div style={{ display: 'flex', gap: '4px', backgroundColor: E.sandLight, borderRadius: '12px', padding: '4px', alignSelf: 'flex-start', overflowX: 'auto', whiteSpace: 'nowrap' }}>
@@ -727,7 +750,7 @@ export default function Design() {
               </span>
             ))}
           </div>
-          {projects.filter(p => p.status !== '結案' && workItems.some(wi => wi.projectId === p.id)).map(proj => (
+          {projects.filter(p => p.status !== '結案').map(proj => (
             <ProjectOverviewCard
               key={proj.id}
               project={proj}
@@ -741,6 +764,71 @@ export default function Design() {
               mob={mob}
             />
           ))}
+        </div>
+      )}
+
+      {/* 到期追蹤 */}
+      {topTab === '到期追蹤' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* 即將到期工項 */}
+          <div style={E.card}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary, marginBottom: '12px' }}>
+              即將到期工項 <span style={{ fontSize: '11px', color: E.textMuted, fontWeight: '400' }}>（14天內）</span>
+            </div>
+            {urgentWorkItems.length === 0 ? (
+              <div style={{ fontSize: '13px', color: E.textMuted, textAlign: 'center', padding: '20px' }}>近期無到期工項</div>
+            ) : urgentWorkItems.map(wi => {
+              const proj = projects.find(p => p.id === wi.projectId)
+              const today = new Date(); today.setHours(0,0,0,0)
+              const dl = Math.ceil((new Date(wi.dueDate) - today) / 86400000)
+              const dlColor = dl < 0 ? '#c04030' : dl <= 3 ? '#a07020' : E.textSecond
+              const ws = wiStats[wi.id]
+              const cst = ws ? (STATUS[ws.computed] || { bg: '#eee', color: '#666' }) : null
+              return (
+                <div key={wi.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '10px', backgroundColor: '#faf7f2', border: '1px solid #ede5d8', marginBottom: '6px' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: proj?.color || '#888', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wi.title}</div>
+                    <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '2px' }}>{proj?.id?.replace('_sl','') || ''} {proj?.name || ''}</div>
+                  </div>
+                  {cst && <span style={{ ...E.chip(cst.bg, cst.color), fontSize: '10px' }}>{ws.computed}</span>}
+                  {wi.assignee && <span style={{ fontSize: '11px', color: E.textMuted, flexShrink: 0 }}>👤 {wi.assignee}</span>}
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: dlColor, flexShrink: 0 }}>
+                    {dl < 0 ? `超期 ${Math.abs(dl)}天` : dl === 0 ? '今日截止' : `剩 ${dl} 天`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 未完成交付物 */}
+          <div style={E.card}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary, marginBottom: '12px' }}>
+              未完成交付物
+            </div>
+            {incompleteDeliverables.length === 0 ? (
+              <div style={{ fontSize: '13px', color: E.textMuted, textAlign: 'center', padding: '20px' }}>所有交付物已完成</div>
+            ) : incompleteDeliverables.map(({ wi, pending }) => {
+              const proj = projects.find(p => p.id === wi.projectId)
+              return (
+                <div key={wi.id} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: `1px solid ${E.divider}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: proj?.color || '#888', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: E.textSecond }}>{proj?.id?.replace('_sl','') || ''}</span>
+                    <span style={{ fontSize: '12px', color: E.textSecond }}>›</span>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: E.textPrimary }}>{wi.title}</span>
+                    <span style={{ fontSize: '10px', color: '#c04030', backgroundColor: '#fde8e4', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>待交 {pending.length}</span>
+                  </div>
+                  {pending.map(d => (
+                    <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 8px' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#d0a080', flexShrink: 0 }} />
+                      <span style={{ fontSize: '12px', color: E.textPrimary }}>{d.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

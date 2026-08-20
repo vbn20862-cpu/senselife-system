@@ -99,7 +99,6 @@ const INITIAL_DATA = {
   employees: [
     { id: 1, name: '林家慶',      role: '專案經理', email: '', phone: '' },
     { id: 2, name: '陳毓雯',      role: '設計',     email: '', phone: '' },
-    { id: 3, name: '祖珠·卡查妮蘭', role: '執行',   email: '', phone: '' },
     { id: 4, name: '陳曦',        role: '執行',     email: '', phone: '' },
     { id: 5, name: '黃宝琳',      role: '行政',     email: '', phone: '' },
     { id: 6, name: '梁庭瑜',      role: '',         email: '', phone: '' },
@@ -110,7 +109,6 @@ const INITIAL_DATA = {
   salarySettings: [
     { id: 9001, empId: 1, payType: 'monthly', baseSalary: 29600, mealAllowance: 0, fullAttendanceBonus: 5500, activityAttendance: 0,    healthInsEmp: 0,   laborInsEmp: 0,   pensionSelf: 0, dependentHealth: 0,   supplementalIns: 0, wireFee: 30, healthInsEmployer: 0,    laborInsEmployer: 0,    pensionEmployer: 0    },
     { id: 9002, empId: 2, payType: 'monthly', baseSalary: 29600, mealAllowance: 0, fullAttendanceBonus: 8600, activityAttendance: 0,    healthInsEmp: 458, laborInsEmp: 738, pensionSelf: 0, dependentHealth: 458, supplementalIns: 0, wireFee: 30, healthInsEmployer: 1428, laborInsEmployer: 2582, pensionEmployer: 1770 },
-    { id: 9003, empId: 3, payType: 'monthly', baseSalary: 29600, mealAllowance: 0, fullAttendanceBonus: 0,    activityAttendance: 6710, healthInsEmp: 458, laborInsEmp: 738, pensionSelf: 0, dependentHealth: 916, supplementalIns: 0, wireFee: 0,  healthInsEmployer: 1428, laborInsEmployer: 2582, pensionEmployer: 1770 },
     { id: 9004, empId: 4, payType: 'hourly',  baseSalary: 210,   hourlyRate: 210, mealAllowance: 0, fullAttendanceBonus: 0, activityAttendance: 0, healthInsEmp: 458, laborInsEmp: 738, pensionSelf: 0, dependentHealth: 0, supplementalIns: 0, wireFee: 30, healthInsEmployer: 1428, laborInsEmployer: 2582, pensionEmployer: 1770 },
     { id: 9005, empId: 5, payType: 'monthly', baseSalary: 29600, mealAllowance: 0, fullAttendanceBonus: 0,    activityAttendance: 6710, healthInsEmp: 458, laborInsEmp: 738, pensionSelf: 0, dependentHealth: 916, supplementalIns: 0, wireFee: 0,  healthInsEmployer: 915,  laborInsEmployer: 2582, pensionEmployer: 1770 },
     { id: 9006, empId: 6, payType: 'monthly', baseSalary: 29600, mealAllowance: 0, fullAttendanceBonus: 0,    activityAttendance: 0,    healthInsEmp: 0,   laborInsEmp: 0,   pensionSelf: 0, dependentHealth: 0,   supplementalIns: 0, wireFee: 0,  healthInsEmployer: 0,    laborInsEmployer: 0,    pensionEmployer: 0    },
@@ -194,8 +192,14 @@ const INITIAL_DATA = {
     { id: 17, workItemId: 'wi-wtm-2', parentId: null, title: '市集場地申請', category: '執行', status: '完成', assignee: '林家慶', dueDate: '2026-03-15', location: '霧台鄉遊客中心前廣場', vendor: '', materials: '', note: '已核准', createdBy: '系統', createdAt: '2026-02-28 09:00' },
     { id: 18, workItemId: 'wi-wtm-2', parentId: null, title: '攤位配置規劃', category: '執行', status: '待開始', assignee: '祖珠·卡查妮蘭', dueDate: '2026-04-20', location: '霧台鄉遊客中心前廣場', vendor: '', materials: '帳篷×20、桌椅×20套', note: '', createdBy: '系統', createdAt: '2026-03-10 09:00' },
   ],
-  // 補休使用紀錄
+  // 補休使用紀錄（出帳）
   compLeaveRecords: [],
+  // 補休進帳（從加班轉、雇主核准）— 含原始費率、到期日，供過期折錢
+  compLeaveAccruals: [],
+  // 手動新增補休時數（舊制，已停用，保留供資料相容）
+  compLeaveManual: [],
+  // 活動工作日（YYYY-MM-DD）— 標記為活動日的週末，於勞基法試算引擎當平日計算
+  activityWorkDays: [],
   // 專案類型
   projectTypes: ['展覽', '活動', '教育', '市集', '行銷', '其他'],
   // 待辦
@@ -205,6 +209,8 @@ const INITIAL_DATA = {
   ],
   // 統編發票
   invoices: [],
+  // 近期活動（細部流程 Run Sheet）
+  activities: [],
   // 使用者回報
   feedbacks: [],
   // 操作紀錄
@@ -259,13 +265,16 @@ function migrateIfNeeded(parsed) {
         contractAmount: 0, deductionAmount: 0, ...p,
         status: (p.status === '企劃中' || p.status === '提案中') ? '執行中' : p.status,
       })),
-      employees: INITIAL_DATA.employees,
-      salarySettings: INITIAL_DATA.salarySettings,
+      // 保留線上既有員工與薪資設定（避免版本升級蓋掉 hireDate/電話/離職異動）
+      employees: parsed.employees !== undefined ? parsed.employees : INITIAL_DATA.employees,
+      salarySettings: parsed.salarySettings !== undefined ? parsed.salarySettings : INITIAL_DATA.salarySettings,
       payrolls: [...missingPayrolls, ...(parsed.payrolls || [])],
       expenses: [...missingExps, ...(parsed.expenses || [])],
       compLeaveRecords: parsed.compLeaveRecords || [],
-      workItems: INITIAL_DATA.workItems,
-      subTasks: INITIAL_DATA.subTasks,
+      compLeaveManual: parsed.compLeaveManual || [],
+      // 遷移時保留使用者既有的工項與子任務（若完全沒有才用 INITIAL_DATA）
+      workItems: parsed.workItems !== undefined ? parsed.workItems : INITIAL_DATA.workItems,
+      subTasks: parsed.subTasks !== undefined ? parsed.subTasks : INITIAL_DATA.subTasks,
       invoices: parsed.invoices || [],
       feedbacks: parsed.feedbacks || [],
       designTasks: undefined,
@@ -339,6 +348,7 @@ export function AppProvider({ children }) {
   }, [])
 
   // 寫入 Firebase — 使用 dataRef 確保每次寫入都基於最新資料
+  // 整包寫入（僅供 batchUpdate 跨多 key 時使用）
   const writeToFirebase = useCallback((newData) => {
     dataRef.current = newData
     set(ref(db, 'appData'), newData).catch(err => {
@@ -347,35 +357,61 @@ export function AppProvider({ children }) {
     })
   }, [])
 
-  function update(key, value) {
+  // 只寫有變動的區塊：打一次卡不再整包 1MB 重寫全庫，
+  // 大幅降低傳輸中 UTF-8 被切壞（亂碼）與不同使用者互相蓋寫的風險
+  const writeKey = useCallback((key, value) => {
     const d = dataRef.current
     if (!d) return
-    const newData = { ...d, [key]: value }
-    writeToFirebase(newData)
+    dataRef.current = { ...d, [key]: value }
+    set(ref(db, `appData/${key}`), value).catch(err => {
+      console.error('Firebase 寫入失敗:', err.code, err.message)
+      alert('資料寫入失敗：' + err.message)
+    })
+  }, [])
+
+  function update(key, value) {
+    writeKey(key, value)
   }
 
   function addItem(key, item) {
     const d = dataRef.current
     if (!d) return
-    const newData = { ...d, [key]: [...(d[key] || []), item] }
-    writeToFirebase(newData)
+    const arr = d[key] || []
+    // 單筆追加：只寫入新的一格，不重寫整個陣列。
+    // 兩台裝置同時新增（例如同時打卡）也不會互相蓋掉對方的紀錄
+    dataRef.current = { ...d, [key]: [...arr, item] }
+    set(ref(db, `appData/${key}/${arr.length}`), item).catch(err => {
+      console.error('Firebase 寫入失敗:', err.code, err.message)
+      alert('資料寫入失敗：' + err.message)
+    })
+  }
+
+  // 原子式批次更新 — 避免連續多次 set() 導致資料被覆蓋
+  // updater: (currentData) => newData；只把有變動的 key 分別寫入
+  function batchUpdate(updater) {
+    const d = dataRef.current
+    if (!d) return
+    const newData = updater(d)
+    if (!newData || newData === d) return
+    const changedKeys = Object.keys(newData).filter(k => newData[k] !== d[k])
+    if (changedKeys.length === 0) return
+    if (changedKeys.length <= 3) {
+      for (const k of changedKeys) writeKey(k, newData[k])
+    } else {
+      writeToFirebase(newData) // 變動太多 key 時整包寫，維持原子性
+    }
   }
 
   function updateItem(key, id, updates) {
     const d = dataRef.current
     if (!d) return
-    const newData = {
-      ...d,
-      [key]: (d[key] || []).map(item => item.id === id ? { ...item, ...updates } : item)
-    }
-    writeToFirebase(newData)
+    writeKey(key, (d[key] || []).map(item => item.id === id ? { ...item, ...updates } : item))
   }
 
   function deleteItem(key, id) {
     const d = dataRef.current
     if (!d) return
-    const newData = { ...d, [key]: (d[key] || []).filter(item => item.id !== id) }
-    writeToFirebase(newData)
+    writeKey(key, (d[key] || []).filter(item => item.id !== id))
   }
 
   function logEdit({ user, action, entityType, entityName, summary }) {
@@ -383,15 +419,14 @@ export function AppProvider({ children }) {
     if (!d) return
     const entry = {
       id: Date.now(),
-      timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      timestamp: new Date().toLocaleString('sv-SE').slice(0, 16),
       user: user || '未知',
       action: action || '編輯',
       entityType: entityType || '',
       entityName: entityName || '',
       summary: summary || '',
     }
-    const newData = { ...d, editLogs: [entry, ...(d.editLogs || [])].slice(0, 500) }
-    writeToFirebase(newData)
+    writeKey('editLogs', [entry, ...(d.editLogs || [])].slice(0, 500))
   }
 
   function generateSerial() {
@@ -414,7 +449,7 @@ export function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ data, loading, update, addItem, updateItem, deleteItem, logEdit, generateSerial }}>
+    <AppContext.Provider value={{ data, loading, update, addItem, updateItem, deleteItem, logEdit, generateSerial, batchUpdate }}>
       {children}
     </AppContext.Provider>
   )

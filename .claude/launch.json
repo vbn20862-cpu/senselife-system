@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "company-system",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "/Users/ching/.nvm/versions/node/v24.13.1/bin/npm",
       "runtimeArgs": ["run", "dev", "--", "--host", "127.0.0.1"],
       "port": 5173
     }

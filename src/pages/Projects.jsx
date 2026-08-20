@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { Plus, ArrowLeft, Trash2, ExternalLink, Pencil, Search, ChevronDown, ChevronUp, X } from 'lucide-react'
@@ -135,6 +135,7 @@ function ProjectCard({ project, onClick }) {
 function ProjectDetail({ project, onBack, initialTab }) {
   const { data, updateItem, deleteItem, addItem, update } = useApp()
   const { currentUser } = useAuth()
+  const navigate = useNavigate()
   const mob = useIsMobile()
   const [tab, setTab] = useState(initialTab || 'tasks')
 
@@ -149,6 +150,10 @@ function ProjectDetail({ project, onBack, initialTab }) {
   const [newTask, setNewTask]             = useState({ title: '', assignee: '', status: '待開始', dueDate: '', note: '', taskType: '', priority: '中' })
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [editTaskVals, setEditTaskVals]   = useState({})
+
+  // 交付物
+  const [showDelivs, setShowDelivs] = useState({})
+  const [newDelivInputs, setNewDelivInputs] = useState({})
 
   // 案件流程 - milestone date editing
   const [editingMilestoneDate, setEditingMilestoneDate] = useState(null)
@@ -215,7 +220,7 @@ function ProjectDetail({ project, onBack, initialTab }) {
   }
 
   function saveEdit() {
-    const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    const now = new Date().toLocaleString('sv-SE').slice(0, 16)
     const autoColor = TYPE_COLORS[editForm.type] || editForm.color
     updateItem('projects', project.id, {
       name:             editForm.name,
@@ -277,6 +282,20 @@ function ProjectDetail({ project, onBack, initialTab }) {
     setEditingMilestoneName(null)
   }
 
+  function toggleDeliverable(wi, delivId) {
+    const current = wi.deliverables || []
+    updateItem('workItems', wi.id, { deliverables: current.map(d => d.id === delivId ? { ...d, done: !d.done } : d) })
+  }
+  function addDeliverable(wi, name) {
+    if (!name.trim()) return
+    const current = wi.deliverables || []
+    updateItem('workItems', wi.id, { deliverables: [...current, { id: Date.now(), name: name.trim(), done: false }] })
+    setNewDelivInputs(p => ({ ...p, [wi.id]: '' }))
+  }
+  function removeDeliverable(wi, delivId) {
+    updateItem('workItems', wi.id, { deliverables: (wi.deliverables || []).filter(d => d.id !== delivId) })
+  }
+
   const TABS = [
     { key: 'tasks', label: '工項', count: workItems.length },
     { key: 'flow',  label: '案件流程', count: milestones.filter(m => m.done).length + '/' + milestones.length },
@@ -306,7 +325,7 @@ function ProjectDetail({ project, onBack, initialTab }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0 }} />
-              <h2 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>{project.name}</h2>
+              <h2 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>{project.name}</h2>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               {project.type && (
@@ -392,6 +411,15 @@ function ProjectDetail({ project, onBack, initialTab }) {
                 剩餘 <strong>NT${(effectiveBudget - spent).toLocaleString()}</strong>
               </span>
               <span style={{ fontSize: '12px', fontWeight: '700', color: bw.color }}>{bw.emoji} {pct.toFixed(1)}%</span>
+              <div style={{ flex: 1 }} />
+              <button onClick={openEdit}
+                style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', border: `1px solid ${E.divider}`, backgroundColor: 'transparent', color: E.textSecond, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Pencil size={11} /> 改預算金額
+              </button>
+              <button onClick={() => navigate(`/finance?tab=budget&project=${project.id}`)}
+                style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', border: `1px solid ${E.divider}`, backgroundColor: 'transparent', color: E.coffee, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                💰 看帳目明細
+              </button>
             </div>
           </div>
         )}
@@ -406,7 +434,7 @@ function ProjectDetail({ project, onBack, initialTab }) {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: E.cardBg, borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {TABS.map(({ key, label, count }) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab === key), display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             {label}
@@ -521,28 +549,60 @@ function ProjectDetail({ project, onBack, initialTab }) {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      {ps && (
-                        <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '999px', backgroundColor: ps.bg, color: ps.color, fontWeight: '700', flexShrink: 0, marginTop: '2px' }}>
-                          {task.priority}
-                        </span>
-                      )}
-                      <span style={{ backgroundColor: ts.bg, color: ts.color, padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: '600', flexShrink: 0, marginTop: '1px' }}>{task.status}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>{task.title}</div>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
-                          {task.taskType && <span style={{ fontSize: '11px', color: E.textSecond, backgroundColor: '#ede8de', padding: '1px 6px', borderRadius: '4px' }}>{task.taskType}</span>}
-                          {task.assignee && <span style={{ fontSize: '11px', color: E.textSecond }}>👤 {task.assignee}</span>}
-                          {task.dueDate  && <span style={{ fontSize: '11px', color: E.textSecond }}>📅 {task.dueDate}</span>}
-                          {task.note     && <span style={{ fontSize: '11px', color: E.textMuted }}>{task.note}</span>}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        {ps && (
+                          <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '999px', backgroundColor: ps.bg, color: ps.color, fontWeight: '700', flexShrink: 0, marginTop: '2px' }}>
+                            {task.priority}
+                          </span>
+                        )}
+                        <span style={{ backgroundColor: ts.bg, color: ts.color, padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: '600', flexShrink: 0, marginTop: '1px' }}>{task.status}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>{task.title}</div>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {task.taskType && <span style={{ fontSize: '11px', color: E.textSecond, backgroundColor: '#ede8de', padding: '1px 6px', borderRadius: '4px' }}>{task.taskType}</span>}
+                            {task.assignee && <span style={{ fontSize: '11px', color: E.textSecond }}>👤 {task.assignee}</span>}
+                            {task.dueDate  && <span style={{ fontSize: '11px', color: E.textSecond }}>📅 {task.dueDate}</span>}
+                            {task.note     && <span style={{ fontSize: '11px', color: E.textMuted }}>{task.note}</span>}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0, alignItems: 'center' }}>
+                          <button
+                            onClick={() => setShowDelivs(p => ({ ...p, [task.id]: !p[task.id] }))}
+                            title="交付物 checklist"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: showDelivs[task.id] ? E.green : E.textMuted, fontWeight: '600', padding: '2px 6px', borderRadius: '6px', backgroundColor: showDelivs[task.id] ? E.greenLight : 'transparent' }}>
+                            {(() => { const dv = task.deliverables || []; const done = dv.filter(d => d.done).length; return dv.length > 0 ? `✓ ${done}/${dv.length}` : '交付物' })()}
+                          </button>
+                          <button onClick={() => { setEditingTaskId(task.id); setEditTaskVals({ title: task.title, assignee: task.assignee || '', status: task.status, dueDate: task.dueDate || '', note: task.note || '', taskType: task.taskType || '', priority: task.priority || '中' }) }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: E.textMuted }}><Pencil size={14} /></button>
+                          <button onClick={() => deleteItem('workItems', task.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={14} /></button>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        <button onClick={() => { setEditingTaskId(task.id); setEditTaskVals({ title: task.title, assignee: task.assignee || '', status: task.status, dueDate: task.dueDate || '', note: task.note || '', taskType: task.taskType || '', priority: task.priority || '中' }) }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: E.textMuted }}><Pencil size={14} /></button>
-                        <button onClick={() => deleteItem('workItems', task.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={14} /></button>
-                      </div>
+                      {showDelivs[task.id] && (
+                        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e8dece' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: E.textSecond, marginBottom: '6px' }}>交付物 checklist</div>
+                          {(task.deliverables || []).map(d => (
+                            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                              <button onClick={() => toggleDeliverable(task, d.id)} style={{ width: 16, height: 16, borderRadius: '3px', border: `2px solid ${d.done ? E.green : '#c8b8a0'}`, backgroundColor: d.done ? E.green : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                                {d.done && <span style={{ color: '#fff', fontSize: '9px', lineHeight: 1 }}>✓</span>}
+                              </button>
+                              <span style={{ flex: 1, fontSize: '12px', color: d.done ? E.textMuted : E.textPrimary, textDecoration: d.done ? 'line-through' : 'none' }}>{d.name}</span>
+                              <button onClick={() => removeDeliverable(task, d.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8', padding: '2px' }}><X size={11} /></button>
+                            </div>
+                          ))}
+                          {(task.deliverables || []).length === 0 && (
+                            <div style={{ fontSize: '11px', color: E.textMuted, fontStyle: 'italic', marginBottom: '4px' }}>尚無交付物</div>
+                          )}
+                          <input
+                            value={newDelivInputs[task.id] || ''}
+                            onChange={e => setNewDelivInputs(p => ({ ...p, [task.id]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') addDeliverable(task, newDelivInputs[task.id] || '') }}
+                            placeholder="輸入交付物名稱，Enter 新增"
+                            style={{ ...SM, marginTop: '6px', fontSize: '12px', width: '100%' }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -751,6 +811,39 @@ function ProjectDetail({ project, onBack, initialTab }) {
               </div>
             </div>
 
+            {/* 預算金額 */}
+            <div style={{ borderTop: `1px solid ${E.divider}`, paddingTop: '12px', marginTop: '2px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: E.textPrimary, marginBottom: '8px' }}>💰 預算金額</div>
+              <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '4px' }}>標案總金額</label>
+                  <input type="number" value={editForm.contractAmount} onChange={e => setEditForm(p => ({ ...p, contractAmount: e.target.value }))} placeholder="0" style={E.input} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '4px' }}>預扣金額（30%）</label>
+                  <input type="number" value={editForm.deductionAmount} onChange={e => setEditForm(p => ({ ...p, deductionAmount: e.target.value }))} placeholder="0" style={E.input} />
+                </div>
+              </div>
+              <div style={{ marginTop: '10px' }}>
+                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '4px' }}>
+                  預算金額（沒有標案時才用，直接填預算上限）
+                </label>
+                <input type="number" value={editForm.budget} onChange={e => setEditForm(p => ({ ...p, budget: e.target.value }))} placeholder="0" style={E.input} />
+              </div>
+              <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '6px', lineHeight: 1.5, backgroundColor: E.sandLight, padding: '6px 10px', borderRadius: '6px' }}>
+                ℹ️ 顯示用「有效預算」計算邏輯：<br/>
+                · 有填「標案總金額」→ <strong>有效預算 = 標案總金額 − 預扣金額</strong><br/>
+                · 沒填標案 → 用「預算金額」
+                {(() => {
+                  const c = Number(editForm.contractAmount) || 0
+                  const d = Number(editForm.deductionAmount) || 0
+                  const b = Number(editForm.budget) || 0
+                  const eff = c > 0 ? c - d : b
+                  return <><br/>目前有效預算：<strong style={{ color: E.coffee }}>NT${eff.toLocaleString()}</strong></>
+                })()}
+              </div>
+            </div>
+
             {/* 雲端資料夾連結 */}
             <div>
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>雲端資料夾連結</label>
@@ -788,8 +881,8 @@ function ProjectDetail({ project, onBack, initialTab }) {
 
 /* ══════════ 主頁面 ══════════ */
 export default function Projects() {
-  const { data, addItem } = useApp()
-  const { currentUser } = useAuth()
+  const { data, addItem, batchUpdate } = useApp()
+  const { currentUser, isAdmin } = useAuth()
   const mob = useIsMobile()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedId, setSelectedId] = useState(searchParams.get('detail') || null)
@@ -836,7 +929,7 @@ export default function Projects() {
   function handleAdd() {
     if (!newProject.name.trim()) return
     const codeVal    = newProject.code.trim() || `PRJ_${Date.now()}`
-    const now        = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    const now        = new Date().toLocaleString('sv-SE').slice(0, 16)
     const autoColor  = TYPE_COLORS[newProject.type] || newProject.color
     addItem('projects', {
       id: codeVal, code: codeVal, ...newProject,
@@ -856,12 +949,51 @@ export default function Projects() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>案件管理</h1>
-        <button onClick={() => setShowAdd(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={15} />新增案件
-        </button>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>案件管理</h1>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {isAdmin && (() => {
+            const wiCount = (data.workItems || []).length
+            const stCount = (data.subTasks || []).length
+            const total = wiCount + stCount
+            if (total === 0) return null
+            return (
+              <button
+                onClick={() => {
+                  console.log('[清除前] workItems:', data.workItems)
+                  console.log('[清除前] subTasks:', data.subTasks)
+                  if (!window.confirm(`即將清空所有工項（${wiCount} 筆）和子任務（${stCount} 筆）。\n\n此動作不可復原。確定？`)) return
+                  batchUpdate(d => {
+                    const newData = {
+                      ...d,
+                      workItems: [],
+                      subTasks: [],
+                      editLogs: [{
+                        id: Date.now(),
+                        timestamp: new Date().toLocaleString('sv-SE').slice(0, 16),
+                        user: currentUser?.name || currentUser?.username || '未知',
+                        action: '清除',
+                        entityType: '案件管理',
+                        entityName: '全部 demo 資料',
+                        summary: `清空 ${wiCount} 筆工項 + ${stCount} 筆子任務`,
+                      }, ...(d.editLogs || [])].slice(0, 500),
+                    }
+                    console.log('[清除後] 寫入 Firebase:', newData.workItems, newData.subTasks)
+                    return newData
+                  })
+                  alert('已清除，請重新整理頁面確認')
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', cursor: 'pointer', backgroundColor: '#f5e8e0', color: '#8a3a20', border: '1px solid #e0b8a8', fontWeight: '600' }}
+              >
+                清空工項+子任務（{total}）
+              </button>
+            )
+          })()}
+          <button onClick={() => setShowAdd(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={15} />新增案件
+          </button>
+        </div>
       </div>
 
       {/* 統計列 */}
@@ -883,7 +1015,7 @@ export default function Projects() {
 
       {/* 狀態篩選 + 搜尋 */}
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '10px', padding: '3px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', gap: '4px', backgroundColor: E.cardBg, borderRadius: '10px', padding: '3px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
           {STATUS_FILTERS.map(f => (
             <button key={f} onClick={() => setStatusFilter(f)} style={{
               padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: statusFilter === f ? '600' : '500',

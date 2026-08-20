@@ -1,0 +1,18 @@
+{
+  "name": "深活共構管理系統",
+  "short_name": "深活共構",
+  "description": "深活共構地方創生內部管理系統",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "background_color": "#e8d5be",
+  "theme_color": "#4a1e0e",
+  "icons": [
+    {
+      "src": "/logo.jpeg",
+      "sizes": "any",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}

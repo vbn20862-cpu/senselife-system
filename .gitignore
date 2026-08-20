@@ -23,5 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables
+.env
+.env.local
+
 # Local Netlify folder
 .netlify
+
+# 離職備份（含個資，勿進版控）
+離職備份/
+*.bak-*

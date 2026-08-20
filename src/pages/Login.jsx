@@ -30,7 +30,7 @@ export default function Login() {
 
   return (
     <div style={{
-      minHeight: '100vh', backgroundColor: '#1c2718',
+      minHeight: '100vh', background: 'linear-gradient(160deg, #4a1e0e 0%, #3d1a0b 50%, #200d06 100%)',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', padding: '20px',
     }}>
@@ -40,7 +40,7 @@ export default function Login() {
 
       {/* Card */}
       <div style={{
-        backgroundColor: '#fdfaf5', borderRadius: '20px', padding: '36px 32px',
+        backgroundColor: '#ffffff', borderRadius: '20px', padding: '36px 32px',
         width: '100%', maxWidth: '380px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
       }}>
@@ -86,13 +86,16 @@ export default function Login() {
             type="submit"
             disabled={loading}
             style={{
-              backgroundColor: '#3a6d31', color: '#f2f7f0',
+              backgroundColor: '#c85c28', color: '#fff8f4',
               border: 'none', borderRadius: '10px',
               padding: '13px', fontSize: '14px', fontWeight: '600',
               cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.75 : 1, marginTop: '6px',
-              transition: 'opacity 0.15s',
+              transition: 'opacity 0.15s, background-color 0.15s, box-shadow 0.15s',
+              boxShadow: '0 2px 8px rgba(58,109,49,0.3)',
             }}
+            onMouseEnter={e => { if (!loading) { e.currentTarget.style.backgroundColor = '#2e5627'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(58,109,49,0.4)' } }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#3a6d31'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(58,109,49,0.3)' }}
           >
             {loading ? '登入中…' : '登入'}
           </button>

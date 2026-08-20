@@ -5,62 +5,18 @@ import { Plus, Trash2, Search, CreditCard, ChevronLeft, Pencil, Download, Receip
 import Modal from '../components/Modal'
 import { E, STATUS, useIsMobile } from '../styles/earth'
 import { exportFinance } from '../utils/exportExcel'
+import { MONTHS, GOVT_WORK_DAYS, computeEmpMonthClockHours } from '../utils/salaryCalc'
+import { hourlyRate, computeCompLedger, annualLeaveStatus, annualLeavePayout, computeHourlyHolidayPremium } from '../utils/payrollEngine'
 
 const CHART_COLORS = ['#4d8843','#5b7ec9','#c89040','#8a5cb0','#c04030','#3a9080','#b06030','#607060']
 
-// ── 薪資計算用常數 & helper（與 HR.jsx 共用邏輯）──
-const MONTHS = ['一','二','三','四','五','六','七','八','九','十','十一','十二']
-const GOVT_WORK_DAYS = {
-  '2025-01': { hours: 136 }, '2025-02': { hours: 152 }, '2025-03': { hours: 168 },
-  '2025-04': { hours: 152 }, '2025-05': { hours: 176 }, '2025-06': { hours: 160 },
-  '2025-07': { hours: 184 }, '2025-08': { hours: 168 }, '2025-09': { hours: 168 },
-  '2025-10': { hours: 160 }, '2025-11': { hours: 168 }, '2025-12': { hours: 168 },
-  '2026-01': { hours: 168 }, '2026-02': { hours: 112 }, '2026-03': { hours: 176 },
-  '2026-04': { hours: 160 }, '2026-05': { hours: 160 }, '2026-06': { hours: 168 },
-  '2026-07': { hours: 184 }, '2026-08': { hours: 168 }, '2026-09': { hours: 160 },
-  '2026-10': { hours: 160 }, '2026-11': { hours: 168 }, '2026-12': { hours: 176 },
-}
 const SHIFTS_DEF = [
   { code: '出勤', hours: 8 }, { code: '上午班', hours: 4 },
   { code: '下午班', hours: 4 }, { code: '休假', hours: 0 },
 ]
 function getShiftHours(code) { return SHIFTS_DEF.find(s => s.code === code)?.hours || 0 }
-const roundHours = m => Math.floor((m / 60) * 2) / 2
-function computeEmpMonthClockHours(emp, yr, mo, data) {
-  const myClockins = data.clockins.filter(c =>
-    c.date?.startsWith(`${yr}-${String(mo).padStart(2,'0')}`) &&
-    c.empName && (c.empName === emp.name || emp.name.includes(c.empName) || c.empName.includes(emp.name))
-  )
-  const allDates = [...new Set(myClockins.map(c => c.date))].sort()
-  let totalMinutes = 0
-  allDates.forEach(date => {
-    const dayRecs = myClockins.filter(c => c.date === date).sort((a, b) => (a.time||'').localeCompare(b.time||''))
-    const ins = dayRecs.filter(c => c.type === '上班')
-    const outs = dayRecs.filter(c => c.type === '下班')
-    if (ins.length > 0 && outs.length > 0 && ins[0].time && outs[outs.length-1].time) {
-      const [ih, im] = ins[0].time.split(':').map(Number)
-      const [oh, om] = outs[outs.length-1].time.split(':').map(Number)
-      let dayMin = Math.max(0, (oh*60+om) - (ih*60+im))
-      if (dayMin >= 300) dayMin = Math.max(0, dayMin - 60)
-      totalMinutes += dayMin
-    }
-  })
-  return roundHours(totalMinutes)
-}
-function computeAllTimeEarned(empId, data) {
-  const emp = data.employees.find(e => e.id === empId)
-  if (!emp) return 0
-  const months = [...new Set(
-    data.clockins
-      .filter(c => c.empName && (c.empName === emp.name || emp.name.includes(c.empName) || c.empName.includes(emp.name)))
-      .map(c => c.date?.slice(0, 7)).filter(Boolean)
-  )]
-  return months.reduce((total, mStr) => {
-    const [yr, mo] = mStr.split('-').map(Number)
-    return total + Math.max(0, computeEmpMonthClockHours(emp, yr, mo, data) - (GOVT_WORK_DAYS[mStr]?.hours || 0))
-  }, 0)
-}
 
+// 補休狀態徽章
 function DonutChart({ slices, size = 120 }) {
   const r = 40, cx = size / 2, cy = size / 2
   const circ = 2 * Math.PI * r
@@ -84,20 +40,24 @@ function DonutChart({ slices, size = 120 }) {
 }
 
 export default function Finance() {
-  const { data, addItem, updateItem, deleteItem, logEdit, generateSerial } = useApp()
+  const { data, addItem, updateItem, deleteItem, logEdit, generateSerial, batchUpdate } = useApp()
   const { isAdmin, currentUser } = useAuth()
   const mob = useIsMobile()
-  const [tab, setTab] = useState('reimburse')
+  // URL 參數可深連結到特定分頁與案件（例：/finance?tab=budget&project=RME_sl）
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams()
+  const [tab, setTab] = useState(urlParams.get('tab') || 'reimburse')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [showAddBank, setShowAddBank] = useState(false)
   const [showAddPayable, setShowAddPayable] = useState(false)
-  const [selectedBudget, setSelectedBudget] = useState(null)
+  const [selectedBudget, setSelectedBudget] = useState(urlParams.get('project') || null)
   const [showClosedBudgets, setShowClosedBudgets] = useState(false)
   const currentYear = new Date().getFullYear()
   const [budgetYear, setBudgetYear] = useState(String(currentYear))
-  const [newR, setNewR] = useState({ date: '', person: '', project: '', amount: '', description: '', method: '現金', receiptNo: '', category: '' })
+  const [newR, setNewR] = useState({ date: '', person: '', vendor: '', project: '', amount: '', description: '', method: '現金', receiptNo: '', category: '', account: '' })
   const [newP, setNewP] = useState({ date: '', person: '', project: '', amount: '', description: '', status: '待審核' })
+  const [formError, setFormError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [newBank, setNewBank] = useState({ name: '', type: 'employee', bank: '', account: '', note: '' })
   const [newPayable, setNewPayable] = useState({ vendor: '', amount: '', invoiceNo: '', dueDate: '', project: '', status: '待付', note: '' })
   const [editR, setEditR] = useState(null)
@@ -111,6 +71,15 @@ export default function Finance() {
   const [showAddExp, setShowAddExp] = useState(false)
   const [viewExp, setViewExp] = useState(null)
   const [editExp, setEditExp] = useState(null)
+
+  // 已入帳判定：代墊連動的帳目，要等該代墊「已還款」才計入預算（還款才轉正）
+  const isBooked = (e) => {
+    if (!e.linkedSerial) return true
+    const r = (data.reimbursements || []).find(x => x.serialNo === e.linkedSerial)
+    return !r || r.status === '已還款'
+  }
+  // 完整判定：案件/科目/憑證號/廠商/日期都填了才算完整（不完整不入預算、進待歸類紅字）
+  const isComplete = (e) => !!(e.project && e.project !== '待歸類' && e.category && (e.receiptNo || '').trim() && e.vendor && e.date)
   const EMPTY_EXP = { date: '', direction: '支出', project: '', category: '', amount: '', vendor: '', method: '現金', receiptNo: '', note: '', linkedSerial: '' }
   const [newExp, setNewExp] = useState(EMPTY_EXP)
   const [expDirFilter, setExpDirFilter] = useState('all')
@@ -126,7 +95,6 @@ export default function Finance() {
   const [viewPayroll, setViewPayroll] = useState(null)  // selected payroll record
   const [viewSlip, setViewSlip] = useState(null)        // selected single slip
   const [salaryEditEmp, setSalaryEditEmp] = useState(null)
-  const [compLeaveForm, setCompLeaveForm] = useState({ empId: null, date: '', hours: 4, note: '' })
   const [salaryExpandedEmp, setSalaryExpandedEmp] = useState(null)
   // 統編發票
   const [showAddInv, setShowAddInv] = useState(false)
@@ -169,7 +137,7 @@ export default function Finance() {
       }),
     [data.bankAccounts, bankFilter, bankSort])
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('sv-SE')
   const { payables, pendingPayables, paidPayables, overduePayables, totalPending } = useMemo(() => {
     const payables = data.payables || []
     const pendingPayables = payables.filter(p => p.status === '待付')
@@ -180,7 +148,7 @@ export default function Finance() {
   }, [data.payables, today])
 
   const ALL_TABS = [['reimburse','代墊申請'],['purchase','採購申請'],['payable','應付款項'],['invoice','統編發票'],['expenses','帳目查詢'],['budget','預算總覽'],['bank','匯款帳戶'],['payroll','薪資管理']]
-  const TABS = isAdmin ? ALL_TABS : [['reimburse','代墊申請'],['purchase','採購申請'],['payroll','薪資管理']]
+  const TABS = isAdmin ? ALL_TABS : [['reimburse','代墊申請'],['purchase','採購申請'],['budget','預算總覽'],['payroll','薪資管理']]
 
   function stChip(s) {
     const c = STATUS[s] || { bg: '#eee', color: '#666' }
@@ -208,13 +176,15 @@ export default function Finance() {
       const payType = s.payType || 'monthly'
       const baseSalary = Number(s.baseSalary || s.hourlyRate || 0)
       const mealAllowance = Number(s.mealAllowance || 0)
-      // calc hours from schedules for that month
-      const hrs = (data.schedules || [])
+      // calc hours: use actual clock hours if available, fallback to schedule
+      const clockHrs = computeEmpMonthClockHours(emp, y, m, data)
+      const schedHrs = (data.schedules || [])
         .filter(sc => sc.empId === emp.id && sc.year === y && sc.month === m)
         .reduce((sum, sc) => {
           const shiftHours = { '出勤': 8, '上午班': 4, '下午班': 4, '休假': 0 }
           return sum + (shiftHours[sc.shift] || 0)
         }, 0)
+      const hrs = clockHrs > 0 ? clockHrs : schedHrs
       const computedBase = payType === 'monthly' ? baseSalary : Math.round(hrs * baseSalary)
       const fullAttendanceBonus = Number(s.fullAttendanceBonus || 0)
       const activityAttendance = Number(s.activityAttendance || 0)
@@ -229,12 +199,25 @@ export default function Finance() {
       const laborInsEmployer = Number(s.laborInsEmployer || 0)
       const pensionEmployer = Number(s.pensionEmployer || 0)
       const totalEmployerBurden = healthInsEmployer + laborInsEmployer + pensionEmployer
+      // ── 走法 B：月缺口扣薪 + 季底補休折現 + 年底特休折現 ──
+      const ledger = computeCompLedger(emp, data, { year: y, month: m })
+      const tm = ledger.monthly.find(mm => mm.year === y && mm.month === m) || {}
+      const compDock = tm.dockAmount || 0                       // 缺口扣薪（扣項，僅月薪制）
+      const isQEnd = m === 6 || m === 9 || m === 12
+      const settle = isQEnd ? ledger.settlements.find(st => st.year === y && st.quarter === Math.ceil(m/3)) : null
+      const compCashout = settle ? settle.amount : 0            // 季底補休折現（加項，僅月薪制）
+      const annualCashout = m === 12 ? annualLeavePayout(emp, y, data).amount : 0 // 年底特休折現（加項）
+      // 時薪制國定假日加給（×2，底薪已含 ×1 → 補 ×1）
+      const holidayPremium = payType === 'hourly' ? computeHourlyHolidayPremium(emp, y, m, data, baseSalary).amount : 0
+      const totalDeductionsB = totalDeductions + compDock
+      const netPay = grossPay + compCashout + annualCashout + holidayPremium - totalDeductionsB
       return {
         empId: emp.id, empName: emp.name, hoursWorked: hrs, payType,
         baseSalary: computedBase, mealAllowance,
         fullAttendanceBonus, activityAttendance, overtime: 0, advance: 0,
+        compDock, compCashout, annualCashout, holidayPremium,
         grossPay, healthInsEmp, laborInsEmp, pensionSelf, dependentHealth, wireFee,
-        totalDeductions, netPay: grossPay - totalDeductions,
+        totalDeductions: totalDeductionsB, netPay,
         healthInsEmployer, laborInsEmployer, pensionEmployer,
         totalEmployerBurden, totalEmployerCost: grossPay + totalEmployerBurden,
         note: '',
@@ -243,12 +226,19 @@ export default function Finance() {
   }
   function recalcSlip(slip) {
     const grossPay = (slip.baseSalary||0) + (slip.mealAllowance||0) + (slip.fullAttendanceBonus||0) + (slip.activityAttendance||0) + (slip.overtime||0)
-    const totalDeductions = (slip.healthInsEmp||0)+(slip.laborInsEmp||0)+(slip.pensionSelf||0)+(slip.dependentHealth||0)+(slip.wireFee||0)+(slip.advance||0)
+    const totalDeductions = (slip.healthInsEmp||0)+(slip.laborInsEmp||0)+(slip.pensionSelf||0)+(slip.dependentHealth||0)+(slip.wireFee||0)+(slip.advance||0)+(slip.compDock||0)
     const totalEmployerBurden = (slip.healthInsEmployer||0)+(slip.laborInsEmployer||0)+(slip.pensionEmployer||0)
-    return { ...slip, grossPay, totalDeductions, netPay: grossPay - totalDeductions, totalEmployerBurden, totalEmployerCost: grossPay + totalEmployerBurden }
+    const netPay = grossPay + (slip.compCashout||0) + (slip.annualCashout||0) + (slip.holidayPremium||0) - totalDeductions
+    return { ...slip, grossPay, totalDeductions, netPay, totalEmployerBurden, totalEmployerCost: grossPay + totalEmployerBurden }
   }
   function monthHoursFor(empId) {
     const [y, m] = payrollMonth.split('-').map(Number)
+    const emp = data.employees.find(e => e.id === empId)
+    if (emp) {
+      const clockHrs = computeEmpMonthClockHours(emp, y, m, data)
+      if (clockHrs > 0) return clockHrs
+    }
+    // fallback to schedule hours if no clock data
     return data.schedules.filter(s => s.empId === empId && s.year === y && s.month === m)
       .reduce((sum, s) => sum + getShiftHours(s.shift), 0)
   }
@@ -262,19 +252,19 @@ export default function Finance() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>財務管理</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>財務管理</h1>
         {isAdmin && (
           <button onClick={() => exportFinance(data)}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '10px', border: '1px solid #d8cbb8', backgroundColor: '#fdfaf5', color: '#5a3a1a', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '10px', border: `1px solid ${E.inputBorder}`, backgroundColor: E.cardBg, color: '#5a3a1a', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
             <Download size={14} /> 匯出 Excel
           </button>
         )}
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#fdfaf5', borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: E.cardBg, borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {TABS.map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab === key), flexShrink: 0 }}>{label}</button>
         ))}
@@ -284,7 +274,7 @@ export default function Finance() {
       {tab === 'reimburse' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={() => { setNewR(r => ({ ...r, person: !isAdmin ? (currentUser?.name || '') : r.person })); setShowAdd(true) }}
+            <button onClick={() => { setNewR(r => ({ ...r, person: !isAdmin ? (currentUser?.name || '') : r.person })); setFormError(''); setSubmitting(false); setShowAdd(true) }}
               style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={15} />新增代墊</button>
           </div>
 
@@ -427,7 +417,7 @@ export default function Finance() {
       {tab === 'purchase' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={() => { setNewP(p => ({ ...p, person: !isAdmin ? (currentUser?.name || '') : p.person })); setShowAdd(true) }}
+            <button onClick={() => { setNewP(p => ({ ...p, person: !isAdmin ? (currentUser?.name || '') : p.person })); setFormError(''); setSubmitting(false); setShowAdd(true) }}
               style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={15} />新增申請</button>
           </div>
           {visiblePurchaseRequests.length === 0
@@ -583,24 +573,43 @@ export default function Finance() {
       {tab === 'invoice' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* 統計 */}
-          <div style={{ ...E.card, display: 'flex', gap: '28px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>發票筆數</div>
-              <div style={{ fontSize: '22px', fontWeight: '800', color: E.textPrimary }}>{invoices.length}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>總金額</div>
-              <div style={{ fontSize: '22px', fontWeight: '800', color: '#c08a30' }}>
-                NT${invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0).toLocaleString()}
+          {(() => {
+            const totalIncl = invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+            const tax = Math.round(totalIncl * 5 / 105)
+            const excl = totalIncl - tax
+            return (
+              <div style={{ ...E.card, display: 'flex', gap: '28px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>發票筆數</div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color: E.textPrimary }}>{invoices.length}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>未稅金額</div>
+                  <div style={{ fontSize: '18px', fontWeight: '700', color: E.textSecond }}>
+                    NT${excl.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>稅額（5%）</div>
+                  <div style={{ fontSize: '18px', fontWeight: '700', color: '#6b3fa0' }}>
+                    NT${tax.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '2px' }}>含稅總額</div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color: '#c08a30' }}>
+                    NT${totalIncl.toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ marginLeft: 'auto' }}>
+                  <button onClick={() => { setNewInv(EMPTY_INV); setEditInv(null); setShowAddInv(true) }}
+                    style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 16px', fontSize: '13px' }}>
+                    <Plus size={14} /> 新增發票
+                  </button>
+                </div>
               </div>
-            </div>
-            <div style={{ marginLeft: 'auto' }}>
-              <button onClick={() => { setNewInv(EMPTY_INV); setEditInv(null); setShowAddInv(true) }}
-                style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 16px', fontSize: '13px' }}>
-                <Plus size={14} /> 新增發票
-              </button>
-            </div>
-          </div>
+            )
+          })()}
 
           {/* 說明 */}
           <div style={{ fontSize: '12px', color: E.textMuted, backgroundColor: '#f8f2e8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #ede5d8' }}>
@@ -682,6 +691,42 @@ export default function Finance() {
       {/* 帳目查詢 */}
       {tab === 'expenses' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* 待歸類清單：案件未定 或 代墊未還款（還款才轉正入預算）*/}
+          {isAdmin && (() => {
+            const missing = (e) => [
+              (!e.project || e.project === '待歸類') && '案件未定',
+              !e.category && '科目未填',
+              !(e.receiptNo || '').trim() && '憑證未填',
+              !e.vendor && '廠商未填',
+              !e.date && '日期未填',
+              !isBooked(e) && '代墊未還款',
+            ].filter(Boolean)
+            const pending = (data.expenses || []).filter(e => missing(e).length > 0)
+            if (!pending.length) return null
+            return (
+              <div style={{ ...E.card, border: '1px solid #e0b8a8', backgroundColor: '#fdf3ef' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#a03020', marginBottom: '8px' }}>⚠ 待歸類（{pending.length} 筆）— 每筆帳「案件/科目/憑證號」都要填齊、代墊要確認還款，缺一就留在這裡且不計入預算</div>
+                {pending.map(e => {
+                  const r = e.linkedSerial ? (data.reimbursements || []).find(x => x.serialNo === e.linkedSerial) : null
+                  const reasons = missing(e).join('、')
+                  return (
+                    <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '5px 0', borderBottom: `1px solid ${E.divider}`, flexWrap: 'wrap' }}>
+                      <span style={{ color: E.textMuted, minWidth: '74px' }}>{e.date}</span>
+                      <span style={{ fontWeight: '600', color: E.textPrimary, flex: 1, minWidth: '110px' }}>{e.vendor}｜NT${Number(e.amount).toLocaleString()}</span>
+                      <span style={{ fontSize: '10px', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#fde8e4', color: '#a03020', fontWeight: '700' }}>{reasons}</span>
+                      {(!e.project || e.project === '待歸類') && (
+                        <select defaultValue="" onChange={ev => { if (ev.target.value) updateItem('expenses', e.id, { project: ev.target.value }) }}
+                          style={{ ...E.input, width: 'auto', fontSize: '11px', padding: '4px 6px' }}>
+                          <option value="">歸類到案件…</option>
+                          {data.projects.map(pp => <option key={pp.id} value={pp.id}>{pp.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: mob ? 'wrap' : 'nowrap' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: mob ? '100%' : '180px' }}>
               <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: E.textMuted }} />
@@ -702,6 +747,42 @@ export default function Finance() {
             <button onClick={() => setShowAddExp(true)} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <Plus size={15} />新增帳目
             </button>
+            {isAdmin && (() => {
+              const exps = data.expenses || []
+              const seen = new Map()
+              const dupes = []
+              for (const e of exps) {
+                const key = `${e.serialNo || ''}|${e.date || ''}|${e.project || ''}|${e.category || ''}|${e.vendor || ''}|${e.amount || 0}|${e.direction || ''}`
+                if (!e.serialNo) continue
+                if (seen.has(key)) dupes.push(e)
+                else seen.set(key, e)
+              }
+              if (dupes.length === 0) return null
+              return (
+                <button
+                  onClick={() => {
+                    if (!window.confirm(`偵測到 ${dupes.length} 筆重複帳目（相同流水號、日期、金額、廠商），確定要清除？保留每組第一筆。`)) return
+                    const dupeIds = new Set(dupes.map(d => d.id))
+                    batchUpdate(d => ({
+                      ...d,
+                      expenses: (d.expenses || []).filter(e => !dupeIds.has(e.id)),
+                      editLogs: [{
+                        id: Date.now(),
+                        timestamp: new Date().toLocaleString('sv-SE').slice(0, 16),
+                        user: currentUser?.name || currentUser?.username || '未知',
+                        action: '清除',
+                        entityType: '帳目',
+                        entityName: '批次去重',
+                        summary: `清除 ${dupes.length} 筆重複帳目`,
+                      }, ...(d.editLogs || [])].slice(0, 500),
+                    }))
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', cursor: 'pointer', backgroundColor: '#f5e8e0', color: '#8a3a20', border: '1px solid #e0b8a8', fontWeight: '600' }}
+                >
+                  清除重複（{dupes.length}）
+                </button>
+              )
+            })()}
           </div>
           {showExpFilters && (
             <div style={{ ...E.card, padding: mob ? '12px' : '14px 18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -813,7 +894,8 @@ export default function Finance() {
 
       {/* 預算總覽 */}
       {tab === 'budget' && !selectedBudget && (() => {
-        const projectsWithBudget = data.projects.filter(p => p.budget > 0)
+        // 有「預算金額」或「標案總金額」任一 > 0 的案件都算有預算
+        const projectsWithBudget = data.projects.filter(p => (Number(p.budget) || 0) > 0 || (Number(p.contractAmount) || 0) > 0)
         const allYears = [...new Set(
           projectsWithBudget.map(p => p.deadline ? p.deadline.slice(0, 4) : String(currentYear))
         )].sort((a, b) => b.localeCompare(a))
@@ -827,7 +909,9 @@ export default function Finance() {
         const closedProjects = yearProjects.filter(p => p.status === '結案')
 
         function BudgetCard({ p }) {
-          const spent = data.expenses.filter(e => e.project === p.id && e.direction !== '稅抵用').reduce((s, e) => s + (e.amount || 0), 0)
+          const projExps = data.expenses.filter(e => e.project === p.id && e.direction !== '稅抵用' && isBooked(e) && isComplete(e))
+          const spent = projExps.filter(e => e.direction !== '收入').reduce((s, e) => s + (e.amount || 0), 0)
+            - projExps.filter(e => e.direction === '收入').reduce((s, e) => s + (e.amount || 0), 0)
           const contractAmount = Number(p.contractAmount) || 0
           const deductionAmount = Number(p.deductionAmount) || 0
           const effectiveBudget = contractAmount > 0 ? contractAmount - deductionAmount : Number(p.budget) || 0
@@ -906,13 +990,16 @@ export default function Finance() {
       {tab === 'budget' && selectedBudget && (() => {
         const p = data.projects.find(x => x.id === selectedBudget)
         if (!p) return null
-        const exps = data.expenses.filter(e => e.project === p.id)
-        const spentExps = exps.filter(e => e.direction !== '稅抵用')
-        const spent = spentExps.reduce((s, e) => s + (e.amount || 0), 0)
+        const exps = data.expenses.filter(e => e.project === p.id && isBooked(e) && isComplete(e))
+        const spentExps = exps.filter(e => e.direction !== '稅抵用' && e.direction !== '收入')
+        const incomeExps = exps.filter(e => e.direction === '收入')
+        const totalSpent = spentExps.reduce((s, e) => s + (e.amount || 0), 0)
+        const totalIncome = incomeExps.reduce((s, e) => s + (e.amount || 0), 0)
+        const spent = totalSpent - totalIncome
         const contractAmount = Number(p.contractAmount) || 0
         const deductionAmount = Number(p.deductionAmount) || 0
         const effectiveBudget = contractAmount > 0 ? contractAmount - deductionAmount : Number(p.budget) || 0
-        const pct = effectiveBudget > 0 ? Math.min((spent / effectiveBudget) * 100, 100) : 0
+        const pct = effectiveBudget > 0 ? Math.min((Math.max(0, spent) / effectiveBudget) * 100, 100) : 0
 
         const byCategory = {}
         spentExps.forEach(e => { byCategory[e.category || '其他'] = (byCategory[e.category || '其他'] || 0) + e.amount })
@@ -954,9 +1041,23 @@ export default function Finance() {
                 {/* 已支出 */}
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', paddingLeft: '12px', paddingBottom: '8px', borderLeft: `2px solid ${E.divider}`, marginLeft: '36px' }}>
                   <span style={{ fontSize: '11px', color: E.textMuted, width: '60px', flexShrink: 0 }}>已支出</span>
-                  <span style={{ fontSize: '15px', fontWeight: '700', color: E.coffee }}>NT${spent.toLocaleString()}</span>
-                  <span style={{ fontSize: '11px', color: pct > 80 ? '#c04030' : E.textMuted }}>({pct.toFixed(1)}%)</span>
+                  <span style={{ fontSize: '15px', fontWeight: '700', color: E.coffee }}>NT${totalSpent.toLocaleString()}</span>
                 </div>
+                {/* 收入 */}
+                {totalIncome > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', paddingLeft: '12px', paddingBottom: '8px', borderLeft: `2px solid ${E.divider}`, marginLeft: '36px' }}>
+                    <span style={{ fontSize: '11px', color: E.textMuted, width: '60px', flexShrink: 0 }}>收入</span>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: E.green }}>+NT${totalIncome.toLocaleString()}</span>
+                  </div>
+                )}
+                {/* 淨支出 */}
+                {totalIncome > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', paddingLeft: '12px', paddingBottom: '8px', borderLeft: `2px solid ${E.divider}`, marginLeft: '36px' }}>
+                    <span style={{ fontSize: '11px', color: E.textMuted, width: '60px', flexShrink: 0 }}>淨支出</span>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: E.coffee }}>NT${spent.toLocaleString()}</span>
+                    <span style={{ fontSize: '11px', color: pct > 80 ? '#c04030' : E.textMuted }}>({pct.toFixed(1)}%)</span>
+                  </div>
+                )}
                 {/* 剩餘 */}
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', paddingLeft: '12px', borderLeft: `2px solid ${E.divider}`, marginLeft: '36px', paddingBottom: '12px' }}>
                   <span style={{ fontSize: '11px', color: E.textMuted, width: '60px', flexShrink: 0 }}>剩餘</span>
@@ -996,13 +1097,13 @@ export default function Finance() {
 
             <div style={{ ...E.card, padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '14px 16px', borderBottom: `1px solid ${E.divider}`, fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>
-                支出明細（{exps.length} 筆）
+                帳目明細（{exps.length} 筆）
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
                     <tr style={{ backgroundColor: E.sandLight }}>
-                      {['流水號','日期','科目','廠商','金額'].map(h => (
+                      {['流水號','日期','收支','科目','廠商','金額'].map(h => (
                         <th key={h} style={{ textAlign: 'left', padding: '8px 14px', fontWeight: '600', color: E.textSecond }}>{h}</th>
                       ))}
                     </tr>
@@ -1016,9 +1117,19 @@ export default function Finance() {
                             : <span style={{ color: E.textMuted, fontSize: '11px' }}>—</span>}
                         </td>
                         <td style={{ padding: '9px 14px', color: E.textSecond }}>{e.date}</td>
+                        <td style={{ padding: '9px 14px' }}>
+                          <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', fontWeight: '600',
+                            backgroundColor: e.direction === '收入' ? '#e8f0e4' : '#f5e8e0',
+                            color: e.direction === '收入' ? '#3a6d31' : '#8a3a20' }}>
+                            {e.direction || '支出'}
+                          </span>
+                        </td>
                         <td style={{ padding: '9px 14px', color: E.textSecond }}>{e.category}</td>
                         <td style={{ padding: '9px 14px', fontWeight: '600', color: E.textPrimary }}>{e.vendor}</td>
-                        <td style={{ padding: '9px 14px', fontWeight: '700', color: E.coffee }}>NT${e.amount.toLocaleString()}</td>
+                        <td style={{ padding: '9px 14px', fontWeight: '700',
+                          color: e.direction === '收入' ? E.green : E.coffee }}>
+                          {e.direction === '收入' ? '+' : ''}NT${Number(e.amount).toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1035,7 +1146,7 @@ export default function Finance() {
           {/* 控制列：篩選 + 排序 + 新增 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             {/* 類型篩選 */}
-            <div style={{ display: 'flex', gap: '3px', backgroundColor: '#fdfaf5', borderRadius: '10px', padding: '3px', border: `1px solid ${E.cardBorder}` }}>
+            <div style={{ display: 'flex', gap: '3px', backgroundColor: E.cardBg, borderRadius: '10px', padding: '3px', border: `1px solid ${E.cardBorder}` }}>
               {[['all','全部'],['employee','員工'],['vendor','廠商']].map(([key, label]) => (
                 <button key={key} onClick={() => setBankFilter(key)}
                   style={{ ...E.tab(bankFilter === key), padding: '5px 14px', fontSize: '12px' }}>{label}</button>
@@ -1086,9 +1197,9 @@ export default function Finance() {
 
       {/* 新增代墊 Modal */}
       {showAdd && tab === 'reimburse' && (
-        <Modal title="新增代墊申請" onClose={() => setShowAdd(false)}>
+        <Modal title="新增代墊申請" onClose={() => { setShowAdd(false); setFormError(''); setSubmitting(false) }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {[['日期 *','date','date',''],['付款人 *','person','text','員工姓名'],['說明 *','description','text','說明用途'],['憑證編號','receiptNo','text','統編/收據號'],['金額 *','amount','number','0']].map(([label,key,type,ph]) => (
+            {[['日期 *','date','date',''],['付款人 *','person','text','員工姓名'],['付款給誰 *','vendor','text','例：建豪印刷、家樂福'],['說明 *','description','text','說明用途'],['憑證編號','receiptNo','text','統編/收據號'],['金額 *','amount','number','0']].map(([label,key,type,ph]) => (
               <div key={key}>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>{label}</label>
                 <input type={type} value={newR[key]} onChange={e => setNewR(p => ({ ...p, [key]: e.target.value }))} placeholder={ph}
@@ -1106,43 +1217,95 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
               <select value={newR.project} onChange={e => setNewR(p => ({ ...p, project: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
                 <option value="">請選擇</option>
+                <option value="待歸類">❓ 不確定屬於哪個專案（由管理員歸類）</option>
                 {data.projects.filter(p => p.status === '執行中' || p.status === '長期').map(p => <option key={p.id} value={p.id}>[{p.code || p.id}] {p.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>支出類別</label>
               <select value={newR.category} onChange={e => setNewR(p => ({ ...p, category: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
-                <option value="">請選擇</option>
-                {expAccounts.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">— 請選擇 —</option>
+                {expCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>會計科目</label>
+              <select value={newR.account || ''} onChange={e => setNewR(p => ({ ...p, account: e.target.value }))} style={{ ...E.input, cursor: 'pointer' }}>
+                <option value="">— 請選擇 —</option>
+                {expAccounts.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
           </div>
-          <button onClick={() => {
-            if (!newR.date||!newR.person||!newR.amount) return
-            const serial = generateSerial()
-            const rId = Date.now()
-            // 1. 新增代墊紀錄
-            addItem('reimbursements', { id: rId, ...newR, amount: Number(newR.amount), status: '待還款', serialNo: serial })
-            // 2. 自動新增對應帳目（代墊類別）
-            const maxNum = (data.expenses || []).reduce((mx, e) => { const m = e.id?.match?.(/(\d+)$/); return m ? Math.max(mx, parseInt(m[1])) : mx }, 0)
-            const expId = `slm26-${String(maxNum + 1).padStart(3, '0')}`
-            addItem('expenses', {
-              id: expId, date: newR.date, direction: '支出', project: newR.project,
-              category: newR.category || '代墊', amount: Number(newR.amount),
-              vendor: newR.person, method: newR.method || '現金', receiptNo: newR.receiptNo || '',
-              note: newR.description || '', serialNo: serial, linkedReimbursementId: rId,
-            })
-            logEdit({ user: who, action: '新增', entityType: '代墊', entityName: newR.person, summary: `${newR.project} NT$${Number(newR.amount).toLocaleString()} → 已自動連動帳目` })
-            setNewR({ date:'',person:'',project:'',amount:'',description:'',method:'現金',receiptNo:'',category:'' })
-            setShowAdd(false)
+          {formError && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#fce8e0', border: '1px solid #e9b8a0', color: '#8a3020', fontSize: '13px', fontWeight: '500' }}>
+              ⚠ {formError}
+            </div>
+          )}
+          <button disabled={submitting} onClick={() => {
+            if (submitting) return
+            if (!newR.date) { setFormError('請選擇日期'); return }
+            if (!newR.person) { setFormError('請填寫付款人'); return }
+            if (!newR.vendor) { setFormError('請填寫付款給誰（廠商/對方）'); return }
+            if (!newR.description) { setFormError('請填寫說明'); return }
+            if (!newR.amount) { setFormError('請填寫金額'); return }
+            if (!newR.category) { setFormError('請選擇支出類別'); return }
+            {
+              // 發票號查重：帳目＋代墊都比對，重複直接擋下不給提報
+              const no = (newR.receiptNo || '').trim()
+              if (no) {
+                const dup = [...(data.expenses || []), ...(data.reimbursements || [])].find(x => (x.receiptNo || '').trim() === no)
+                if (dup) { setFormError(`⛔ 發票號碼 ${no} 已被提報過（${dup.person || dup.vendor || ''}｜${dup.date}｜NT$${Number(dup.amount).toLocaleString()}），重複的帳不能提報`); return }
+              }
+            }
+            setFormError('')
+            setSubmitting(true)
+            try {
+              const who = currentUser?.name || currentUser?.username || '未知'
+              const serial = generateSerial()
+              const rId = Date.now()
+              // 原子寫入：代墊 + 帳目 + 編輯紀錄 一次寫入，避免多次 set() 互相覆蓋
+              batchUpdate(d => {
+                const maxNum = (d.expenses || []).reduce((mx, e) => { const m = e.id?.match?.(/(\d+)$/); return m ? Math.max(mx, parseInt(m[1])) : mx }, 0)
+                const expId = `slm26-${String(maxNum + 1).padStart(3, '0')}`
+                const reimbEntry = { id: rId, ...newR, amount: Number(newR.amount), status: '待還款', serialNo: serial }
+                const expEntry = {
+                  id: expId, date: newR.date, direction: '支出', project: newR.project,
+                  category: newR.category, account: newR.account || '', amount: Number(newR.amount),
+                  vendor: newR.vendor, method: newR.method || '現金', receiptNo: newR.receiptNo || '',
+                  note: `${newR.description}（${newR.person} 代墊）`, serialNo: serial, linkedReimbursementId: rId,
+                }
+                const logEntry = {
+                  id: Date.now() + 1,
+                  timestamp: new Date().toLocaleString('sv-SE').slice(0, 16),
+                  user: who, action: '新增', entityType: '代墊',
+                  entityName: newR.person,
+                  summary: `${newR.project} NT$${Number(newR.amount).toLocaleString()} → 已自動連動帳目`,
+                }
+                return {
+                  ...d,
+                  reimbursements: [...(d.reimbursements || []), reimbEntry],
+                  expenses: [...(d.expenses || []), expEntry],
+                  editLogs: [logEntry, ...(d.editLogs || [])].slice(0, 500),
+                }
+              })
+              setNewR({ date:'',person:'',vendor:'',project:'',amount:'',description:'',method:'現金',receiptNo:'',category:'',account:'' })
+              setShowAdd(false)
+              setSubmitting(false)
+            } catch (err) {
+              console.error('[代墊提交失敗]', err)
+              setFormError('送出失敗，請再試一次')
+              setSubmitting(false)
+            }
           }}
-            style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>送出申請</button>
+            style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '12px 0', opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
+            {submitting ? '送出中…' : '送出申請'}
+          </button>
         </Modal>
       )}
 
       {/* 新增採購 Modal */}
       {showAdd && tab === 'purchase' && (
-        <Modal title="新增採購申請" onClose={() => setShowAdd(false)}>
+        <Modal title="新增採購申請" onClose={() => { setShowAdd(false); setFormError(''); setSubmitting(false) }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[['日期 *','date','date'],['申請人 *','person','text'],['說明 *','description','text'],['金額 *','amount','number']].map(([label,key,type]) => (
               <div key={key}>
@@ -1160,8 +1323,33 @@ export default function Finance() {
               </select>
             </div>
           </div>
-          <button onClick={() => { if (!newP.date||!newP.person||!newP.amount) return; addItem('purchaseRequests',{id:Date.now(),...newP,amount:Number(newP.amount)}); setNewP({date:'',person:'',project:'',amount:'',description:'',status:'待審核'}); setShowAdd(false) }}
-            style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>送出申請</button>
+          {formError && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#fce8e0', border: '1px solid #e9b8a0', color: '#8a3020', fontSize: '13px', fontWeight: '500' }}>
+              ⚠ {formError}
+            </div>
+          )}
+          <button disabled={submitting} onClick={() => {
+            if (submitting) return
+            if (!newP.date) { setFormError('請選擇日期'); return }
+            if (!newP.person) { setFormError('請填寫申請人'); return }
+            if (!newP.description) { setFormError('請填寫說明'); return }
+            if (!newP.amount) { setFormError('請填寫金額'); return }
+            setFormError('')
+            setSubmitting(true)
+            try {
+              addItem('purchaseRequests', { id: Date.now(), ...newP, amount: Number(newP.amount) })
+              setNewP({ date:'', person:'', project:'', amount:'', description:'', status:'待審核' })
+              setShowAdd(false)
+              setSubmitting(false)
+            } catch (err) {
+              console.error('[採購提交失敗]', err)
+              setFormError('送出失敗，請再試一次')
+              setSubmitting(false)
+            }
+          }}
+            style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '12px 0', opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
+            {submitting ? '送出中…' : '送出申請'}
+          </button>
         </Modal>
       )}
 
@@ -1238,7 +1426,7 @@ export default function Finance() {
       {editR && (
         <Modal title="編輯代墊申請" onClose={() => setEditR(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {[['日期','date','date',''],['付款人','person','text',''],['說明','description','text',''],['憑證編號','receiptNo','text',''],['金額','amount','number','']].map(([label,key,type,ph]) => (
+            {[['日期','date','date',''],['付款人','person','text',''],['付款給誰','vendor','text','例：建豪印刷'],['說明','description','text',''],['憑證編號','receiptNo','text',''],['金額','amount','number','']].map(([label,key,type,ph]) => (
               <div key={key}>
                 <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>{label}</label>
                 <input type={type} value={editR[key] ?? ''} onChange={e => setEditR(p => ({ ...p, [key]: e.target.value }))} placeholder={ph} style={E.input} />
@@ -1265,10 +1453,23 @@ export default function Finance() {
             </div>
           </div>
           <button onClick={() => {
-            const now = new Date().toISOString().slice(0,16).replace('T',' ')
+            const now = new Date().toLocaleString('sv-SE').slice(0, 16)
             const who = currentUser?.name || currentUser?.username || '未知'
-            updateItem('reimbursements', editR.id, { ...editR, amount: Number(editR.amount), updatedBy: who, updatedAt: now })
-            logEdit({ user: who, action: '編輯', entityType: '代墊申請', entityName: editR.description || '代墊款', summary: `金額 NT$${Number(editR.amount).toLocaleString()}` })
+            // 原子更新：代墊紀錄 + 連動的帳目（廠商、金額、日期、案件、說明）
+            batchUpdate(d => {
+              const newReimb = (d.reimbursements || []).map(r =>
+                r.id === editR.id ? { ...editR, amount: Number(editR.amount), updatedBy: who, updatedAt: now } : r
+              )
+              const newExp = (d.expenses || []).map(e =>
+                e.linkedReimbursementId === editR.id
+                  ? { ...e, date: editR.date, project: editR.project, amount: Number(editR.amount),
+                      vendor: editR.vendor || e.vendor,
+                      note: `${editR.description || ''}（${editR.person} 代墊）` }
+                  : e
+              )
+              return { ...d, reimbursements: newReimb, expenses: newExp }
+            })
+            logEdit({ user: who, action: '編輯', entityType: '代墊申請', entityName: editR.description || '代墊款', summary: `金額 NT$${Number(editR.amount).toLocaleString()} → 帳目同步更新` })
             setEditR(null)
           }} style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>儲存</button>
         </Modal>
@@ -1423,8 +1624,11 @@ export default function Finance() {
                   {addRow('全勤獎金', sl.fullAttendanceBonus)}
                   {addRow('活動出勤', sl.activityAttendance)}
                   {addRow('加班費', sl.overtime)}
+                  {addRow('假日加給(時薪×2)', sl.holidayPremium, '#1a56a0')}
+                  {addRow('補休季結折現', sl.compCashout, '#1a56a0')}
+                  {addRow('特休年底折現', sl.annualCashout, '#1a56a0')}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0 5px', fontSize:'13px', fontWeight:'700', borderTop:`2px solid ${E.divider}`, marginTop:'4px' }}>
-                    <span>薪資總額</span><span>NT${Number(sl.grossPay||0).toLocaleString()}</span>
+                    <span>薪資總額</span><span>NT${Number(sl.grossPay + (sl.compCashout||0) + (sl.annualCashout||0) + (sl.holidayPremium||0)).toLocaleString()}</span>
                   </div>
                 </div>
                 {/* 扣項 */}
@@ -1436,6 +1640,7 @@ export default function Finance() {
                   {addRow('眷屬健保', sl.dependentHealth, '#8a3a20')}
                   {addRow('匯費', sl.wireFee, '#8a3a20')}
                   {addRow('代墊扣除', sl.advance, '#8a3a20')}
+                  {addRow('月缺口扣薪', sl.compDock, '#c04030')}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0 5px', fontSize:'13px', fontWeight:'700', borderTop:`2px solid ${E.divider}`, marginTop:'4px', color:'#8a3a20' }}>
                     <span>扣項合計</span><span>－ NT${Number(sl.totalDeductions||0).toLocaleString()}</span>
                   </div>
@@ -1506,6 +1711,7 @@ export default function Finance() {
         // 薪資管理主頁
         const [py, pm] = payrollMonth.split('-').map(Number)
         const govtHrs = GOVT_WORK_DAYS[payrollMonth]?.hours || 0
+        const todayStr = new Date().toLocaleDateString('sv-SE')
         const monthNav = (
           <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
             <button onClick={() => setPayrollMonth(p => { const [y,m] = p.split('-').map(Number); return m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}` })}
@@ -1527,10 +1733,12 @@ export default function Finance() {
           )
           const setting = data.salarySettings?.find(s => s.empId === myEmp.id) || {}
           const clockHrs = computeEmpMonthClockHours(myEmp, py, pm, data)
-          const earnedThisMonth = Math.max(0, clockHrs - govtHrs)
-          const allEarned = computeAllTimeEarned(myEmp.id, data)
-          const allUsed = (data.compLeaveRecords || []).filter(r => r.empId === myEmp.id).reduce((sum, r) => sum + Number(r.hours), 0)
-          const balance = Math.max(0, allEarned - allUsed)
+          // 走法 B：補休總帳（加班自動入帳 + 月缺口扣補休/扣薪 + 季結折現）
+          const ledger = computeCompLedger(myEmp, data, { year: py, month: pm })
+          const thisMonth = ledger.monthly.find(m => m.year === py && m.month === pm) || { accruedHours: 0, balHours: 0, shortfall: 0, dockHours: 0, dockAmount: 0, govtH: govtHrs }
+          const al = annualLeaveStatus(myEmp, py, data)
+          const quarterSettle = ledger.settlements.find(s => s.year === py && s.quarter === Math.ceil(pm/3))
+          const balance = thisMonth.balHours
           const payType = setting.payType || 'monthly'
           const schHrs = monthHoursFor(myEmp.id)
           const base = Number(setting.baseSalary || setting.hourlyRate || 0)
@@ -1568,10 +1776,21 @@ export default function Finance() {
                     <div>
                       <div style={{ fontSize:'11px', fontWeight:'700', color:E.textSecond, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>工時</div>
                       <div style={{ display:'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(2, 1fr)', gap:'8px' }}>
-                        {[['應上時數', govtHrs > 0 ? `${govtHrs}h` : '—'],['打卡時數',`${clockHrs}h`],['本月轉補休',`+${earnedThisMonth}h`],['補休餘額',`${balance}h`]].map(([label, value]) => (
+                        {[
+                          [thisMonth.govtH < govtHrs ? '應上時數(政府,已扣停班)' : '應上時數(政府)',`${thisMonth.govtH ?? govtHrs}h`, E.textPrimary],
+                          ['打卡時數',`${clockHrs}h`, E.textPrimary],
+                          ['本月加班→補休', thisMonth.accruedHours>0?`+${thisMonth.accruedHours}h`:'—', E.green],
+                          ['補休餘額',`${balance}h`, E.coffee],
+                          ['缺時(少做時數)', thisMonth.deficitHours>0?`${thisMonth.deficitHours}h`:'—', thisMonth.deficitHours>0?'#c04030':E.textPrimary],
+                          ['遲到/早退', thisMonth.lateLeaveDays>0?`${thisMonth.lateLeaveDays}天`:'—', thisMonth.lateLeaveDays>0?'#b45309':E.textPrimary],
+                          ['停班未出勤(無薪)', thisMonth.suspShortDays>0?`${thisMonth.suspShortDays}天`:'—', thisMonth.suspShortDays>0?'#3c6eb4':E.textPrimary],
+                          ['曠職天數', thisMonth.absentDays>0?`${thisMonth.absentDays}天`:'—', thisMonth.absentDays>0?'#c04030':E.textPrimary],
+                          ['待補登(忘打卡)', thisMonth.missingPunchDays>0?`${thisMonth.missingPunchDays}天`:'—', thisMonth.missingPunchDays>0?'#b45309':E.textPrimary],
+                          ['本月缺時扣薪', thisMonth.dockAmount>0?`-NT$${thisMonth.dockAmount.toLocaleString()}`:'—', thisMonth.dockAmount>0?'#c04030':E.textPrimary],
+                        ].map(([label, value, color]) => (
                           <div key={label} style={{ backgroundColor:E.sandLight, borderRadius:'8px', padding:'10px 12px' }}>
                             <div style={{ fontSize:'11px', color:E.textMuted }}>{label}</div>
-                            <div style={{ fontSize:'16px', fontWeight:'700', color: label==='補休餘額' ? E.green : E.textPrimary }}>{value}</div>
+                            <div style={{ fontSize:'16px', fontWeight:'700', color }}>{value}</div>
                           </div>
                         ))}
                       </div>
@@ -1608,16 +1827,28 @@ export default function Finance() {
                   </div>
                 )}
               </div>
-              {/* 補休餘額 */}
+              {/* 補休 + 特休（走法 B）*/}
               <div style={{ ...E.card, backgroundColor:'#f5f0e8', border:'none' }}>
-                <div style={{ fontSize:'13px', fontWeight:'600', color:E.textPrimary, marginBottom:'10px' }}>補休餘額</div>
-                <div style={{ display:'flex', gap:'24px', flexWrap:'wrap' }}>
-                  {[['累計轉補休',`${allEarned}h`,E.textPrimary],['已使用',`${allUsed}h`,'#8a3a20'],['剩餘',`${balance}h`,E.green]].map(([label, value, color]) => (
+                <div style={{ fontSize:'13px', fontWeight:'600', color:E.textPrimary, marginBottom:'10px' }}>🌊 補休 / 特休</div>
+                <div style={{ display:'flex', gap:'24px', flexWrap:'wrap', marginBottom:'12px' }}>
+                  {[
+                    ['補休餘額',`${balance}h`, E.coffee],
+                    ['特休剩餘', myEmp.hireDate?`${al.remainingDays}天`:'—', E.green],
+                    ['特休已用', myEmp.hireDate?`${al.usedDays}天`:'—', '#8a3a20'],
+                  ].map(([label, value, color]) => (
                     <div key={label}>
                       <div style={{ fontSize:'11px', color:E.textMuted }}>{label}</div>
                       <div style={{ fontSize:'20px', fontWeight:'800', color }}>{value}</div>
                     </div>
                   ))}
+                </div>
+                {quarterSettle && (
+                  <div style={{ fontSize:'12px', color:'#1a56a0', backgroundColor:'#e3ecf6', padding:'8px 12px', borderRadius:'8px', marginBottom:'8px' }}>
+                    📅 本季（Q{quarterSettle.quarter}）季底折現：{quarterSettle.hours}h → <strong>NT${quarterSettle.amount.toLocaleString()}</strong>
+                  </div>
+                )}
+                <div style={{ fontSize:'11px', color:E.textMuted, lineHeight:1.5 }}>
+                  加班打卡自動轉補休（國定假日 ×2）；補休可抵月缺口，季底（6/9/12月）未休折現。特休曆年制，年底未休折現。
                 </div>
               </div>
               {/* 薪資單記錄 */}
@@ -1662,6 +1893,58 @@ export default function Finance() {
                 <Plus size={15} />一鍵產生薪資
               </button>
             </div>
+
+            {/* ── 補休季結總覽（走法 B）── */}
+            {(() => {
+              const asOf = { year: py, month: pm }
+              const isQuarterEnd = pm === 6 || pm === 9 || pm === 12
+              return (
+                <div style={{ ...E.card }}>
+                  <div style={{ marginBottom:'12px' }}>
+                    <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>🌊 補休 / 特休 / 季結總覽</h3>
+                    <p style={{ fontSize:'12px', color:E.textMuted, margin:0 }}>
+                      加班打卡自動轉補休（國定假日 ×2）· 月缺口先扣補休、不足扣薪 · 季底（6/9/12月）未休折現。2026/6 起算。
+                    </p>
+                  </div>
+                  <div style={{ overflowX:'auto' }}>
+                    <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px', minWidth:'640px' }}>
+                      <thead>
+                        <tr style={{ backgroundColor:E.sandLight }}>
+                          {['員工','本月加班→補休','補休餘額','本月缺口','缺口扣薪','特休剩餘', isQuarterEnd ? '本季折現' : ''].filter(Boolean).map(h => (
+                            <th key={h} style={{ textAlign: h==='員工'?'left':'right', padding:'8px 12px', fontWeight:'600', color:E.textSecond, whiteSpace:'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.employees.map((emp, i) => {
+                          const ledger = computeCompLedger(emp, data, asOf)
+                          const thisMonth = ledger.monthly.find(m => m.year === py && m.month === pm)
+                          if (!thisMonth) return null
+                          const al = annualLeaveStatus(emp, py, data)
+                          const settle = ledger.settlements.find(s => s.year === py && (s.quarter === Math.ceil(pm/3)))
+                          return (
+                            <tr key={emp.id} style={{ borderBottom:`1px solid ${E.divider}`, backgroundColor: i%2===0?'transparent':'#faf7f2' }}>
+                              <td style={{ padding:'8px 12px', fontWeight:'600', color:E.textPrimary, whiteSpace:'nowrap' }}>{emp.name}</td>
+                              <td style={{ padding:'8px 12px', textAlign:'right', color: thisMonth.accruedHours>0?E.green:E.textMuted, fontWeight: thisMonth.accruedHours>0?'700':'400' }}>{thisMonth.accruedHours>0?`+${thisMonth.accruedHours}h`:'—'}</td>
+                              <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:'700', color:E.coffee }}>{thisMonth.balHours}h</td>
+                              <td style={{ padding:'8px 12px', textAlign:'right', color: thisMonth.shortfall>0?'#b45309':E.textMuted }}>{thisMonth.shortfall>0?`${thisMonth.shortfall}h`:'—'}</td>
+                              <td style={{ padding:'8px 12px', textAlign:'right', color: thisMonth.dockAmount>0?'#c04030':E.textMuted, fontWeight: thisMonth.dockAmount>0?'700':'400' }}>{thisMonth.dockAmount>0?`-NT$${thisMonth.dockAmount.toLocaleString()}`:'—'}</td>
+                              <td style={{ padding:'8px 12px', textAlign:'right', color: emp.hireDate?E.textSecond:'#c08a30' }}>{emp.hireDate?`${al.remainingDays}天`:'未填到職日'}</td>
+                              {isQuarterEnd && <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:'700', color: settle?'#1a56a0':E.textMuted }}>{settle?`NT$${settle.amount.toLocaleString()}`:'—'}</td>}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {isQuarterEnd && (
+                    <div style={{ marginTop:'10px', fontSize:'11px', color:'#1a56a0', backgroundColor:'#e3ecf6', padding:'8px 12px', borderRadius:'8px' }}>
+                      📅 本月為季底，未休完的補休將折現發放（折現金額已按 1.34/1.67/2.0 倍率加權計算）
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* 薪資設定 */}
             <div style={{ ...E.card }}>
@@ -1735,66 +2018,36 @@ export default function Finance() {
               </div>
             </div>
 
-            {/* 補休管理 */}
+            {/* 補休 / 加班費明細（走法 B：加班自動轉補休、季底折現）*/}
             <div style={{ ...E.card }}>
-              <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>補休管理</h3>
-              <p style={{ fontSize:'12px', color:E.textMuted, margin:'0 0 16px' }}>本月轉補休 = 打卡時數 − 應上時數（{govtHrs > 0 ? `${govtHrs}h` : '本月無政府行事曆資料'}）</p>
+              <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>補休 / 加班費明細</h3>
+              <p style={{ fontSize:'12px', color:E.textMuted, margin:'0 0 16px', lineHeight:1.5 }}>
+                加班(超過8h部分)自動轉補休：平日前2h×1.34、超過×1.67、國定假日×2。員工可請補休休假，季底(6/9/12月)未休依各費率折現成加班費。
+              </p>
               {data.employees.map((emp, i) => {
-                const clockHrs = computeEmpMonthClockHours(emp, py, pm, data)
-                const earnedThisMonth = Math.max(0, clockHrs - govtHrs)
-                const allEarned = computeAllTimeEarned(emp.id, data)
-                const usageRecs = (data.compLeaveRecords || []).filter(r => r.empId === emp.id).sort((a, b) => b.date.localeCompare(a.date))
-                const allUsed = usageRecs.reduce((sum, r) => sum + Number(r.hours), 0)
-                const balance = Math.max(0, allEarned - allUsed)
-                const isAddingForThisEmp = compLeaveForm.empId === emp.id
+                const ledger = computeCompLedger(emp, data, { year: py, month: pm })
+                const tm = ledger.monthly.find(m => m.year === py && m.month === pm) || {}
+                const settle = ledger.settlements.find(s => s.year === py && s.quarter === Math.ceil(pm/3))
+                const lots = settle?.lots || {}
                 return (
-                  <div key={emp.id} style={{ padding:'14px 0', borderBottom: i < data.employees.length-1 ? `1px solid ${E.divider}` : 'none' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', flexWrap:'wrap', gap:'8px' }}>
+                  <div key={emp.id} style={{ padding:'12px 0', borderBottom: i < data.employees.length-1 ? `1px solid ${E.divider}` : 'none' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'8px' }}>
                       <span style={{ fontWeight:'700', fontSize:'14px', color:E.textPrimary }}>{emp.name}</span>
                       <div style={{ display:'flex', gap:'16px', fontSize:'12px', flexWrap:'wrap' }}>
-                        <span style={{ color:E.textMuted }}>打卡 <strong style={{ color:E.textPrimary }}>{clockHrs}h</strong></span>
-                        <span style={{ color:E.textMuted }}>本月轉補休 <strong style={{ color:E.textPrimary }}>+{earnedThisMonth}h</strong></span>
-                        <span style={{ color:E.textMuted }}>累計已用 <strong style={{ color:'#8a3a20' }}>{allUsed}h</strong></span>
-                        <span style={{ color:E.textMuted }}>餘額 <strong style={{ color:E.green, fontSize:'14px' }}>{balance}h</strong></span>
+                        <span style={{ color:E.textMuted }}>補休餘額 <strong style={{ color:E.coffee, fontSize:'14px' }}>{ledger.balanceHours}h</strong></span>
+                        {tm.accruedHours > 0 && <span style={{ color:E.textMuted }}>本月加班→補休 <strong style={{ color:E.green }}>+{tm.accruedHours}h</strong></span>}
+                        {tm.compTaken > 0 && <span style={{ color:E.textMuted }}>本月請補休 <strong style={{ color:'#6a3a80' }}>-{tm.compTaken}h</strong></span>}
+                        {tm.deficitHours > 0 && <span style={{ color:E.textMuted }}>缺時 <strong style={{ color:'#c04030' }}>{tm.deficitHours}h</strong></span>}
                       </div>
                     </div>
-                    {usageRecs.length > 0 && (
-                      <div style={{ display:'flex', flexDirection:'column', gap:'4px', marginBottom:'8px' }}>
-                        {usageRecs.map(r => (
-                          <div key={r.id} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 10px', backgroundColor:'#f5f0f8', borderRadius:'8px', fontSize:'12px' }}>
-                            <span style={{ color:E.textMuted, minWidth:'80px' }}>{r.date}</span>
-                            <span style={{ color:'#6a3a80', fontWeight:'600' }}>－{r.hours}h</span>
-                            <span style={{ color:E.textSecond, flex:1 }}>{r.note || '—'}</span>
-                            <button onClick={() => deleteItem('compLeaveRecords', r.id)}
-                              style={{ background:'none', border:'none', cursor:'pointer', color:'#d0b8a8', padding:'2px' }}><Trash2 size={12} /></button>
-                          </div>
-                        ))}
+                    {/* 季結折現明細（加班費怎麼算出來的）*/}
+                    {settle && (settle.hours > 0) && (
+                      <div style={{ marginTop:'8px', padding:'8px 12px', backgroundColor:'#e3ecf6', borderRadius:'8px', fontSize:'12px', color:'#1a56a0' }}>
+                        📅 Q{settle.quarter} 季結折現：{settle.hours}h → <strong>NT${settle.amount.toLocaleString()}</strong>
+                        <div style={{ fontSize:'11px', color:'#3a6ba0', marginTop:'3px' }}>
+                          計算：{[['1.34', lots['1.34']], ['1.67', lots['1.67']], ['2', lots['2']]].filter(([, h]) => h > 0).map(([rate, h]) => `${h}h×${rate}`).join(' + ')} = {Math.round((Object.entries(lots).reduce((s,[r,h])=>s+Number(r)*h,0))*100)/100} 加權時數 × 時薪 {ledger.hourlyRate} = NT${settle.amount.toLocaleString()}
+                        </div>
                       </div>
-                    )}
-                    {isAddingForThisEmp ? (
-                      <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap' }}>
-                        <input type="date" value={compLeaveForm.date} onChange={e => setCompLeaveForm(p => ({...p, date: e.target.value}))}
-                          style={{ ...E.input, width:'130px', fontSize:'12px', padding:'5px 8px' }} />
-                        <input type="number" value={compLeaveForm.hours} min="0.5" max="8" step="0.5"
-                          onChange={e => setCompLeaveForm(p => ({...p, hours: Number(e.target.value)}))}
-                          style={{ ...E.input, width:'64px', fontSize:'12px', padding:'5px 8px' }} />
-                        <span style={{ fontSize:'11px', color:E.textMuted }}>小時</span>
-                        <input type="text" placeholder="備注" value={compLeaveForm.note}
-                          onChange={e => setCompLeaveForm(p => ({...p, note: e.target.value}))}
-                          style={{ ...E.input, flex:1, minWidth:'80px', fontSize:'12px', padding:'5px 8px' }} />
-                        <button onClick={() => {
-                          if (!compLeaveForm.date || !compLeaveForm.hours) return
-                          addItem('compLeaveRecords', { id: Date.now(), empId: emp.id, date: compLeaveForm.date, hours: compLeaveForm.hours, note: compLeaveForm.note })
-                          setCompLeaveForm({ empId: null, date: '', hours: 4, note: '' })
-                        }} style={{ ...E.btnPrimary, fontSize:'12px', padding:'5px 12px', whiteSpace:'nowrap' }}>新增</button>
-                        <button onClick={() => setCompLeaveForm({ empId: null, date: '', hours: 4, note: '' })}
-                          style={{ ...E.btnGhost, fontSize:'12px', padding:'5px 10px' }}>取消</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setCompLeaveForm({ empId: emp.id, date: `${py}-${String(pm).padStart(2,'0')}-01`, hours: 4, note: '' })}
-                        style={{ fontSize:'11px', padding:'4px 10px', border:`1px solid ${E.divider}`, borderRadius:'6px', background:'none', cursor:'pointer', color:E.textSecond }}>
-                        ＋ 新增補休使用記錄
-                      </button>
                     )}
                   </div>
                 )
@@ -1834,7 +2087,17 @@ export default function Finance() {
       {showGenPayroll && (
         <Modal title={`產生 ${monthLabel(payrollMonth)} 薪資`} onClose={() => setShowGenPayroll(false)}>
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-            <p style={{ fontSize:'12px', color:E.textSecond, margin:'0 0 4px' }}>確認各員工薪資明細，可調整加班費、全勤獎金等，確認後儲存。</p>
+            <p style={{ fontSize:'12px', color:E.textSecond, margin:'0 0 4px' }}>確認各員工薪資明細，可調整加班費、全勤獎金等，確認後儲存。月缺口扣薪、補休/特休折現由系統自動帶入。</p>
+            {(() => {
+              const [gy, gm] = payrollMonth.split('-').map(Number)
+              const todayY = new Date().getFullYear(), todayM = new Date().getMonth() + 1
+              const isCurrentOrFuture = gy > todayY || (gy === todayY && gm >= todayM)
+              return isCurrentOrFuture ? (
+                <div style={{ fontSize:'12px', color:'#8a4a18', backgroundColor:'#fef3cd', border:'1px solid #f0d78c', borderRadius:'8px', padding:'10px 12px', lineHeight:1.5 }}>
+                  ⚠️ 本月（{monthLabel(payrollMonth)}）尚未結束，打卡未打滿會造成「月缺口扣薪」過大、實領偏低甚至負數。<strong>請於月底打卡完整後再產生薪資。</strong>
+                </div>
+              ) : null
+            })()}
             {genSlips.map((sl, i) => (
               <div key={sl.empId} style={{ ...E.card, padding:'14px', backgroundColor: i%2===0 ? '#fdfaf5' : '#faf7f2' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
@@ -1869,6 +2132,15 @@ export default function Finance() {
                       style={{ ...E.input, padding:'6px 8px', fontSize:'13px' }} />
                   </div>
                 </div>
+                {/* 走法 B：自動帶入的補休扣薪/折現（唯讀） */}
+                {(sl.compDock > 0 || sl.compCashout > 0 || sl.annualCashout > 0 || sl.holidayPremium > 0) && (
+                  <div style={{ marginTop:'10px', display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                    {sl.holidayPremium > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#e3ecf6', color:'#1a56a0', fontWeight:'600' }}>＋假日加給(時薪×2) NT${sl.holidayPremium.toLocaleString()}</span>}
+                    {sl.compCashout > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#e3ecf6', color:'#1a56a0', fontWeight:'600' }}>＋補休季結折現 NT${sl.compCashout.toLocaleString()}</span>}
+                    {sl.annualCashout > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#e3ecf6', color:'#1a56a0', fontWeight:'600' }}>＋特休年底折現 NT${sl.annualCashout.toLocaleString()}</span>}
+                    {sl.compDock > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#fce8e0', color:'#c04030', fontWeight:'600' }}>－月缺口扣薪 NT${sl.compDock.toLocaleString()}</span>}
+                  </div>
+                )}
                 <div style={{ marginTop:'10px', paddingTop:'10px', borderTop:`1px solid ${E.divider}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span style={{ fontSize:'12px', color:E.textSecond }}>員工實領</span>
                   <span style={{ fontSize:'16px', fontWeight:'800', color:E.green }}>NT${Number(sl.netPay||0).toLocaleString()}</span>
@@ -2011,9 +2283,36 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>備註</label>
               <input value={newExp.note} onChange={e => setNewExp(p => ({ ...p, note: e.target.value }))} placeholder="備註說明" style={E.input} />
             </div>
+            {/* 查重：發票號撞號（帳目＋代墊）紅警；同日期＋同金額 黃警 */}
+            {(() => {
+              const no = (newExp.receiptNo || '').trim()
+              const exact = no ? [
+                ...(data.expenses || []).filter(x => (x.receiptNo || '').trim() === no).map(x => ({ src: '帳目', who: x.vendor, date: x.date, amt: x.amount, sn: x.serialNo })),
+                ...(data.reimbursements || []).filter(x => (x.receiptNo || '').trim() === no).map(x => ({ src: '代墊', who: x.person, date: x.date, amt: x.amount, sn: x.serialNo })),
+              ] : []
+              const fuzzy = (!exact.length && newExp.date && newExp.amount) ? [
+                ...(data.expenses || []).filter(x => x.date === newExp.date && Number(x.amount) === Number(newExp.amount)).map(x => ({ src: '帳目', who: x.vendor, date: x.date, amt: x.amount, sn: x.serialNo })),
+                ...(data.reimbursements || []).filter(x => x.date === newExp.date && Number(x.amount) === Number(newExp.amount)).map(x => ({ src: '代墊', who: x.person, date: x.date, amt: x.amount, sn: x.serialNo })),
+              ] : []
+              const list = exact.length ? exact : fuzzy
+              if (!list.length) return null
+              const red = exact.length > 0
+              return (
+                <div style={{ fontSize: '12px', padding: '9px 12px', borderRadius: '8px', lineHeight: 1.6,
+                  backgroundColor: red ? '#fde8e4' : '#fef6dc', color: red ? '#a03020' : '#7a5c10', border: `1px solid ${red ? '#e8b0a0' : '#e8d48a'}` }}>
+                  {red ? '⛔ 發票號碼已存在，很可能重複：' : '⚠ 同日期同金額已有紀錄，確認是否重複：'}
+                  {list.slice(0, 3).map((d, i) => (
+                    <div key={i}>・{d.src}｜{d.who}｜{d.date}｜NT${Number(d.amt).toLocaleString()}{d.sn ? `｜${d.sn}` : ''}</div>
+                  ))}
+                </div>
+              )
+            })()}
             <button
               onClick={() => {
                 if (!newExp.date || !newExp.vendor || !newExp.amount) return
+                const no = (newExp.receiptNo || '').trim()
+                const hasExactDup = no && [...(data.expenses || []), ...(data.reimbursements || [])].some(x => (x.receiptNo || '').trim() === no)
+                if (hasExactDup) { alert('⛔ 這個發票號碼已存在（見上方紅色警示來源），重複的帳不能提報。若確為不同憑證請改號碼。'); return }
                 const who = currentUser?.name || currentUser?.username || '未知'
                 const maxId = (data.expenses || []).filter(e => e.id?.startsWith('slm')).length + 1
                 const id = `slm26-${String(maxId).padStart(3, '0')}`

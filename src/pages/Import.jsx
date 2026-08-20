@@ -154,7 +154,7 @@ function parseExcelFile(file) {
         if (stSheet) {
           const rows = XLSX.utils.sheet_to_json(stSheet, { header: 1 })
           const headers = rows[0] || []
-          const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
+          const now = new Date().toLocaleString('sv-SE').slice(0, 16)
           for (let i = 2; i < rows.length; i++) {
             const row = rows[i]
             if (!row || row[0] == null) continue
@@ -201,6 +201,23 @@ export default function Import() {
   const { data, addItem, update } = useApp()
   const mob = useIsMobile()
   const [mode, setMode] = useState('excel') // 'excel' | 'csv'
+
+  // 完整資料備份匯出（含帳號）
+  async function exportBackup() {
+    let accounts = []
+    try {
+      const res = await fetch('https://senselifemaker-default-rtdb.firebaseio.com/accounts.json')
+      accounts = await res.json() || []
+    } catch { /* 帳號抓不到就只備份主資料 */ }
+    const backup = { _backupAt: new Date().toLocaleString('sv-SE'), appData: data, accounts }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `深活共構備份_${new Date().toLocaleDateString('sv-SE')}.json`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   // CSV 狀態
   const [typeKey, setTypeKey] = useState('employees')
@@ -292,7 +309,20 @@ export default function Import() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>匯入資料</h1>
+      <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>匯入 / 備份資料</h1>
+
+      {/* 完整資料備份 */}
+      <div style={{ ...E.card, display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', backgroundColor: '#f0f5ed', border: '1px solid #cfe0c8' }}>
+        <div style={{ flex: 1, minWidth: '200px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary }}>🛟 完整資料備份</div>
+          <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '3px', lineHeight: 1.5 }}>
+            下載一份包含所有資料（員工、打卡、薪資、案件、帳目、帳號…）的 JSON 檔。建議每月備份一次，存到電腦或雲端硬碟。
+          </div>
+        </div>
+        <button onClick={exportBackup} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+          <Download size={15} /> 下載備份檔
+        </button>
+      </div>
 
       {/* 模式切換 */}
       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', whiteSpace: 'nowrap' }}>

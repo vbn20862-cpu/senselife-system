@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
       ...data,
       username: data.username.trim(),
       id: `user_${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toLocaleDateString('sv-SE'),
     }
     const newList = [...accounts, newAcc]
     writeAccounts(newList)

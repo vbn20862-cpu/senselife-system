@@ -16,48 +16,51 @@ export function useIsMobile() {
 // 深活共構 大地色系 共用樣式
 export const E = {
   // 顏色
-  bg:          '#f5f0e8',
-  cardBg:      '#fdfaf5',
-  cardBorder:  '#e5d8c8',
-  cardShadow:  '0 1px 6px rgba(60,30,0,0.07)',
+  bg:          '#e8d5be',
+  cardBg:      '#ffffff',
+  cardBorder:  '#e0cdb8',
+  cardShadow:  '0 2px 12px rgba(80,20,0,0.10), 0 1px 3px rgba(80,20,0,0.06)',
+  cardShadowHover: '0 6px 24px rgba(80,20,0,0.16), 0 2px 6px rgba(80,20,0,0.09)',
 
-  textPrimary: '#2c1a0e',
-  textSecond:  '#7a6050',
-  textMuted:   '#b09070',
+  textPrimary: '#2c1208',
+  textSecond:  '#7a4a30',
+  textMuted:   '#b08060',
 
-  green:       '#3a6d31',
-  greenLight:  '#edf2ea',
-  greenText:   '#2e5627',
+  green:       '#c85c28',
+  greenLight:  '#faeee6',
+  greenText:   '#9a3a10',
 
   coffee:      '#8f5b38',
   coffeeLight: '#f5ede4',
 
   sand:        '#c89a62',
-  sandLight:   '#f8f2e6',
+  sandLight:   '#f8f0e4',
 
-  divider:     '#ede5d8',
-  inputBg:     '#fdfaf5',
-  inputBorder: '#d8cbb8',
+  divider:     '#e8d5be',
+  inputBg:     '#fffaf5',
+  inputBorder: '#d8c0a8',
 
   // 元件
   card: {
-    backgroundColor: '#fdfaf5',
-    border: '1px solid #e5d8c8',
-    borderRadius: '16px',
-    boxShadow: '0 1px 6px rgba(60,30,0,0.07)',
+    backgroundColor: '#ffffff',
+    border: '1px solid #e0cdb8',
+    borderRadius: '14px',
+    boxShadow: '0 2px 12px rgba(80,20,0,0.10), 0 1px 3px rgba(80,20,0,0.06)',
     padding: '20px',
   },
 
   // 按鈕
   btnPrimary: {
-    backgroundColor: '#3a6d31',
-    color: '#f2f7f0',
+    backgroundColor: '#c85c28',
+    color: '#fff8f4',
     border: 'none',
     borderRadius: '10px',
     padding: '10px 18px',
     fontSize: '13px',
     fontWeight: '600',
     cursor: 'pointer',
+    transition: 'background-color 0.15s, box-shadow 0.15s',
+    boxShadow: '0 1px 4px rgba(200,92,40,0.3)',
   },
   btnGhost: {
     backgroundColor: 'transparent',
@@ -113,8 +116,8 @@ export const E = {
     borderRadius: '8px',
     fontSize: '13px',
     fontWeight: active ? '600' : '500',
-    backgroundColor: active ? '#3a6d31' : 'transparent',
-    color: active ? '#f2f7f0' : '#7a6050',
+    backgroundColor: active ? '#c85c28' : 'transparent',
+    color: active ? '#fff8f4' : '#7a4a30',
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.15s',
@@ -130,6 +133,8 @@ export const STATUS = {
   '暫停':   { bg: '#f5e4e0', color: '#8a3020' },
   '提案中': { bg: '#f0ece0', color: '#8a7028' },
   '完成':   { bg: '#e4f0e8', color: '#2e6040' },
+  '待辦':   { bg: '#fef3cd', color: '#8a6d1a' },
+  '已完成': { bg: '#e4f0e8', color: '#2e6040' },
   '進行中': { bg: '#e0e8f0', color: '#305080' },
   '待開始': { bg: '#ece8e4', color: '#6a5a4a' },
   '待審核': { bg: '#f0ece0', color: '#8a7028' },

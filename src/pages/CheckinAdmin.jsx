@@ -2,15 +2,11 @@ import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { Plus, Trash2, Edit3, Check, X, Lock, LogOut } from 'lucide-react'
 import { useIsMobile } from '../styles/earth'
+import { resolveEmpName } from '../utils/salaryCalc'
+import { mapLink } from '../utils/geo'
 import logo from '../assets/logo.jpeg'
 
 const ADMIN_PASSWORD = 'admin1234'
-
-const resolveEmpName = (name, employees) => {
-  if (!name) return name
-  const emp = employees.find(e => e.name === name || e.name.includes(name) || name.includes(e.name))
-  return emp?.name || name
-}
 const PUNCH_TYPES = ['上班', '下班', '加班開始', '加班結束']
 const TYPE_STYLE = {
   '上班':   { color: '#3a6d31', bg: '#edf2ea' },
@@ -44,8 +40,44 @@ export default function CheckinAdmin() {
   const [editVals, setEditVals]     = useState({})
   const [showAdd, setShowAdd] = useState(false)
   const [newRec, setNewRec]   = useState({
-    empId: '', date: new Date().toISOString().split('T')[0], time: '09:00', type: '上班',
+    empId: '', date: new Date().toLocaleDateString('sv-SE'), time: '09:00', type: '上班',
   })
+  // 活動日批次補登
+  const [showBatch, setShowBatch] = useState(false)
+  const [batch, setBatch] = useState({
+    date: new Date().toLocaleDateString('sv-SE'),
+    empIds: [], inTime: '09:00', outTime: '18:00',
+    otStart: '', otEnd: '',
+  })
+  const [batchMsg, setBatchMsg] = useState('')
+
+  function toggleBatchEmp(id) {
+    setBatch(p => ({ ...p, empIds: p.empIds.includes(id) ? p.empIds.filter(x => x !== id) : [...p.empIds, id] }))
+  }
+  function handleBatchAdd() {
+    if (batch.empIds.length === 0) { setBatchMsg('請至少選一位員工'); return }
+    if (!batch.date || !batch.inTime || !batch.outTime) { setBatchMsg('請填日期與上下班時間'); return }
+    let added = 0, skipped = 0
+    const ts = Date.now()
+    let k = 0
+    for (const empId of batch.empIds) {
+      const emp = data.employees.find(e => e.id === empId)
+      if (!emp) continue
+      // 跳過當天已有上班卡的員工，避免重複
+      const dup = data.clockins.some(c => c.empId === empId && c.date === batch.date && c.type === '上班')
+      if (dup) { skipped++; continue }
+      addItem('clockins', { id: ts + (k++), empId, empName: emp.name, date: batch.date, time: batch.inTime, type: '上班' })
+      addItem('clockins', { id: ts + (k++), empId, empName: emp.name, date: batch.date, time: batch.outTime, type: '下班' })
+      if (batch.otStart && batch.otEnd) {
+        addItem('clockins', { id: ts + (k++), empId, empName: emp.name, date: batch.date, time: batch.otStart, type: '加班開始' })
+        addItem('clockins', { id: ts + (k++), empId, empName: emp.name, date: batch.date, time: batch.otEnd, type: '加班結束' })
+      }
+      added++
+    }
+    setBatchMsg(`✅ 補登 ${added} 人${skipped > 0 ? `（跳過 ${skipped} 人：當天已有打卡）` : ''}`)
+    setBatch(p => ({ ...p, empIds: [] }))
+    setTimeout(() => setBatchMsg(''), 4000)
+  }
 
   /* ── 登入 ── */
   function handleLogin() {
@@ -76,7 +108,7 @@ export default function CheckinAdmin() {
     if (!emp) return
     addItem('clockins', { id: Date.now(), empId: emp.id, empName: emp.name, date: newRec.date, time: newRec.time, type: newRec.type })
     setShowAdd(false)
-    setNewRec({ empId: '', date: new Date().toISOString().split('T')[0], time: '09:00', type: '上班' })
+    setNewRec({ empId: '', date: new Date().toLocaleDateString('sv-SE'), time: '09:00', type: '上班' })
   }
 
   /* ══════════ 密碼頁 ══════════ */
@@ -138,10 +170,74 @@ export default function CheckinAdmin() {
             </button>
           )}
           <span style={{ fontSize: '12px', color: '#9a8070', marginLeft: 'auto' }}>共 {filtered.length} 筆</span>
-          <button onClick={() => setShowAdd(v => !v)} style={{ backgroundColor: '#3a6d31', color: '#f2f7f0', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => { setShowBatch(v => !v); setShowAdd(false) }} style={{ backgroundColor: showBatch ? '#a85420' : '#c06a30', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            📅 活動日批次補登
+          </button>
+          <button onClick={() => { setShowAdd(v => !v); setShowBatch(false) }} style={{ backgroundColor: '#3a6d31', color: '#f2f7f0', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={14} />補登打卡
           </button>
         </div>
+
+        {/* 活動日批次補登 */}
+        {showBatch && (
+          <div style={{ backgroundColor: '#fdfaf5', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 4px 20px rgba(0,0,0,0.22)' }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#2c1a0e', marginBottom: '4px' }}>📅 活動日批次補登</div>
+            <div style={{ fontSize: '11px', color: '#9a8070', marginBottom: '14px' }}>選日期 + 勾選員工 + 統一上下班時間，一次補完。當天已有打卡的員工會自動跳過。</div>
+            {/* 日期 + 時間 */}
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', color: '#7a6050', fontWeight: '600' }}>活動日期</label>
+                <input type="date" value={batch.date} onChange={e => setBatch(p => ({ ...p, date: e.target.value }))} style={INPUT} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', color: '#7a6050', fontWeight: '600' }}>上班時間</label>
+                <input type="time" value={batch.inTime} onChange={e => setBatch(p => ({ ...p, inTime: e.target.value }))} style={INPUT} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', color: '#7a6050', fontWeight: '600' }}>下班時間</label>
+                <input type="time" value={batch.outTime} onChange={e => setBatch(p => ({ ...p, outTime: e.target.value }))} style={INPUT} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', color: '#7a6050', fontWeight: '600' }}>加班開始（選填）</label>
+                <input type="time" value={batch.otStart} onChange={e => setBatch(p => ({ ...p, otStart: e.target.value }))} style={INPUT} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', color: '#7a6050', fontWeight: '600' }}>加班結束（選填）</label>
+                <input type="time" value={batch.otEnd} onChange={e => setBatch(p => ({ ...p, otEnd: e.target.value }))} style={INPUT} />
+              </div>
+            </div>
+            {/* 員工勾選 */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#7a6050', fontWeight: '600' }}>選擇員工（{batch.empIds.length} 人）</span>
+                <button onClick={() => setBatch(p => ({ ...p, empIds: p.empIds.length === data.employees.length ? [] : data.employees.map(e => e.id) }))}
+                  style={{ fontSize: '11px', color: '#3a6d31', background: 'none', border: '1px solid #d8cbb8', borderRadius: '6px', padding: '2px 10px', cursor: 'pointer' }}>
+                  {batch.empIds.length === data.employees.length ? '取消全選' : '全選'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {data.employees.map(e => {
+                  const on = batch.empIds.includes(e.id)
+                  return (
+                    <button key={e.id} onClick={() => toggleBatchEmp(e.id)}
+                      style={{ fontSize: '13px', padding: '6px 14px', borderRadius: '999px', cursor: 'pointer', fontWeight: '600',
+                        border: `1.5px solid ${on ? '#3a6d31' : '#d8cbb8'}`, backgroundColor: on ? '#edf2ea' : '#fff', color: on ? '#3a6d31' : '#7a6050' }}>
+                      {on ? '✓ ' : ''}{e.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            {batchMsg && <div style={{ fontSize: '13px', color: batchMsg.startsWith('✅') ? '#3a6d31' : '#c04030', fontWeight: '600', marginBottom: '10px' }}>{batchMsg}</div>}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handleBatchAdd} disabled={batch.empIds.length === 0}
+                style={{ backgroundColor: batch.empIds.length ? '#3a6d31' : '#c8b8a8', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: batch.empIds.length ? 'pointer' : 'default' }}>
+                批次補登 {batch.empIds.length > 0 ? `（${batch.empIds.length} 人）` : ''}
+              </button>
+              <button onClick={() => setShowBatch(false)} style={{ backgroundColor: 'transparent', color: '#9a8070', border: '1px solid #d8cbb8', borderRadius: '8px', padding: '10px 16px', fontSize: '13px', cursor: 'pointer' }}>關閉</button>
+            </div>
+          </div>
+        )}
 
         {/* 補登表單 */}
         {showAdd && (
@@ -189,7 +285,7 @@ export default function CheckinAdmin() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead style={{ backgroundColor: '#f5f0e8' }}>
                   <tr>
-                    {['姓名', '日期', '時間', '打卡類型', '操作'].map(h => (
+                    {['姓名', '日期', '時間', '打卡類型', '地點', '操作'].map(h => (
                       <th key={h} style={{ padding: '11px 16px', textAlign: 'left', color: '#7a6050', fontWeight: '600', borderBottom: '1px solid #ede5d8', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -228,6 +324,19 @@ export default function CheckinAdmin() {
                               </select>
                             : <span style={{ backgroundColor: ts.bg, color: ts.color, padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: '600' }}>{c.type}</span>
                           }
+                        </td>
+
+                        {/* 地點 */}
+                        <td style={{ padding: '10px 16px', whiteSpace: 'nowrap', fontSize: '12px' }}>
+                          {Number.isFinite(c.lat) && Number.isFinite(c.lng) ? (
+                            <a href={mapLink(c.lat, c.lng)} target="_blank" rel="noreferrer"
+                              style={{ color: '#3a6d31', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              title={`誤差約 ${c.accuracy ?? '?'} 公尺，點擊看地圖`}>
+                              📍 {c.address || '查看地圖'}
+                            </a>
+                          ) : (
+                            <span style={{ color: '#c8b8a8' }}>—</span>
+                          )}
                         </td>
 
                         {/* 操作 */}

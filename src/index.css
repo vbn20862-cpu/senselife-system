@@ -6,7 +6,188 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-  background-color: #f5f0e8;
-  color: #2c1a0e;
+  font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  background-color: #e8d5be;
+  color: #2c1208;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 防止橫向溢出 */
+  overflow-x: hidden;
+}
+
+/* iOS safe area 全局 */
+#root {
+  height: 100dvh; /* dynamic viewport height，iOS 網址列消失時自動調整 */
+  overflow: hidden;
+}
+
+/* 全局滾動條 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d8cbb8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #c0a888; }
+
+/* 按鈕 focus 統一 */
+button:focus-visible { outline: 2px solid #4d8843; outline-offset: 2px; }
+
+/* input focus 統一 */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #c85c28 !important;
+  box-shadow: 0 0 0 3px rgba(200,92,40,0.12);
+}
+
+/* ── 手機輸入框優化 ── 避免 iOS Safari 聚焦時自動放大畫面 */
+/* 只改 font-size，不動 padding / min-height，避免打壞排版 */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="week"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="password"],
+  input[type="search"],
+  input:not([type]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+button:focus-visible { outline: 2px solid #c85c28; outline-offset: 2px; }
+
+/* 卡片 hover — 可選，需要加 .card-hover class */
+.card-hover {
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.card-hover:hover {
+  box-shadow: 0 4px 16px rgba(60,30,0,0.13), 0 2px 4px rgba(60,30,0,0.07) !important;
+  transform: translateY(-1px);
+}
+
+/* tab active 下底線 */
+.tab-underline {
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.15s, color 0.15s;
+}
+.tab-underline.active {
+  border-bottom-color: #3a6d31;
+}
+
+/* 表格 row hover */
+tbody tr {
+  transition: background-color 0.1s;
+}
+tbody tr:hover {
+  background-color: rgba(77,136,67,0.05) !important;
+}
+
+/* Dashboard 頁面 gradient header 背景 */
+.page-header {
+  background: linear-gradient(135deg, #2e5627 0%, #3a6d31 50%, #4d8843 100%);
+  border-radius: 14px;
+  padding: 20px 24px;
+  color: #f2f7f0;
+  margin-bottom: 4px;
+}
+
+/* 白卡片頂部 accent 細線 */
+.card-accent {
+  border-top: 3px solid #c85c28 !important;
+}
+.card-accent-coffee {
+  border-top: 3px solid #8f5b38 !important;
+}
+.card-accent-sand {
+  border-top: 3px solid #c89a62 !important;
+}
+.card-accent-warn {
+  border-top: 3px solid #d43020 !important;
+}
+
+/* page header — 部落感 */
+.page-header {
+  background: linear-gradient(135deg, #4a1e10 0%, #8a3010 55%, #c85c28 100%) !important;
+}
+
+/* 選取文字顏色 */
+::selection {
+  background-color: rgba(77,136,67,0.25);
+  color: #1e381a;
+}
+
+/* ── 動畫 ── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes progressFill {
+  from { width: 0 !important; }
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.4); opacity: 0.6; }
+}
+
+.page-enter {
+  animation: pageIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.card-animate {
+  animation: cardIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  opacity: 0;
+}
+
+.d1 { animation-delay: 0s;    }
+.d2 { animation-delay: 0.07s; }
+.d3 { animation-delay: 0.14s; }
+.d4 { animation-delay: 0.21s; }
+.d5 { animation-delay: 0.28s; }
+.d6 { animation-delay: 0.35s; }
+
+/* 按鈕按下微縮 */
+button:not(:disabled):active {
+  transform: scale(0.96);
+  transition: transform 0.08s ease;
+}
+
+/* 卡片 hover 上浮 */
+.card-hover-lift {
+  transition: box-shadow 0.22s, transform 0.22s;
+}
+.card-hover-lift:hover {
+  box-shadow: 0 8px 28px rgba(60,30,0,0.16), 0 3px 8px rgba(60,30,0,0.08) !important;
+  transform: translateY(-2px);
+}
+
+/* progress bar 動畫 */
+.progress-bar {
+  animation: progressFill 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* chip hover */
+.chip-hover {
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.chip-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(60,30,0,0.15);
 }

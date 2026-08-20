@@ -1,21 +1,24 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History, MessageSquarePlus, Bug, Lightbulb, HelpCircle, Send, WifiOff, Wifi } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History, MessageSquarePlus, Bug, Lightbulb, HelpCircle, Send, WifiOff, Wifi, CalendarClock, CalendarOff } from 'lucide-react'
 import logo from '../assets/logo.jpeg'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { useFirebaseConnection } from '../context/AppContext'
 
 const NAV_MAIN = [
-  { to: '/',         icon: LayoutDashboard, label: '儀表板' },
-  { to: '/projects', icon: FolderKanban,    label: '案件管理' },
-  { to: '/design',   icon: Kanban,          label: '執行追蹤' },
-  { to: '/finance',  icon: DollarSign,      label: '財務管理' },
-  { to: '/hr',       icon: Users,           label: '人事管理' },
-  { to: '/assets',   icon: Package,         label: '公司財產' },
+  { to: '/',           icon: LayoutDashboard, label: '儀表板' },
+  { to: '/dispatch',   icon: ClipboardCheck,  label: '交辦任務' },
+  { to: '/projects',   icon: FolderKanban,    label: '案件管理' },
+  { to: '/finance',    icon: DollarSign,      label: '財務管理' },
+  { to: '/hr',         icon: Users,           label: '人事管理' },
+  { to: '/leave',      icon: CalendarOff,     label: '請假管理' },
+  { to: '/assets',     icon: Package,         label: '公司財產' },
 ]
 
 const NAV_EXPAND = [
+  { to: '/design',        icon: Kanban,         label: '執行追蹤(舊)' },
+  { to: '/guide',         icon: HelpCircle,     label: '使用說明' },
   { to: '/history',       icon: History,        label: '歷年紀錄' },
 ]
 
@@ -24,30 +27,34 @@ const NAV_SYSTEM = [
 ]
 
 const C = {
-  sidebarBg:      '#1c2718',
-  sidebarBorder:  'rgba(255,255,255,0.07)',
-  logoText:       '#c8b88a',
-  logoSub:        'rgba(200,184,138,0.45)',
-  navText:        'rgba(200,184,138,0.7)',
-  navActive:      '#4d8843',
-  navActiveTxt:   '#f2f7f0',
-  footerTxt:      'rgba(200,184,138,0.28)',
-  mobileBg:       '#1c2718',
-  mobileTxt:      '#c8b88a',
+  sidebarBg:      '#3d1a0b',
+  sidebarBorder:  'rgba(255,220,180,0.10)',
+  logoText:       '#f0c898',
+  logoSub:        'rgba(240,200,152,0.45)',
+  navText:        'rgba(240,200,152,0.65)',
+  navActive:      '#c85c28',
+  navActiveTxt:   '#fff8f4',
+  footerTxt:      'rgba(240,200,152,0.28)',
+  mobileBg:       '#3d1a0b',
+  mobileTxt:      '#f0c898',
 }
 
 function NavItem({ to, icon: Icon, label, end, size = 16, fontSize = '14px', fontWeight500 = true }) {
+  const [hovered, setHovered] = useState(false)
   return (
     <NavLink to={to} end={end}>
       {({ isActive }) => (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '9px 12px', borderRadius: '8px',
-          fontSize, fontWeight: isActive ? '600' : (fontWeight500 ? '500' : '400'),
-          backgroundColor: isActive ? C.navActive : 'transparent',
-          color: isActive ? C.navActiveTxt : C.navText,
-          cursor: 'pointer', transition: 'all 0.15s',
-        }}>
+        <div
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '9px 12px', borderRadius: '8px',
+            fontSize, fontWeight: isActive ? '600' : (fontWeight500 ? '500' : '400'),
+            backgroundColor: isActive ? C.navActive : hovered ? 'rgba(255,255,255,0.06)' : 'transparent',
+            color: isActive ? C.navActiveTxt : hovered ? 'rgba(200,184,138,0.95)' : C.navText,
+            cursor: 'pointer', transition: 'background-color 0.15s, color 0.15s',
+          }}>
           <Icon size={size} />
           {label}
         </div>
@@ -89,7 +96,7 @@ export default function Layout({ children }) {
 
   function handleFeedbackSubmit() {
     if (!fbMsg.trim()) return
-    const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    const now = new Date().toLocaleString('sv-SE').slice(0, 16)
     addItem('feedbacks', {
       id: Date.now(),
       type: fbType,
@@ -115,7 +122,7 @@ export default function Layout({ children }) {
   const roleColor = isAdmin ? '#c8a84a' : 'rgba(200,184,138,0.6)'
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#f5f0e8' }}>
+    <div className="flex overflow-hidden" style={{ backgroundColor: '#e8d5be', height: '100dvh' }}>
       {open && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setOpen(false)} />}
 
       {/* ── Sidebar ── */}
@@ -123,7 +130,7 @@ export default function Layout({ children }) {
         fixed md:static inset-y-0 left-0 z-30 w-60 flex flex-col
         transform transition-transform duration-200
         ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `} style={{ backgroundColor: C.sidebarBg }}>
+      `} style={{ background: 'linear-gradient(180deg, #4a1e0e 0%, #3d1a0b 55%, #2c1208 100%)', boxShadow: '2px 0 20px rgba(0,0,0,0.35)' }}>
 
         {/* Logo */}
         <div className="px-5 py-5 flex items-center justify-between"
@@ -212,7 +219,7 @@ export default function Layout({ children }) {
         </div>
 
         {/* 底部：使用者資訊 + 登出 */}
-        <div style={{ borderTop: `1px solid ${C.sidebarBorder}`, padding: '12px 14px' }}>
+        <div style={{ borderTop: `1px solid ${C.sidebarBorder}`, padding: '12px 14px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* 頭像圓圈 */}
             <div style={{
@@ -246,8 +253,8 @@ export default function Layout({ children }) {
 
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="md:hidden px-4 py-3 flex items-center gap-3"
-          style={{ backgroundColor: C.mobileBg, borderBottom: `1px solid ${C.sidebarBorder}` }}>
+        <header className="md:hidden px-4 flex items-center gap-3"
+          style={{ backgroundColor: C.mobileBg, borderBottom: `1px solid ${C.sidebarBorder}`, paddingTop: 'calc(12px + env(safe-area-inset-top))', paddingBottom: '12px' }}>
           <button onClick={() => setOpen(true)} style={{ color: C.mobileTxt }}>
             <Menu size={22} />
           </button>
@@ -278,7 +285,7 @@ export default function Layout({ children }) {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
           {children}
         </main>
       </div>
