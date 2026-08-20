@@ -79,6 +79,9 @@ export default function Finance() {
     return !r || r.status === '已還款'
   }
   // 完整判定：案件/科目/憑證號/廠商/日期都填了才算完整（不完整不入預算、進待歸類紅字）
+  // 人事類（薪資、工讀、臨時人員）僅管理員可見，其餘帳目員工都看得到以協助作帳
+  const isSalaryEntry = (e) => ['人事', '薪'].some(w => (String(e.category || '') + String(e.account || '')).includes(w))
+  const canSeeExpense = (e) => isAdmin || !isSalaryEntry(e)
   const isComplete = (e) => !!(e.project && e.project !== '待歸類' && e.category && ((e.receiptNo || '').trim() || e.noReceipt) && e.vendor && e.date)
   const EMPTY_EXP = { date: '', direction: '支出', project: '', category: '', amount: '', vendor: '', method: '現金', receiptNo: '', noReceipt: false, noReceiptNote: '', note: '', linkedSerial: '' }
   const [newExp, setNewExp] = useState(EMPTY_EXP)
@@ -110,13 +113,13 @@ export default function Finance() {
   const expAccounts = useMemo(() => [...new Set([...data.expenses.map(e => e.category), ...data.expenses.map(e => e.account)].filter(Boolean))].sort(), [data.expenses])
   const expFiltered = useMemo(() =>
     [...data.expenses]
-      .filter(e => isAdmin || e.createdBy === currentUser?.name)
+      .filter(canSeeExpense)
       .filter(e => !search || e.vendor?.includes(search) || e.project?.includes(search) || e.category?.includes(search))
       .filter(e => expDirFilter === 'all' || (e.direction || '支出') === expDirFilter)
       .filter(e => expProjFilter === 'all' || e.project === expProjFilter)
       .filter(e => expCatFilter === 'all' || e.category === expCatFilter)
       .sort((a, b) => (b.date || '').localeCompare(a.date || '')),
-    [data.expenses, search, expDirFilter, expProjFilter, expCatFilter, isAdmin, currentUser?.name])
+    [data.expenses, search, expDirFilter, expProjFilter, expCatFilter, isAdmin])
 
   const allVisibleReimbursements = useMemo(() =>
     (isAdmin ? data.reimbursements : data.reimbursements.filter(r => r.person === currentUser?.name))
@@ -692,6 +695,12 @@ export default function Finance() {
       {/* 帳目查詢 */}
       {tab === 'expenses' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {!isAdmin && (
+            <div style={{ fontSize: '12px', color: E.textSecond, backgroundColor: '#eef2f8', border: '1px solid #cfd9e8', borderRadius: '10px', padding: '10px 14px', lineHeight: 1.6 }}>
+你在這裡是<strong>幫公司作帳</strong>：可以新增、補齊任何一筆帳的欄位（人事/薪資類不顯示）。<br />
+              這些是<strong>公司的錢，不算在你身上、也不會還給你</strong>；自己先墊錢要請款請走「<strong>代墊申請</strong>」分頁。
+            </div>
+          )}
           {/* 待歸類清單：案件未定 或 代墊未還款（還款才轉正入預算）*/}
           {(() => {
             const missing = (e) => [
@@ -702,11 +711,11 @@ export default function Finance() {
               !e.date && '日期未填',
               !isBooked(e) && '代墊未還款',
             ].filter(Boolean)
-            const pending = (data.expenses || []).filter(e => (isAdmin || e.createdBy === currentUser?.name) && missing(e).length > 0)
+            const pending = (data.expenses || []).filter(e => canSeeExpense(e) && missing(e).length > 0)
             if (!pending.length) return null
             return (
               <div style={{ ...E.card, border: '1px solid #e0b8a8', backgroundColor: '#fdf3ef' }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#a03020', marginBottom: '8px' }}>⚠ 待歸類（{pending.length} 筆）— {isAdmin ? '點任一列可開啟明細補齊欄位。每筆帳「案件/科目/憑證號」都要填齊、代墊要確認還款，缺一就不計入預算' : '點任一列補齊欄位，補齊才會正式入帳'}</div>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#a03020', marginBottom: '8px' }}>⚠ 待歸類（{pending.length} 筆）— {isAdmin ? '點任一列可開啟明細補齊欄位。每筆帳「案件/科目/憑證號」都要填齊、代墊要確認還款，缺一就不計入預算' : '點任一列補齊欄位，補齊才會正式入帳（可協助補任何一筆）'}</div>
                 {pending.map(e => {
                   const r = e.linkedSerial ? (data.reimbursements || []).find(x => x.serialNo === e.linkedSerial) : null
                   const reasons = missing(e).join('、')
@@ -718,7 +727,7 @@ export default function Finance() {
                       <span style={{ color: E.textMuted, minWidth: '74px' }}>{e.date || '（無日期）'}</span>
                       <span style={{ fontWeight: '600', color: E.textPrimary, flex: 1, minWidth: '110px' }}>{e.vendor || '（無廠商）'}｜NT${Number(e.amount).toLocaleString()}</span>
                       {e.category && <span style={{ color: E.textMuted }}>{e.category}</span>}
-                      {e.createdBy && <span style={{ fontSize: '10px', color: E.textMuted }}>由 {e.createdBy}</span>}
+                      {e.createdBy && <span style={{ fontSize: '10px', color: E.textMuted }}>填表 {e.createdBy}</span>}
                       <span style={{ fontSize: '10px', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#fde8e4', color: '#a03020', fontWeight: '700' }}>{reasons}</span>
                       {(!e.project || e.project === '待歸類') && (
                         <span onClick={ev => ev.stopPropagation()}>
@@ -738,7 +747,7 @@ export default function Finance() {
           })()}
           {/* 憑證遺失彙總（已入帳，報稅時備查用）*/}
           {(() => {
-            const lost = (data.expenses || []).filter(e => e.noReceipt && (isAdmin || e.createdBy === currentUser?.name))
+            const lost = (data.expenses || []).filter(e => e.noReceipt && canSeeExpense(e))
             if (!lost.length) return null
             const total = lost.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
             return (
@@ -2329,6 +2338,11 @@ export default function Finance() {
               <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>備註</label>
               <input value={newExp.note} onChange={e => setNewExp(p => ({ ...p, note: e.target.value }))} placeholder="備註說明" style={E.input} />
             </div>
+            {!isAdmin && (
+              <div style={{ fontSize: '12px', color: '#2f5a80', backgroundColor: '#eef2f8', borderRadius: '8px', padding: '8px 12px', lineHeight: 1.6 }}>
+                ℹ️ 這筆記為<strong>公司支出</strong>（你只是代填、不算你的錢）。<br />若是你自己先墊的，請改用「代墊申請」才會還款給你。
+              </div>
+            )}
             {/* 查重：發票號撞號（帳目＋代墊）紅警；同日期＋同金額 黃警 */}
             {(() => {
               const no = (newExp.receiptNo || '').trim()
