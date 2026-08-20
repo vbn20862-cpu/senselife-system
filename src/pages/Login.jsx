@@ -103,7 +103,7 @@ export default function Login() {
       </div>
 
       <p style={{ fontSize: '11px', color: 'rgba(200,184,138,0.3)', marginTop: '28px', letterSpacing: '0.05em' }}>
-        深活共構 · v1.0 · 2026
+        深活共構 · v2.0 · 2026
       </p>
     </div>
   )

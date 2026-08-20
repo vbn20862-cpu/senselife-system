@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import { CATEGORIES, CAT_COLOR, STATUSES, ST_STYLE, OPEN_STATUSES } from './Dispatch'
+import { parseQuickAdd } from '../utils/tasks'
+import { localTimestamp } from '../utils/salaryCalc'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { Plus, ArrowLeft, Trash2, ExternalLink, Pencil, Search, ChevronDown, ChevronUp, X } from 'lucide-react'
@@ -93,6 +96,18 @@ function ProjectCard({ project, onClick }) {
               </span>
             )}
             <span style={{ ...statusChip(project.status), fontSize: '10px', padding: '1px 7px' }}>{project.status}</span>
+            {(() => {
+              const open = (data.dispatches || []).filter(d => String(d.projectId) === String(project.id) && OPEN_STATUSES.includes(d.status))
+              if (!open.length) return null
+              const today = new Date().toLocaleDateString('sv-SE')
+              const hasOverdue = open.some(d => d.dueDate && d.dueDate < today)
+              return (
+                <span style={{ fontSize: '10px', padding: '1px 7px', borderRadius: '999px', fontWeight: '700',
+                  backgroundColor: hasOverdue ? '#fde0dc' : '#fef3cd', color: hasOverdue ? '#c04030' : '#8a6d1a' }}>
+                  📋 交辦 {open.length} 未結{hasOverdue ? '・逾期' : ''}
+                </span>
+              )
+            })()}
             {hs && health !== '正常' && (
               <span style={{ fontSize: '10px', padding: '1px 7px', borderRadius: '999px', backgroundColor: hs.bg, color: hs.color, fontWeight: '600' }}>
                 {hs.emoji} {health}
@@ -299,6 +314,7 @@ function ProjectDetail({ project, onBack, initialTab }) {
   const TABS = [
     { key: 'tasks', label: '工項', count: workItems.length },
     { key: 'flow',  label: '案件流程', count: milestones.filter(m => m.done).length + '/' + milestones.length },
+    { key: 'dispatch', label: '交辦', count: (data.dispatches || []).filter(d => String(d.projectId) === String(project.id) && OPEN_STATUSES.includes(d.status)).length },
   ]
 
   // Find current step (first not-done)
@@ -612,6 +628,8 @@ function ProjectDetail({ project, onBack, initialTab }) {
         )}
 
         {/* ── 案件流程 (Project Flow) ── */}
+        {tab === 'dispatch' && <ProjectDispatchBlock project={project} />}
+
         {tab === 'flow' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1184,6 +1202,85 @@ export default function Projects() {
           <button onClick={handleAdd} style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>新增案件</button>
         </Modal>
       )}
+    </div>
+  )
+}
+
+
+// ── 案件 × 交辦掛勾：案件內的交辦區塊（類別分區＋鎖定案件的快速派工）──
+function ProjectDispatchBlock({ project }) {
+  const { data, addItem, updateItem } = useApp()
+  const { currentUser } = useAuth()
+  const navigate = useNavigate()
+  const [quick, setQuick] = useState('')
+  const [quickCat, setQuickCat] = useState('設計')
+  const [quickErr, setQuickErr] = useState('')
+  const todayStr = new Date().toLocaleDateString('sv-SE')
+  const list = (data.dispatches || []).filter(d => String(d.projectId) === String(project.id))
+
+  function quickSubmit() {
+    const parsed = parseQuickAdd(quick, data.employees)
+    if (!parsed.title) { setQuickErr('要有任務名稱'); return }
+    if (!parsed.assignee) { setQuickErr('用 @人名 指定負責人（如 @毓雯）'); return }
+    addItem('dispatches', {
+      id: Date.now(), category: quickCat, title: parsed.title,
+      projectId: project.id, assignee: parsed.assignee, dueDate: parsed.dueDate, spec: '',
+      status: '待辦', assignedBy: currentUser?.name || '', assignedDate: todayStr, createdAt: localTimestamp(),
+    })
+    setQuick(''); setQuickErr('')
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ ...E.card, padding: '10px 12px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={quickCat} onChange={e => setQuickCat(e.target.value)} style={{ ...E.input, width: 'auto', fontSize: '12px', padding: '7px 8px' }}>
+            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+          </select>
+          <input value={quick} onChange={e => { setQuick(e.target.value); setQuickErr('') }}
+            onKeyDown={e => { if (e.key === 'Enter') quickSubmit() }}
+            placeholder={`派工到「${project.name}」：任務名 @人名 交付日`}
+            style={{ ...E.input, flex: 1, minWidth: '170px', fontSize: '13px', padding: '8px 10px' }} />
+          <button onClick={quickSubmit} style={{ ...E.btnPrimary, fontSize: '13px', padding: '8px 16px', whiteSpace: 'nowrap' }}>派工</button>
+        </div>
+        {quickErr && <div style={{ fontSize: '12px', color: '#c04030', marginTop: '6px' }}>⚠ {quickErr}</div>}
+      </div>
+
+      {list.length === 0 ? (
+        <div style={{ ...E.card, textAlign: 'center', color: E.textMuted, fontSize: '13px', padding: '28px' }}>此案件尚無交辦，用上面一行派第一件</div>
+      ) : CATEGORIES.filter(cat => list.some(d => d.category === cat)).map(cat => {
+        const cs = CAT_COLOR[cat] || CAT_COLOR['其他']
+        const items = list.filter(d => d.category === cat).sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
+        const done = items.filter(d => d.status === '已完成').length
+        return (
+          <div key={cat} style={{ ...E.card, padding: '10px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '10px', padding: '1px 8px', borderRadius: '999px', backgroundColor: cs.bg, color: cs.color, fontWeight: '800' }}>{cat}</span>
+              <span style={{ fontSize: '10px', color: E.textMuted }}>{done}/{items.length}</span>
+              <div style={{ flex: 1, height: '1px', backgroundColor: E.divider }} />
+            </div>
+            {items.map(d => {
+              const st = ST_STYLE[d.status] || ST_STYLE['待辦']
+              const overdue = d.dueDate && d.dueDate < todayStr && OPEN_STATUSES.includes(d.status)
+              const closed = d.status === '已完成' || d.status === '取消'
+              return (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '6px 0', borderBottom: `1px solid ${E.divider}`, flexWrap: 'wrap', opacity: closed ? 0.55 : 1 }}>
+                  <span style={{ flex: 1, minWidth: '110px', color: E.textPrimary, fontWeight: '600', textDecoration: d.status === '取消' ? 'line-through' : 'none' }}>{d.title}</span>
+                  <span style={{ color: E.textMuted }}>{d.assignee}</span>
+                  {d.dueDate && <span style={{ color: overdue ? '#c0202a' : E.textMuted, fontWeight: overdue ? '800' : '500' }}>{d.dueDate.slice(5)}</span>}
+                  <select value={d.status} onChange={e => updateItem('dispatches', d.id, { status: e.target.value, ...(e.target.value === '已完成' ? { completedAt: localTimestamp() } : {}) })}
+                    style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '999px', border: 'none', backgroundColor: st.bg, color: st.color, cursor: 'pointer' }}>
+                    {STATUSES.map(x => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+
+      <button onClick={() => navigate(`/dispatch?project=${project.id}`)}
+        style={{ ...E.btnGhost, fontSize: '12px', padding: '9px 0' }}>在交辦任務頁查看（含編輯/刪除）→</button>
     </div>
   )
 }

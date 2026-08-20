@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { E, useIsMobile } from '../styles/earth'
@@ -8,8 +9,8 @@ import { localTimestamp } from '../utils/salaryCalc'
 import { parseQuickAdd, bucketByDue, DUE_SEGMENTS } from '../utils/tasks'
 
 // 交辦清單：一列 = 一件事（類別｜任務｜案件｜負責人｜交付日｜規格備註｜狀態）
-const CATEGORIES = ['設計', '輸出印刷', '網宣', '策展場佈', '文書', '採購', '聯繫', '行政', '其他']
-const CAT_COLOR = {
+export const CATEGORIES = ['設計', '輸出印刷', '網宣', '策展場佈', '文書', '採購', '聯繫', '行政', '其他']
+export const CAT_COLOR = {
   '設計':   { bg: '#efe6f5', color: '#6a3f8a' },
   '輸出印刷': { bg: '#e8e8f0', color: '#4a4a7a' },
   '網宣':   { bg: '#e0f0f0', color: '#1f6a6a' },
@@ -20,28 +21,31 @@ const CAT_COLOR = {
   '行政':   { bg: '#ece9e2', color: '#5f5a4e' },
   '其他':   { bg: '#f0ece5', color: '#7a7264' },
 }
-const STATUSES = ['待辦', '進行中', '已完成', '暫停', '取消']
-const ST_STYLE = {
+export const STATUSES = ['待辦', '進行中', '已完成', '暫停', '取消']
+export const ST_STYLE = {
   '待辦':  { bg: '#fef3cd', color: '#8a6d1a' },
   '進行中': { bg: '#e0edf8', color: '#2f5a80' },
   '已完成': { bg: '#e4f0e8', color: '#2e6040' },
   '暫停':  { bg: '#ece9e2', color: '#6f6a5e' },
   '取消':  { bg: '#f5e4e0', color: '#8a3020' },
 }
-const OPEN_STATUSES = ['待辦', '進行中', '暫停']
+export const OPEN_STATUSES = ['待辦', '進行中', '暫停']
 
 export default function Dispatch() {
   const { data, addItem, updateItem, deleteItem } = useApp()
   const { currentUser, isAdmin } = useAuth()
   const mob = useIsMobile()
   const myName = currentUser?.name || ''
-  const [tab, setTab] = useState(isAdmin ? 'all' : 'mine')
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const initProj = searchParams.get('project') || 'all'
+  const [tab, setTab] = useState(initProj !== 'all' ? 'all' : (isAdmin ? 'all' : 'mine'))
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [fltPerson, setFltPerson] = useState('all')
   const [fltStatus, setFltStatus] = useState('open')
-  const [fltProject, setFltProject] = useState('all')
+  const [fltProject, setFltProject] = useState(initProj)
   const [showDoneMine, setShowDoneMine] = useState(false)
 
   function emptyForm() {
@@ -260,7 +264,8 @@ export default function Dispatch() {
           {byProject.map(g => (
             <div key={g.key} style={{ ...E.card }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary }}>{g.name}</span>
+                <span onClick={() => g.key !== '_none' && navigate(`/projects?detail=${g.key}`)}
+                  style={{ fontSize: '14px', fontWeight: '700', color: g.key !== '_none' ? '#c85c28' : E.textPrimary, cursor: g.key !== '_none' ? 'pointer' : 'default', textDecoration: g.key !== '_none' ? 'underline' : 'none', textUnderlineOffset: '3px' }}>{g.name}</span>
                 <span style={{ fontSize: '11px', color: E.textMuted }}>未結 {g.open}｜完成 {g.done}／{g.list.length}</span>
                 <div style={{ flex: 1, minWidth: '80px', height: '6px', borderRadius: '999px', backgroundColor: '#efe9e0', overflow: 'hidden' }}>
                   <div style={{ width: `${g.list.length ? Math.round(g.done / g.list.length * 100) : 0}%`, height: '100%', backgroundColor: '#4d8843' }} />
