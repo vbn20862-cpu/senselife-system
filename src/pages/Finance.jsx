@@ -706,22 +706,30 @@ export default function Finance() {
             if (!pending.length) return null
             return (
               <div style={{ ...E.card, border: '1px solid #e0b8a8', backgroundColor: '#fdf3ef' }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#a03020', marginBottom: '8px' }}>⚠ 待歸類（{pending.length} 筆）— {isAdmin ? '每筆帳「案件/科目/憑證號」都要填齊、代墊要確認還款，缺一就留在這裡且不計入預算' : '你填的帳還缺欄位，補齊才會正式入帳'}</div>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#a03020', marginBottom: '8px' }}>⚠ 待歸類（{pending.length} 筆）— {isAdmin ? '點任一列可開啟明細補齊欄位。每筆帳「案件/科目/憑證號」都要填齊、代墊要確認還款，缺一就不計入預算' : '點任一列補齊欄位，補齊才會正式入帳'}</div>
                 {pending.map(e => {
                   const r = e.linkedSerial ? (data.reimbursements || []).find(x => x.serialNo === e.linkedSerial) : null
                   const reasons = missing(e).join('、')
                   return (
-                    <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '5px 0', borderBottom: `1px solid ${E.divider}`, flexWrap: 'wrap' }}>
-                      <span style={{ color: E.textMuted, minWidth: '74px' }}>{e.date}</span>
-                      <span style={{ fontWeight: '600', color: E.textPrimary, flex: 1, minWidth: '110px' }}>{e.vendor}｜NT${Number(e.amount).toLocaleString()}</span>
+                    <div key={e.id} onClick={() => setEditExp({ ...e })} title="點開補齊欄位"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '7px 6px', borderBottom: `1px solid ${E.divider}`, flexWrap: 'wrap', cursor: 'pointer', borderRadius: '6px' }}
+                      onMouseEnter={ev => ev.currentTarget.style.backgroundColor = '#fbe9e3'}
+                      onMouseLeave={ev => ev.currentTarget.style.backgroundColor = 'transparent'}>
+                      <span style={{ color: E.textMuted, minWidth: '74px' }}>{e.date || '（無日期）'}</span>
+                      <span style={{ fontWeight: '600', color: E.textPrimary, flex: 1, minWidth: '110px' }}>{e.vendor || '（無廠商）'}｜NT${Number(e.amount).toLocaleString()}</span>
+                      {e.category && <span style={{ color: E.textMuted }}>{e.category}</span>}
+                      {e.createdBy && <span style={{ fontSize: '10px', color: E.textMuted }}>由 {e.createdBy}</span>}
                       <span style={{ fontSize: '10px', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#fde8e4', color: '#a03020', fontWeight: '700' }}>{reasons}</span>
                       {(!e.project || e.project === '待歸類') && (
-                        <select defaultValue="" onChange={ev => { if (ev.target.value) updateItem('expenses', e.id, { project: ev.target.value }) }}
-                          style={{ ...E.input, width: 'auto', fontSize: '11px', padding: '4px 6px' }}>
-                          <option value="">歸類到案件…</option>
-                          {data.projects.map(pp => <option key={pp.id} value={pp.id}>{pp.name}</option>)}
-                        </select>
+                        <span onClick={ev => ev.stopPropagation()}>
+                          <select defaultValue="" onChange={ev => { if (ev.target.value) updateItem('expenses', e.id, { project: ev.target.value }) }}
+                            style={{ ...E.input, width: 'auto', fontSize: '11px', padding: '4px 6px' }}>
+                            <option value="">快速歸類案件…</option>
+                            {data.projects.map(pp => <option key={pp.id} value={pp.id}>{pp.name}</option>)}
+                          </select>
+                        </span>
                       )}
+                      <span style={{ fontSize: '11px', color: '#a03020', fontWeight: '700' }}>›</span>
                     </div>
                   )
                 })}
