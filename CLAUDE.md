@@ -9,9 +9,12 @@
 - **資料**：Firebase Realtime Database（REST 端點 `https://senselifemaker-default-rtdb.firebaseio.com`）
   - 業務資料在 `/appData`，帳號在 `/accounts`
   - ⚠️ 目前規則全開（未登入可讀寫、密碼明文）——已知風險，待鎖（見待辦）
+- **程式碼**：GitHub `https://github.com/vbn20862-cpu/senselife-system`（**公開** repo，
+  勿放任何密鑰／個資；備份檔在 `~/senselife-backups/` 不入 git）
 - **部署**：Netlify `https://senselife-system.netlify.app`
-  - 綁 GitHub 自動部署：push `main` = 上線；`netlify.toml` 已設定
-  - 手動備援：`npm run build && npx netlify-cli deploy --prod --dir=dist`
+  - **push `main` 即自動建置上線**（webhook + deploy key 已接，`netlify.toml` 已設定）
+  - 手動備援：`npm run build && npx netlify-cli deploy --prod --dir=dist`（Netlify 帳號 wewewewe0327@gmail.com）
+  - 本 repo 的 git 身分已設 `ching <wewewewe0327@gmail.com>`，新機器 clone 後照設
 - **薪資引擎**：`src/utils/payrollEngine.js`（走法B）＋ `src/utils/salaryCalc.js`
 
 ## 鐵則（違反＝任務失敗）
