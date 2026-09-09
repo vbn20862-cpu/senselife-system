@@ -1,0 +1,13 @@
+# Netlify CI 設定 — 綁 GitHub 後 push main 即自動建置部署
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback：所有路徑交給 React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
