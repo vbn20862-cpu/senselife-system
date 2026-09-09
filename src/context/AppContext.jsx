@@ -288,7 +288,8 @@ function migrateIfNeeded(parsed) {
 // Firebase 存的陣列可能變成物件（含 undefined），需要清理
 function cleanFirebaseData(obj) {
   if (obj === null || obj === undefined) return obj
-  if (Array.isArray(obj)) return obj.map(cleanFirebaseData)
+  // 陣列裡的 null 洞（斷網寫入失敗殘留）一律濾掉，避免頁面讀到 undefined 崩潰
+  if (Array.isArray(obj)) return obj.filter(x => x !== null && x !== undefined).map(cleanFirebaseData)
   if (typeof obj === 'object') {
     // Firebase 把空陣列存成 null，把含 undefined 的陣列變成帶 null 洞的物件
     // 檢查是否是 Firebase 回傳的「偽陣列」（key 全是數字）

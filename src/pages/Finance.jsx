@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import { E, STATUS, useIsMobile } from '../styles/earth'
 import { exportFinance } from '../utils/exportExcel'
 import { MONTHS, GOVT_WORK_DAYS, computeEmpMonthClockHours } from '../utils/salaryCalc'
-import { hourlyRate, computeCompLedger, annualLeaveStatus, annualLeavePayout, computeHourlyHolidayPremium } from '../utils/payrollEngine'
+import { hourlyRate, computeCompLedger, annualLeaveStatus, annualLeavePayout, computeHourlyHolidayPremium, computeHourlyOTHours } from '../utils/payrollEngine'
 
 const CHART_COLORS = ['#4d8843','#5b7ec9','#c89040','#8a5cb0','#c04030','#3a9080','#b06030','#607060']
 
@@ -188,7 +188,9 @@ export default function Finance() {
           const shiftHours = { '出勤': 8, '上午班': 4, '下午班': 4, '休假': 0 }
           return sum + (shiftHours[sc.shift] || 0)
         }, 0)
-      const hrs = clockHrs > 0 ? clockHrs : schedHrs
+      // 時薪制加班：加班卡時數照記、費率 1.0（時數 × 時薪直接併入）
+      const hourlyOTHrs = payType === 'hourly' ? computeHourlyOTHours(emp, y, m, data) : 0
+      const hrs = (clockHrs > 0 ? clockHrs : schedHrs) + hourlyOTHrs
       const computedBase = payType === 'monthly' ? baseSalary : Math.round(hrs * baseSalary)
       const fullAttendanceBonus = Number(s.fullAttendanceBonus || 0)
       const activityAttendance = Number(s.activityAttendance || 0)
@@ -216,7 +218,7 @@ export default function Finance() {
       const totalDeductionsB = totalDeductions + compDock
       const netPay = grossPay + compCashout + annualCashout + holidayPremium - totalDeductionsB
       return {
-        empId: emp.id, empName: emp.name, hoursWorked: hrs, payType,
+        empId: emp.id, empName: emp.name, hoursWorked: hrs, hourlyOTHrs, payType,
         baseSalary: computedBase, mealAllowance,
         fullAttendanceBonus, activityAttendance, overtime: 0, advance: 0,
         compDock, compCashout, annualCashout, holidayPremium,
@@ -1706,7 +1708,7 @@ export default function Finance() {
                   </div>
                 ) : null}
                 {sl.note && <div style={{ marginTop:'12px', fontSize:'13px', color:E.textSecond, backgroundColor:E.sandLight, borderRadius:'8px', padding:'10px 12px' }}>備註：{sl.note}</div>}
-                {sl.payType === 'hourly' && <div style={{ marginTop:'8px', fontSize:'12px', color:E.textMuted }}>本月出勤時數：{sl.hoursWorked} 小時</div>}
+                {sl.payType === 'hourly' && <div style={{ marginTop:'8px', fontSize:'12px', color:E.textMuted }}>本月出勤時數：{sl.hoursWorked} 小時{sl.hourlyOTHrs > 0 ? `（含加班 ${sl.hourlyOTHrs}h×1.0）` : ''}</div>}
               </div>
             </div>
           )
@@ -1783,7 +1785,8 @@ export default function Finance() {
           const quarterSettle = ledger.settlements.find(s => s.year === py && s.quarter === Math.ceil(pm/3))
           const balance = thisMonth.balHours
           const payType = setting.payType || 'monthly'
-          const schHrs = monthHoursFor(myEmp.id)
+          const myOTHrs = payType === 'hourly' ? computeHourlyOTHours(myEmp, py, pm, data) : 0
+          const schHrs = monthHoursFor(myEmp.id) + myOTHrs
           const base = Number(setting.baseSalary || setting.hourlyRate || 0)
           const computedBase = payType === 'monthly' ? base : Math.round(schHrs * base)
           const meal = Number(setting.mealAllowance || 0)

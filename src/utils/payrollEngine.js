@@ -591,6 +591,19 @@ export function computeMonthCompAccrual(emp, yr, mo, data, holidaySet) {
 
 // 時薪制國定假日加給：假日出勤工時 × 時薪 × 1（補足到 ×2，因時薪底薪已含 ×1）
 //   回傳 { hours, amount }
+// 時薪制加班時數（加班開始/結束配對，跨日歸開始日）— 費率 1.0：時數 × 時薪直接併入薪資
+export function computeHourlyOTHours(emp, yr, mo, data) {
+  const monthStr = `${yr}-${pad2(mo)}`
+  const recs = (data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp))
+  let min = 0
+  for (const sp of computeOTSpans(recs)) {
+    if (sp.missingEnd || sp.missingStart || !sp.startDate) continue
+    if (!sp.startDate.startsWith(monthStr)) continue
+    min += sp.minutes
+  }
+  return round2(min / 60)
+}
+
 export function computeHourlyHolidayPremium(emp, yr, mo, data, rate) {
   const holidaySet = new Set(getHolidays(data).map(h => h.date))
   const monthStr = `${yr}-${pad2(mo)}`
