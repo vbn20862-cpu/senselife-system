@@ -88,10 +88,6 @@ export default function Finance() {
   // 薪資管理 state
   const now = new Date()
   const [payrollMonth, setPayrollMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`)
-  const [showGenPayroll, setShowGenPayroll] = useState(false)
-  const [genSlips, setGenSlips] = useState([])   // draft slips during generation
-  const [viewPayroll, setViewPayroll] = useState(null)  // selected payroll record
-  const [viewSlip, setViewSlip] = useState(null)        // selected single slip
   const [salaryEditEmp, setSalaryEditEmp] = useState(null)
   // 統編發票
   const [showAddInv, setShowAddInv] = useState(false)
@@ -219,23 +215,11 @@ export default function Finance() {
       }
     })
   }
-  function recalcSlip(slip) {
-    const grossPay = (slip.baseSalary||0) + (slip.mealAllowance||0) + (slip.fullAttendanceBonus||0) + (slip.activityAttendance||0) + (slip.overtime||0)
-    const totalDeductions = (slip.healthInsEmp||0)+(slip.laborInsEmp||0)+(slip.pensionSelf||0)+(slip.dependentHealth||0)+(slip.wireFee||0)+(slip.advance||0)+(slip.compDock||0)
-    const totalEmployerBurden = (slip.healthInsEmployer||0)+(slip.laborInsEmployer||0)+(slip.pensionEmployer||0)
-    const netPay = grossPay + (slip.compCashout||0) + (slip.annualCashout||0) + (slip.holidayPremium||0) - totalDeductions
-    return { ...slip, grossPay, totalDeductions, netPay, totalEmployerBurden, totalEmployerCost: grossPay + totalEmployerBurden }
-  }
   function hourlyPayHours(emp, y, m) {
     const clockHrs = computeEmpMonthClockHours(emp, y, m, data)
     const leaveHrs = leaveEffectiveHoursInMonth(emp, y, m, data)
     const otHrs = computeHourlyOTHours(emp, y, m, data)
     return { clockHrs, leaveHrs, otHrs, total: Math.round((clockHrs + leaveHrs + otHrs) * 100) / 100 }
-  }
-  function monthHoursFor(empId) {
-    const [y, m] = payrollMonth.split('-').map(Number)
-    const emp = data.employees.find(e => e.id === empId)
-    return emp ? hourlyPayHours(emp, y, m).total : 0
   }
   function updateSalarySettingFor(emp, updates) {
     const existing = (data.salarySettings || []).find(s => s.empId === emp.id)
@@ -1622,125 +1606,7 @@ export default function Finance() {
       {/* 新增帳目 Modal */}
       {/* ── 薪資管理 ── */}
       {tab === 'payroll' && (() => {
-        const payrolls = data.payrolls || []
-        // employee sees only slips with their name
         const myName = currentUser?.name || ''
-
-        if (viewSlip) {
-          const sl = viewSlip
-          const isMySlip = !isAdmin && sl.empName !== myName
-          if (isMySlip) return null
-          const addRow = (label, val, color) => val > 0 ? (
-            <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom:`1px solid ${E.divider}`, fontSize:'13px' }}>
-              <span style={{ color: E.textSecond }}>{label}</span>
-              <span style={{ color: color || E.textPrimary, fontWeight:'500' }}>NT${Number(val).toLocaleString()}</span>
-            </div>
-          ) : null
-          return (
-            <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-              <button onClick={() => setViewSlip(null)} style={{ alignSelf:'flex-start', background:'none', border:'none', cursor:'pointer', color:E.textSecond, fontSize:'13px', display:'flex', alignItems:'center', gap:'4px' }}>← 返回</button>
-              <div style={{ ...E.card }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'16px' }}>
-                  <div>
-                    <h2 style={{ fontSize:'16px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>{sl.empName} · 薪資明細</h2>
-                    <p style={{ fontSize:'13px', color:E.textMuted, margin:0 }}>{viewPayroll?.label || viewPayroll?.month}</p>
-                  </div>
-                  <div style={{ textAlign:'right' }}>
-                    <div style={{ fontSize:'22px', fontWeight:'800', color:E.green }}>NT${Number(sl.netPay||0).toLocaleString()}</div>
-                    <div style={{ fontSize:'11px', color:E.textMuted }}>員工實領</div>
-                  </div>
-                </div>
-                {/* 加項 */}
-                <div style={{ marginBottom:'14px' }}>
-                  <div style={{ fontSize:'11px', fontWeight:'700', color:E.textSecond, letterSpacing:'0.06em', marginBottom:'8px' }}>薪資加項</div>
-                  {addRow('底薪', sl.baseSalary)}
-                  {addRow('伙食津貼', sl.mealAllowance)}
-                  {addRow('全勤獎金', sl.fullAttendanceBonus)}
-                  {addRow('活動出勤', sl.activityAttendance)}
-                  {addRow('加班費', sl.overtime)}
-                  {addRow('假日加給(時薪×2)', sl.holidayPremium, '#1a56a0')}
-                  {addRow('補休季結折現', sl.compCashout, '#1a56a0')}
-                  {addRow('特休年底折現', sl.annualCashout, '#1a56a0')}
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0 5px', fontSize:'13px', fontWeight:'700', borderTop:`2px solid ${E.divider}`, marginTop:'4px' }}>
-                    <span>薪資總額</span><span>NT${Number(sl.grossPay + (sl.compCashout||0) + (sl.annualCashout||0) + (sl.holidayPremium||0)).toLocaleString()}</span>
-                  </div>
-                </div>
-                {/* 扣項 */}
-                <div style={{ marginBottom:'14px' }}>
-                  <div style={{ fontSize:'11px', fontWeight:'700', color:E.textSecond, letterSpacing:'0.06em', marginBottom:'8px' }}>員工扣項</div>
-                  {addRow('健保費', sl.healthInsEmp, '#8a3a20')}
-                  {addRow('勞保費', sl.laborInsEmp, '#8a3a20')}
-                  {addRow('勞退自提', sl.pensionSelf, '#8a3a20')}
-                  {addRow('眷屬健保', sl.dependentHealth, '#8a3a20')}
-                  {addRow('匯費', sl.wireFee, '#8a3a20')}
-                  {addRow('代墊扣除', sl.advance, '#8a3a20')}
-                  {addRow('月缺口扣薪', sl.compDock, '#c04030')}
-                  <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0 5px', fontSize:'13px', fontWeight:'700', borderTop:`2px solid ${E.divider}`, marginTop:'4px', color:'#8a3a20' }}>
-                    <span>扣項合計</span><span>－ NT${Number(sl.totalDeductions||0).toLocaleString()}</span>
-                  </div>
-                </div>
-                {/* 實領 */}
-                <div style={{ backgroundColor:'#e8f0e4', borderRadius:'10px', padding:'14px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: isAdmin ? '14px' : 0 }}>
-                  <span style={{ fontSize:'15px', fontWeight:'700', color:E.textPrimary }}>員工實領</span>
-                  <span style={{ fontSize:'20px', fontWeight:'800', color:E.green }}>NT${Number(sl.netPay||0).toLocaleString()}</span>
-                </div>
-                {/* 雇主負擔（管理員才看得到）*/}
-                {isAdmin && (sl.healthInsEmployer||sl.laborInsEmployer||sl.pensionEmployer) ? (
-                  <div style={{ marginTop:'14px' }}>
-                    <div style={{ fontSize:'11px', fontWeight:'700', color:E.textSecond, letterSpacing:'0.06em', marginBottom:'8px' }}>雇主負擔（不影響員工薪資）</div>
-                    {addRow('健保費 雇主負擔', sl.healthInsEmployer)}
-                    {addRow('勞保費 雇主負擔', sl.laborInsEmployer)}
-                    {addRow('勞退 雇主負擔', sl.pensionEmployer)}
-                    <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', fontSize:'13px', fontWeight:'700', borderTop:`2px solid ${E.divider}`, marginTop:'4px' }}>
-                      <span>雇主總成本</span><span>NT${Number(sl.totalEmployerCost||0).toLocaleString()}</span>
-                    </div>
-                  </div>
-                ) : null}
-                {sl.note && <div style={{ marginTop:'12px', fontSize:'13px', color:E.textSecond, backgroundColor:E.sandLight, borderRadius:'8px', padding:'10px 12px' }}>備註：{sl.note}</div>}
-                {sl.payType === 'hourly' && <div style={{ marginTop:'8px', fontSize:'12px', color:E.textMuted }}>本月出勤時數：{sl.hoursWorked} 小時{sl.hourlyOTHrs > 0 ? `（含加班 ${sl.hourlyOTHrs}h×1.0）` : ''}</div>}
-              </div>
-            </div>
-          )
-        }
-
-        if (viewPayroll) {
-          const visibleSlips = isAdmin ? viewPayroll.slips : viewPayroll.slips.filter(s => s.empName === myName)
-          return (
-            <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <button onClick={() => setViewPayroll(null)} style={{ background:'none', border:'none', cursor:'pointer', color:E.textSecond, fontSize:'13px', display:'flex', alignItems:'center', gap:'4px' }}>← 返回</button>
-                <span style={{ fontSize:'13px', color:E.textMuted }}>產生時間：{viewPayroll.generatedAt}</span>
-              </div>
-              <div style={{ ...E.card }}>
-                <h2 style={{ fontSize:'15px', fontWeight:'700', color:E.textPrimary, margin:'0 0 16px' }}>{viewPayroll.label} 薪資明細</h2>
-                {visibleSlips.length === 0
-                  ? <div style={{ textAlign:'center', color:E.textMuted, fontSize:'13px', padding:'24px' }}>無薪資資料</div>
-                  : visibleSlips.map((sl, i) => (
-                    <div key={sl.empId} onClick={() => setViewSlip(sl)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 0', borderBottom: i < visibleSlips.length-1 ? `1px solid ${E.divider}` : 'none', cursor:'pointer' }}>
-                      <div>
-                        <div style={{ fontSize:'14px', fontWeight:'600', color:E.textPrimary }}>{sl.empName}</div>
-                        <div style={{ fontSize:'12px', color:E.textMuted, marginTop:'2px' }}>
-                          {sl.payType === 'hourly' ? `${sl.hoursWorked}h × 時薪` : '月薪制'}
-                          {sl.grossPay ? ` · 總額 NT$${Number(sl.grossPay).toLocaleString()}` : ''}
-                        </div>
-                      </div>
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontSize:'16px', fontWeight:'700', color:E.green }}>NT${Number(sl.netPay||0).toLocaleString()}</div>
-                        <div style={{ fontSize:'11px', color:E.textMuted }}>實領</div>
-                      </div>
-                    </div>
-                  ))
-                }
-                {isAdmin && (
-                  <div style={{ marginTop:'16px', paddingTop:'12px', borderTop:`2px solid ${E.divider}`, display:'flex', justifyContent:'space-between' }}>
-                    <span style={{ fontSize:'13px', color:E.textSecond }}>本月薪資合計</span>
-                    <span style={{ fontSize:'15px', fontWeight:'700', color:E.textPrimary }}>NT${viewPayroll.slips.reduce((s,sl)=>s+Number(sl.netPay||0),0).toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        }
 
         // 薪資管理主頁
         const [py, pm] = payrollMonth.split('-').map(Number)
@@ -1765,7 +1631,7 @@ export default function Finance() {
               <div style={{ ...E.card, textAlign:'center', color:E.textMuted, padding:'40px', fontSize:'13px' }}>無法找到您的員工資料</div>
             </div>
           )
-          // 與正式薪資單同一套算法（buildDraftSlips），即時反映當月狀態
+          // 與管理員薪資頁同一套算法（buildDraftSlips），即時反映當月狀態
           const slip = buildDraftSlips(payrollMonth).find(s => s.empId === myEmp.id) || {}
           const payType = slip.payType || 'monthly'
           const isHourly = payType === 'hourly'
@@ -1780,13 +1646,12 @@ export default function Finance() {
           const md = s => { const [, m2, d2] = s.split('-'); return `${Number(m2)}/${Number(d2)}` }
           const yest = new Date(); yest.setDate(yest.getDate() - 1)
           const asOfText = isFutureMonth ? '尚未開始' : isCurrentMonth ? `即時試算・統計到 ${md(yest.toLocaleDateString('sv-SE'))}（今天之前）` : '本月已結束'
-          const officialSlip = payrolls.filter(pr => pr.month === payrollMonth).flatMap(pr => pr.slips || []).find(s => s.empId === myEmp.id)
           const hasSetting = (slip.grossPay || 0) > 0
           const gross = (slip.grossPay || 0) + (slip.compCashout || 0) + (slip.annualCashout || 0) + (slip.holidayPremium || 0)
           const net = slip.netPay || 0
           const H = v => (v > 0 ? `${v}h` : '—')
           const D = v => (v > 0 ? `${v} 天` : '—')
-          const RED = '#c04030', AMBER = '#b45309', BLUE = '#3c6eb4'
+          const RED = '#c04030', AMBER = '#b45309'
 
           // 本月請假
           const leaves = leavesInMonth(myEmp, py, pm, data)
@@ -1819,7 +1684,6 @@ export default function Finance() {
 
           const timeItems = [
             ['應上時數（政府）', `${tm.govtH ?? govtHrs}h`, E.textPrimary],
-            ['已排班時數（至今）', H(tm.scheduledH), E.textPrimary],
             ['打卡時數', `${clockHrs}h`, E.textPrimary],
             isHourly
               ? ['加班時數（×1.0 併薪）', H(slip.hourlyOTHrs), E.green]
@@ -1829,15 +1693,10 @@ export default function Finance() {
             ['缺時扣薪時數', isHourly ? '—' : H(tm.dockHours), tm.dockHours > 0 ? RED : E.textPrimary],
             ['補休餘額', isHourly ? '—' : `${tm.balHours ?? 0}h`, E.coffee],
             ['遲到 / 早退', D(tm.lateLeaveDays), tm.lateLeaveDays > 0 ? AMBER : E.textPrimary],
-            ['曠職', D(tm.absentDays), tm.absentDays > 0 ? RED : E.textPrimary],
-            ['停班未出勤（無薪）', D(tm.suspShortDays), tm.suspShortDays > 0 ? BLUE : E.textPrimary],
-            ['待補登（忘打下班卡）', D(tm.missingPunchDays), tm.missingPunchDays > 0 ? AMBER : E.textPrimary],
           ]
           const dateNotes = [
             !isHourly && tm.deficitDates?.length ? ['缺時', [...tm.deficitDates].sort((a, b) => a.date.localeCompare(b.date)).map(x => `${md(x.date)} ${x.hours}h`).join('、'), RED] : null,
-            tm.absentDates?.length ? ['曠職', [...tm.absentDates].sort().map(md).join('、'), RED] : null,
             tm.missingPunchDates?.length ? ['待補登', [...tm.missingPunchDates].sort().map(md).join('、') + '（補登下班卡後才會計算）', AMBER] : null,
-            tm.suspShortDates?.length ? ['停班', [...tm.suspShortDates].sort().map(md).join('、'), BLUE] : null,
           ].filter(Boolean)
 
           const row = (label, val, opt = {}) => (
@@ -1864,11 +1723,6 @@ export default function Finance() {
                 {hasSetting && (
                   <div style={{ fontSize:'12px', opacity:0.9, marginTop:'6px' }}>
                     應發 NT${gross.toLocaleString()}　－　扣項 NT${Number(slip.totalDeductions || 0).toLocaleString()}
-                  </div>
-                )}
-                {officialSlip && (
-                  <div style={{ fontSize:'12px', marginTop:'10px', backgroundColor:'rgba(255,255,255,0.14)', borderRadius:'8px', padding:'6px 10px' }}>
-                    本月薪資單已開立：實領 NT${Number(officialSlip.netPay || 0).toLocaleString()}{Number(officialSlip.netPay || 0) !== net ? '（與即時試算不同，以薪資單為準）' : ''}
                   </div>
                 )}
               </div>
@@ -1962,47 +1816,21 @@ export default function Finance() {
                   </div>
                 </div>
               )}
-              {/* 薪資單記錄 */}
-              {payrolls.filter(pr=>pr.slips.some(s=>s.empName===myName)).length > 0 && (
-                <div style={{ ...E.card, padding:0 }}>
-                  <div style={{ padding:'14px 20px 8px', fontSize:'13px', fontWeight:'700', color:E.textSecond, borderBottom:`1px solid ${E.divider}` }}>薪資單記錄</div>
-                  {[...payrolls].sort((a,b)=>b.month.localeCompare(a.month)).map((pr, i) => {
-                    const visSlips = pr.slips.filter(s => s.empName === myName)
-                    if (visSlips.length === 0) return null
-                    return (
-                      <div key={pr.id} onClick={() => { setViewPayroll(pr); setViewSlip(null) }}
-                        style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderBottom:`1px solid ${E.divider}`, cursor:'pointer' }}>
-                        <div>
-                          <div style={{ fontSize:'14px', fontWeight:'600', color:E.textPrimary }}>{pr.label}</div>
-                          <div style={{ fontSize:'12px', color:E.textMuted, marginTop:'2px' }}>產生：{pr.generatedAt}</div>
-                        </div>
-                        <div style={{ textAlign:'right' }}>
-                          <div style={{ fontSize:'15px', fontWeight:'700', color:E.green }}>NT${Number(visSlips[0]?.netPay||0).toLocaleString()}</div>
-                          <div style={{ fontSize:'11px', color:E.textMuted }}>實領</div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </div>
           )
         }
 
         // ── 管理員視角 ──
+        const liveSlips = buildDraftSlips(payrollMonth)
         return (
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-            {/* 月份 + 一鍵產生薪資 */}
+            {/* 月份 */}
             <div style={{ display:'flex', gap:'8px', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap' }}>
               <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                 <input type="month" value={payrollMonth} onChange={e => setPayrollMonth(e.target.value)}
                   style={{ ...E.input, width:'150px', padding:'7px 10px', fontSize:'13px' }} />
                 <span style={{ fontSize:'13px', color:E.textMuted }}>{monthLabel(payrollMonth)}</span>
               </div>
-              <button onClick={() => { setGenSlips(buildDraftSlips(payrollMonth)); setShowGenPayroll(true) }}
-                style={{ ...E.btnPrimary, display:'flex', alignItems:'center', gap:'6px', whiteSpace:'nowrap' }}>
-                <Plus size={15} />一鍵產生薪資
-              </button>
             </div>
 
             {/* ── 補休季結總覽（走法 B）── */}
@@ -2061,21 +1889,20 @@ export default function Finance() {
             <div style={{ ...E.card }}>
               <div style={{ marginBottom:'16px' }}>
                 <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>薪資設定</h3>
-                <p style={{ fontSize:'12px', color:E.textMuted, margin:0 }}>{py}年{MONTHS[pm-1]}月 · 設定薪制、底薪與保費，確認後一鍵產生薪資單</p>
+                <p style={{ fontSize:'12px', color:E.textMuted, margin:0 }}>{py}年{MONTHS[pm-1]}月 · 設定薪制、底薪與保費；實領為即時計算（含缺時扣薪、折現），員工畫面同步</p>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:'0' }}>
                 {data.employees.map((emp, i) => {
+                  const live = liveSlips.find(x => x.empId === emp.id) || {}
                   const setting = data.salarySettings?.find(s => s.empId === emp.id) || {}
                   const payType = setting.payType || 'monthly'
                   const baseSalary = Number(setting.baseSalary || setting.hourlyRate || 0)
                   const mealAllowance = Number(setting.mealAllowance || 0)
                   const fullAttendanceBonus = Number(setting.fullAttendanceBonus || 0)
                   const activityAttendance = Number(setting.activityAttendance || 0)
-                  const clockHrs = computeEmpMonthClockHours(emp, py, pm, data)
-                  const computedBase = payType === 'monthly' ? baseSalary : Math.round(clockHrs * baseSalary)
-                  const estimatedGross = computedBase + mealAllowance + fullAttendanceBonus + activityAttendance
-                  const totalDeductions = Number(setting.healthInsEmp||0)+Number(setting.laborInsEmp||0)+Number(setting.pensionSelf||0)+Number(setting.dependentHealth||0)+Number(setting.supplementalIns||0)+Number(setting.wireFee||0)
-                  const netPay = estimatedGross - totalDeductions
+                  const estimatedGross = (payType === 'monthly' ? baseSalary : 0) + mealAllowance + fullAttendanceBonus + activityAttendance
+                  const totalDeductions = live.totalDeductions || 0
+                  const netPay = live.netPay || 0
                   return (
                     <div key={emp.id} style={{ padding:'14px 0', borderBottom: i < data.employees.length-1 ? `1px solid ${E.divider}` : 'none' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
@@ -2096,13 +1923,13 @@ export default function Finance() {
                               style={{ ...E.input, width:'90px', padding:'6px 10px', fontSize:'13px' }} />
                           )}
                           <span style={{ fontSize:'11px', color:E.textSecond, whiteSpace:'nowrap' }}>
-                            {payType === 'monthly' ? '元/月' : `元/時 ×${clockHrs}h`}
+                            {payType === 'monthly' ? '元/月' : `元/時 ×${live.hoursWorked || 0}h`}
                           </span>
                         </div>
                         <div style={{ marginLeft:'auto', textAlign:'right', flexShrink:0 }}>
-                          {netPay > 0 || estimatedGross > 0 ? (
+                          {live.grossPay > 0 || totalDeductions > 0 ? (
                             <>
-                              <div style={{ fontSize:'13px', fontWeight:'700', color:E.textPrimary }}>實領 NT${netPay.toLocaleString()}</div>
+                              <div style={{ fontSize:'13px', fontWeight:'700', color: netPay < 0 ? '#c04030' : E.textPrimary }}>實領 NT${netPay.toLocaleString()}</div>
                               {totalDeductions > 0 && <div style={{ fontSize:'11px', color:E.textMuted }}>扣 {totalDeductions.toLocaleString()}</div>}
                             </>
                           ) : <div style={{ fontSize:'13px', color:E.textMuted }}>--</div>}
@@ -2115,16 +1942,9 @@ export default function Finance() {
                 })}
               </div>
               <div style={{ marginTop:'16px', paddingTop:'16px', borderTop:`1px solid ${E.divider}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:'12px', color:E.textSecond }}>本月薪資合計（估算）</span>
+                <span style={{ fontSize:'12px', color:E.textSecond }}>本月實領合計（即時）</span>
                 <span style={{ fontSize:'15px', fontWeight:'700', color:E.textPrimary }}>
-                  NT${data.employees.reduce((sum, emp) => {
-                    const s = data.salarySettings?.find(x => x.empId === emp.id) || {}
-                    const type = s.payType || 'monthly'
-                    const base = Number(s.baseSalary || s.hourlyRate || 0)
-                    const cHrs = computeEmpMonthClockHours(emp, py, pm, data)
-                    const cBase = type === 'monthly' ? base : Math.round(cHrs * base)
-                    return sum + cBase + Number(s.mealAllowance||0) + Number(s.fullAttendanceBonus||0) + Number(s.activityAttendance||0)
-                  }, 0).toLocaleString()}
+                  NT${liveSlips.reduce((sum, x) => sum + Number(x.netPay || 0), 0).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -2165,119 +1985,10 @@ export default function Finance() {
               })}
             </div>
 
-            {/* 薪資記錄 */}
-            <div style={{ ...E.card }}>
-              <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 12px' }}>薪資單記錄</h3>
-              {payrolls.length === 0 ? (
-                <div style={{ textAlign:'center', color:E.textMuted, fontSize:'13px', padding:'20px 0' }}>
-                  尚未產生任何薪資記錄，設定完成後點「一鍵產生薪資」
-                </div>
-              ) : (
-                <div style={{ margin:'0 -20px -20px' }}>
-                  {[...payrolls].sort((a,b)=>b.month.localeCompare(a.month)).map((pr, i) => (
-                    <div key={pr.id} onClick={() => { setViewPayroll(pr); setViewSlip(null) }}
-                      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderTop:`1px solid ${E.divider}`, cursor:'pointer' }}>
-                      <div>
-                        <div style={{ fontSize:'14px', fontWeight:'600', color:E.textPrimary }}>{pr.label}</div>
-                        <div style={{ fontSize:'12px', color:E.textMuted, marginTop:'2px' }}>產生：{pr.generatedAt} · {pr.slips.length}位員工</div>
-                      </div>
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontSize:'15px', fontWeight:'700', color:E.green }}>NT${pr.slips.reduce((s,sl)=>s+Number(sl.netPay||0),0).toLocaleString()}</div>
-                        <div style={{ fontSize:'11px', color:E.textMuted }}>合計</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )
       })()}
 
-      {/* Modal：產生薪資 */}
-      {showGenPayroll && (
-        <Modal title={`產生 ${monthLabel(payrollMonth)} 薪資`} onClose={() => setShowGenPayroll(false)}>
-          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-            <p style={{ fontSize:'12px', color:E.textSecond, margin:'0 0 4px' }}>確認各員工薪資明細，可調整加班費、全勤獎金等，確認後儲存。月缺口扣薪、補休/特休折現由系統自動帶入。</p>
-            {(() => {
-              const [gy, gm] = payrollMonth.split('-').map(Number)
-              const todayY = new Date().getFullYear(), todayM = new Date().getMonth() + 1
-              const isCurrentOrFuture = gy > todayY || (gy === todayY && gm >= todayM)
-              return isCurrentOrFuture ? (
-                <div style={{ fontSize:'12px', color:'#8a4a18', backgroundColor:'#fef3cd', border:'1px solid #f0d78c', borderRadius:'8px', padding:'10px 12px', lineHeight:1.5 }}>
-                  ⚠️ 本月（{monthLabel(payrollMonth)}）尚未結束，打卡未打滿會造成「月缺口扣薪」過大、實領偏低甚至負數。<strong>請於月底打卡完整後再產生薪資。</strong>
-                </div>
-              ) : null
-            })()}
-            {genSlips.map((sl, i) => (
-              <div key={sl.empId} style={{ ...E.card, padding:'14px', backgroundColor: i%2===0 ? '#fdfaf5' : '#faf7f2' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
-                  <span style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary }}>{sl.empName}</span>
-                  <span style={{ fontSize:'13px', color:E.textMuted }}>{sl.payType === 'hourly' ? `${sl.hoursWorked}h 時薪制` : '月薪制'}</span>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap:'8px' }}>
-                  {[
-                    ['底薪', 'baseSalary', true],
-                    ['伙食津貼', 'mealAllowance', false],
-                    ['全勤獎金', 'fullAttendanceBonus', false],
-                    ['活動出勤', 'activityAttendance', false],
-                    ['加班費', 'overtime', false],
-                    ['代墊扣除', 'advance', false],
-                  ].map(([label, key, readOnly]) => (
-                    <div key={key}>
-                      <label style={{ fontSize:'11px', color:E.textSecond, display:'block', marginBottom:'3px' }}>{label}</label>
-                      <input
-                        type="number" value={sl[key] || 0} readOnly={readOnly}
-                        onChange={e => {
-                          const updated = genSlips.map((s,j) => j===i ? recalcSlip({...s,[key]:Number(e.target.value)}) : s)
-                          setGenSlips(updated)
-                        }}
-                        style={{ ...E.input, padding:'6px 8px', fontSize:'13px', backgroundColor: readOnly ? E.sandLight : 'white', color: readOnly ? E.textMuted : E.textPrimary }}
-                      />
-                    </div>
-                  ))}
-                  <div>
-                    <label style={{ fontSize:'11px', color:E.textSecond, display:'block', marginBottom:'3px' }}>備註</label>
-                    <input type="text" value={sl.note || ''} placeholder="備註"
-                      onChange={e => { const updated = genSlips.map((s,j) => j===i ? {...s,note:e.target.value} : s); setGenSlips(updated) }}
-                      style={{ ...E.input, padding:'6px 8px', fontSize:'13px' }} />
-                  </div>
-                </div>
-                {/* 走法 B：自動帶入的補休扣薪/折現（唯讀） */}
-                {(sl.compDock > 0 || sl.compCashout > 0 || sl.annualCashout > 0 || sl.holidayPremium > 0) && (
-                  <div style={{ marginTop:'10px', display:'flex', gap:'8px', flexWrap:'wrap' }}>
-                    {sl.holidayPremium > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#e3ecf6', color:'#1a56a0', fontWeight:'600' }}>＋假日加給(時薪×2) NT${sl.holidayPremium.toLocaleString()}</span>}
-                    {sl.compCashout > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#e3ecf6', color:'#1a56a0', fontWeight:'600' }}>＋補休季結折現 NT${sl.compCashout.toLocaleString()}</span>}
-                    {sl.annualCashout > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#e3ecf6', color:'#1a56a0', fontWeight:'600' }}>＋特休年底折現 NT${sl.annualCashout.toLocaleString()}</span>}
-                    {sl.compDock > 0 && <span style={{ fontSize:'11px', padding:'3px 10px', borderRadius:'6px', backgroundColor:'#fce8e0', color:'#c04030', fontWeight:'600' }}>－月缺口扣薪 NT${sl.compDock.toLocaleString()}</span>}
-                  </div>
-                )}
-                <div style={{ marginTop:'10px', paddingTop:'10px', borderTop:`1px solid ${E.divider}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span style={{ fontSize:'12px', color:E.textSecond }}>員工實領</span>
-                  <span style={{ fontSize:'16px', fontWeight:'800', color:E.green }}>NT${Number(sl.netPay||0).toLocaleString()}</span>
-                </div>
-              </div>
-            ))}
-            <div style={{ display:'flex', justifyContent:'space-between', padding:'12px 0', borderTop:`2px solid ${E.divider}` }}>
-              <span style={{ fontSize:'13px', fontWeight:'700', color:E.textPrimary }}>合計實領</span>
-              <span style={{ fontSize:'16px', fontWeight:'800', color:E.green }}>NT${genSlips.reduce((s,sl)=>s+Number(sl.netPay||0),0).toLocaleString()}</span>
-            </div>
-            <button
-              onClick={() => {
-                const who = currentUser?.name || currentUser?.username || '管理員'
-                const now2 = new Date()
-                const genAt = `${now2.getFullYear()}-${String(now2.getMonth()+1).padStart(2,'0')}-${String(now2.getDate()).padStart(2,'0')} ${String(now2.getHours()).padStart(2,'0')}:${String(now2.getMinutes()).padStart(2,'0')}`
-                const id = `payroll_${payrollMonth.replace('-','_')}_${Date.now()}`
-                const record = { id, month: payrollMonth, label: monthLabel(payrollMonth), generatedAt: genAt, generatedBy: who, slips: genSlips }
-                addItem('payrolls', record)
-                logEdit({ user: who, action: '新增', entityType: '薪資', entityName: monthLabel(payrollMonth), summary: `${genSlips.length}位員工，合計NT$${genSlips.reduce((s,sl)=>s+Number(sl.netPay||0),0).toLocaleString()}` })
-                setShowGenPayroll(false)
-                setViewPayroll(record)
-              }}
-              style={{ ...E.btnPrimary, width:'100%', padding:'12px 0', fontSize:'14px', fontWeight:'700' }}>確認產生薪資</button>
-          </div>
-        </Modal>
-      )}
 
       {viewExp && (
         <Modal title="帳目明細" onClose={() => setViewExp(null)} size="sm">
@@ -2606,16 +2317,12 @@ export default function Finance() {
                 </div>
               ))}
               <div style={{ backgroundColor: '#f0ede0', borderRadius: '10px', padding: '12px 14px' }}>
-                <div style={{ fontSize: '12px', color: E.textSecond, marginBottom: '6px', fontWeight: '600' }}>本月估算</div>
+                <div style={{ fontSize: '12px', color: E.textSecond, marginBottom: '6px', fontWeight: '600' }}>本月即時（含缺時扣薪、折現）</div>
                 {(() => {
-                  const ls = data.salarySettings?.find(x => x.empId === salaryEditEmp.id) || {}
-                  const hrs = monthHoursFor(salaryEditEmp.id)
-                  const type = ls.payType || 'monthly'
-                  const base = Number(ls.baseSalary || ls.hourlyRate || 0)
-                  const cBase = type === 'monthly' ? base : Math.round(hrs * base)
-                  const gross = cBase + Number(ls.mealAllowance||0) + Number(ls.fullAttendanceBonus||0) + Number(ls.activityAttendance||0)
-                  const deduct = Number(ls.healthInsEmp||0)+Number(ls.laborInsEmp||0)+Number(ls.pensionSelf||0)+Number(ls.dependentHealth||0)+Number(ls.supplementalIns||0)+Number(ls.wireFee||0)
-                  const employer = Number(ls.healthInsEmployer||0)+Number(ls.laborInsEmployer||0)+Number(ls.pensionEmployer||0)
+                  const lv = buildDraftSlips(payrollMonth).find(x => x.empId === salaryEditEmp.id) || {}
+                  const gross = (lv.grossPay || 0) + (lv.compCashout || 0) + (lv.annualCashout || 0) + (lv.holidayPremium || 0)
+                  const deduct = lv.totalDeductions || 0
+                  const employer = lv.totalEmployerBurden || 0
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: E.textSecond }}>薪資總額</span><span style={{ fontWeight: '600' }}>NT${gross.toLocaleString()}</span></div>
