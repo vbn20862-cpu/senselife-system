@@ -635,12 +635,54 @@ export const LEAVE_TYPES = [
   { type: '公傷病假', cat: 'paid',   desc: '職災醫療期間，全薪' },
   { type: '產假',    cat: 'paid',   desc: '8 週，全薪' },
   { type: '陪產假',  cat: 'paid',   desc: '7 天，全薪' },
-  { type: '病假',    cat: 'half',   desc: '一年 30 天內，半薪' },
-  { type: '事假',    cat: 'unpaid', desc: '一年 14 天，無薪' },
+  { type: '病假',    cat: 'half',   desc: '一年 30 天內半薪（2026 年 12 天），超過仍可請、無薪' },
+  { type: '事假',    cat: 'unpaid', desc: '一年 14 天，無薪（超過仍可請）' },
 ]
 export const PAY_FACTOR = { paid: 1.0, half: 0.5, unpaid: 0 }
 export function leaveTypeCat(type) {
   return LEAVE_TYPES.find(t => t.type === type)?.cat || 'paid'
+}
+
+// 病假年度上限：半薪額度內給半薪，超過仍可請但無薪（系統 2026/9 上線，當年上限 12 天）
+export const sickLeaveCap = (yr) => (yr === 2026 ? 12 : 30)
+
+// 某員工某年病假逐日給薪係數 Map(date → 0~0.5)：依日期先後累計，額度內 0.5、超過 0
+export function sickLeaveFactorMap(emp, yr, data) {
+  const days = []
+  for (const l of (data.leaveRequests || [])) {
+    if (!l || l.empId !== emp.id || l.type !== '病假') continue
+    if (l.status && l.status !== '已核准') continue
+    const start = l.startDate || l.date
+    const end = l.endDate || start
+    if (!start) continue
+    const w = (start === end && Number(l.days) === 0.5) ? 0.5 : 1
+    const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
+    while (d <= last) {
+      const ds = d.toLocaleDateString('sv-SE')
+      if (ds.startsWith(String(yr))) days.push({ ds, w })
+      d.setDate(d.getDate() + 1)
+    }
+  }
+  days.sort((a, b) => a.ds.localeCompare(b.ds))
+  const cap = sickLeaveCap(yr)
+  const map = new Map()
+  let used = 0
+  for (const { ds, w } of days) {
+    const paidPart = Math.max(0, Math.min(w, cap - used))
+    used += w
+    map.set(ds, w > 0 ? 0.5 * (paidPart / w) : 0.5)
+  }
+  return map
+}
+
+// 某筆請假在某日的給薪係數（病假依年度累計判斷是否超過上限）
+function leaveFactorOn(l, emp, ds, data, sickMaps) {
+  if (l.type === '病假') {
+    const yr = Number(ds.slice(0, 4))
+    if (!sickMaps[yr]) sickMaps[yr] = sickLeaveFactorMap(emp, yr, data)
+    return sickMaps[yr].get(ds) ?? 0.5
+  }
+  return PAY_FACTOR[leaveTypeCat(l.type)] ?? 1.0
 }
 
 // 計算一筆請假在某年月內的天數（支援半天）
@@ -660,21 +702,41 @@ function leaveDaysInMonth(l, yr, mo) {
   return cal
 }
 
+// 某員工某月的請假清單（含待審核/已駁回，供顯示）：每筆附當月天數與給薪類別
+export function leavesInMonth(emp, yr, mo, data) {
+  return (data.leaveRequests || [])
+    .filter(l => l && l.empId === emp.id)
+    .map(l => ({ ...l, daysInMonth: leaveDaysInMonth(l, yr, mo), cat: leaveTypeCat(l.type) }))
+    .filter(l => l.daysInMonth > 0)
+    .sort((a, b) => (a.startDate || a.date || '').localeCompare(b.startDate || b.date || ''))
+}
+
 // 某員工某月「請假折算有效工時」：全薪假×8h、半薪假×4h、無薪假×0h（僅計已核准）
 // 用於月缺口判斷：有效工時 = 正常工時 + 此值
 export function leaveEffectiveHoursInMonth(emp, yr, mo, data) {
+  const monthStr = `${yr}-${pad2(mo)}`
+  const sickMaps = {}
   let hours = 0
   for (const l of (data.leaveRequests || [])) {
-    if (l.empId !== emp.id) continue
+    if (!l || l.empId !== emp.id) continue
     if (l.status && l.status !== '已核准') continue // 只算已核准（無 status 視為舊資料已生效）
-    const factor = PAY_FACTOR[leaveTypeCat(l.type)] ?? 1.0
-    hours += leaveDaysInMonth(l, yr, mo) * 8 * factor
+    const start = l.startDate || l.date
+    const end = l.endDate || start
+    if (!start) continue
+    const dayHours = (start === end && Number(l.days) === 0.5) ? 4 : 8
+    const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
+    while (d <= last) {
+      const ds = d.toLocaleDateString('sv-SE')
+      if (ds.startsWith(monthStr)) hours += dayHours * leaveFactorOn(l, emp, ds, data, sickMaps)
+      d.setDate(d.getDate() + 1)
+    }
   }
   return round2(hours)
 }
 
 // 某日員工的已核准請假折算有效時數（全薪 8h、半薪 4h、無薪 0h；半天減半）
 function leaveEffectiveHoursOnDate(emp, dateStr, data) {
+  const sickMaps = {}
   let h = 0
   for (const l of (data.leaveRequests || [])) {
     if (l.empId !== emp.id) continue
@@ -682,7 +744,7 @@ function leaveEffectiveHoursOnDate(emp, dateStr, data) {
     const start = l.startDate || l.date
     const end = l.endDate || l.startDate || l.date
     if (!start || dateStr < start || dateStr > end) continue
-    const factor = PAY_FACTOR[leaveTypeCat(l.type)] ?? 1.0
+    const factor = leaveFactorOn(l, emp, dateStr, data, sickMaps)
     const dayHours = (start === end && Number(l.days) === 0.5) ? 4 : 8
     h += dayHours * factor
   }

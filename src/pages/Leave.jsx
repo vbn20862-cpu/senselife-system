@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { E, useIsMobile } from '../styles/earth'
 import Modal from '../components/Modal'
 import { Plus, Check, X, Trash2, Clock } from 'lucide-react'
-import { LEAVE_TYPES, leaveTypeCat, annualLeaveStatus, computeCompLedger } from '../utils/payrollEngine'
+import { LEAVE_TYPES, leaveTypeCat, annualLeaveStatus, computeCompLedger, sickLeaveCap } from '../utils/payrollEngine'
 import { localTimestamp } from '../utils/salaryCalc'
 
 const CAT_STYLE = {
@@ -110,6 +110,22 @@ export default function Leave() {
   }
 
   const curCat = leaveTypeCat(form.type)
+
+  // 病假／事假超過年度上限：仍可請，超過部分無薪 → 送出前提示
+  const capNotice = (() => {
+    if (!['病假', '事假'].includes(form.type) || !form.startDate) return null
+    const empId = isAdmin ? Number(form.empId) : myEmp?.id
+    if (!empId) return null
+    const yr = Number(form.startDate.slice(0, 4))
+    const cap = form.type === '病假' ? sickLeaveCap(yr) : 14
+    const used = (data.leaveRequests || []).filter(l => l && l.empId === empId && l.type === form.type && l.status !== '已駁回' && (l.startDate || l.date || '').startsWith(String(yr))).reduce((sum, l) => sum + Number(l.days || 0), 0)
+    const end = form.halfDay ? form.startDate : (form.endDate || form.startDate)
+    const days = form.halfDay ? 0.5 : (end >= form.startDate ? daysBetween(form.startDate, end) : 0)
+    const over = used + days - cap
+    const base = `${yr} 年${form.type}已請 ${used} 天（含待審核），上限 ${cap} 天`
+    if (over <= 0) return { warn: false, text: `${base}，這次請完剩 ${cap - used - days} 天。` }
+    return { warn: true, text: `${base}。這次請完會超過 ${Math.min(over, days)} 天${form.type === '病假' ? '，超過的部分改為無薪' : '（事假本來就無薪）'}，仍可送出。` }
+  })()
 
   return (
     <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -226,6 +242,7 @@ export default function Leave() {
             <Field label="事由（選填）">
               <textarea value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} rows={2} style={{ ...E.input, resize: 'vertical', fontFamily: 'inherit' }} />
             </Field>
+            {capNotice && <div style={{ fontSize: '12px', lineHeight: 1.5, color: capNotice.warn ? '#8a6d1a' : E.textMuted, backgroundColor: capNotice.warn ? '#fef3cd' : 'transparent', padding: capNotice.warn ? '8px 12px' : 0, borderRadius: '8px' }}>{capNotice.text}</div>}
             {formErr && <div style={{ fontSize: '13px', color: '#c04030', backgroundColor: '#fce8e0', padding: '8px 12px', borderRadius: '8px' }}>⚠ {formErr}</div>}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button onClick={() => setShowForm(false)} style={{ ...E.btnGhost, padding: '8px 18px' }}>取消</button>

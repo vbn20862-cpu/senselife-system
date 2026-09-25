@@ -6,15 +6,10 @@ import Modal from '../components/Modal'
 import { E, STATUS, useIsMobile } from '../styles/earth'
 import { exportFinance } from '../utils/exportExcel'
 import { MONTHS, GOVT_WORK_DAYS, computeEmpMonthClockHours } from '../utils/salaryCalc'
-import { hourlyRate, computeCompLedger, annualLeaveStatus, annualLeavePayout, computeHourlyHolidayPremium, computeHourlyOTHours } from '../utils/payrollEngine'
+import { hourlyRate, computeCompLedger, annualLeaveStatus, annualLeavePayout, computeHourlyHolidayPremium, computeHourlyOTHours, leavesInMonth, leaveEffectiveHoursInMonth, sickLeaveCap, sickLeaveFactorMap } from '../utils/payrollEngine'
 
 const CHART_COLORS = ['#4d8843','#5b7ec9','#c89040','#8a5cb0','#c04030','#3a9080','#b06030','#607060']
 
-const SHIFTS_DEF = [
-  { code: '出勤', hours: 8 }, { code: '上午班', hours: 4 },
-  { code: '下午班', hours: 4 }, { code: '休假', hours: 0 },
-]
-function getShiftHours(code) { return SHIFTS_DEF.find(s => s.code === code)?.hours || 0 }
 
 // 補休狀態徽章
 function DonutChart({ slices, size = 120 }) {
@@ -98,7 +93,6 @@ export default function Finance() {
   const [viewPayroll, setViewPayroll] = useState(null)  // selected payroll record
   const [viewSlip, setViewSlip] = useState(null)        // selected single slip
   const [salaryEditEmp, setSalaryEditEmp] = useState(null)
-  const [salaryExpandedEmp, setSalaryExpandedEmp] = useState(null)
   // 統編發票
   const [showAddInv, setShowAddInv] = useState(false)
   const [editInv, setEditInv] = useState(null)
@@ -180,17 +174,12 @@ export default function Finance() {
       const payType = s.payType || 'monthly'
       const baseSalary = Number(s.baseSalary || s.hourlyRate || 0)
       const mealAllowance = Number(s.mealAllowance || 0)
-      // calc hours: use actual clock hours if available, fallback to schedule
-      const clockHrs = computeEmpMonthClockHours(emp, y, m, data)
-      const schedHrs = (data.schedules || [])
-        .filter(sc => sc.empId === emp.id && sc.year === y && sc.month === m)
-        .reduce((sum, sc) => {
-          const shiftHours = { '出勤': 8, '上午班': 4, '下午班': 4, '休假': 0 }
-          return sum + (shiftHours[sc.shift] || 0)
-        }, 0)
-      // 時薪制加班：加班卡時數照記、費率 1.0（時數 × 時薪直接併入）
-      const hourlyOTHrs = payType === 'hourly' ? computeHourlyOTHours(emp, y, m, data) : 0
-      const hrs = (clockHrs > 0 ? clockHrs : schedHrs) + hourlyOTHrs
+      // 時薪制時數 = 實際打卡 + 已核准有薪假折算 + 加班(×1.0)；不以排班補足
+      const hp = hourlyPayHours(emp, y, m)
+      const isHourlyPay = payType === 'hourly'
+      const hrs = isHourlyPay ? hp.total : hp.clockHrs
+      const hourlyLeaveHrs = isHourlyPay ? hp.leaveHrs : 0
+      const hourlyOTHrs = isHourlyPay ? hp.otHrs : 0
       const computedBase = payType === 'monthly' ? baseSalary : Math.round(hrs * baseSalary)
       const fullAttendanceBonus = Number(s.fullAttendanceBonus || 0)
       const activityAttendance = Number(s.activityAttendance || 0)
@@ -218,7 +207,7 @@ export default function Finance() {
       const totalDeductionsB = totalDeductions + compDock
       const netPay = grossPay + compCashout + annualCashout + holidayPremium - totalDeductionsB
       return {
-        empId: emp.id, empName: emp.name, hoursWorked: hrs, hourlyOTHrs, payType,
+        empId: emp.id, empName: emp.name, hoursWorked: hrs, hourlyOTHrs, hourlyLeaveHrs, payType,
         baseSalary: computedBase, mealAllowance,
         fullAttendanceBonus, activityAttendance, overtime: 0, advance: 0,
         compDock, compCashout, annualCashout, holidayPremium,
@@ -237,16 +226,16 @@ export default function Finance() {
     const netPay = grossPay + (slip.compCashout||0) + (slip.annualCashout||0) + (slip.holidayPremium||0) - totalDeductions
     return { ...slip, grossPay, totalDeductions, netPay, totalEmployerBurden, totalEmployerCost: grossPay + totalEmployerBurden }
   }
+  function hourlyPayHours(emp, y, m) {
+    const clockHrs = computeEmpMonthClockHours(emp, y, m, data)
+    const leaveHrs = leaveEffectiveHoursInMonth(emp, y, m, data)
+    const otHrs = computeHourlyOTHours(emp, y, m, data)
+    return { clockHrs, leaveHrs, otHrs, total: Math.round((clockHrs + leaveHrs + otHrs) * 100) / 100 }
+  }
   function monthHoursFor(empId) {
     const [y, m] = payrollMonth.split('-').map(Number)
     const emp = data.employees.find(e => e.id === empId)
-    if (emp) {
-      const clockHrs = computeEmpMonthClockHours(emp, y, m, data)
-      if (clockHrs > 0) return clockHrs
-    }
-    // fallback to schedule hours if no clock data
-    return data.schedules.filter(s => s.empId === empId && s.year === y && s.month === m)
-      .reduce((sum, s) => sum + getShiftHours(s.shift), 0)
+    return emp ? hourlyPayHours(emp, y, m).total : 0
   }
   function updateSalarySettingFor(emp, updates) {
     const existing = (data.salarySettings || []).find(s => s.empId === emp.id)
@@ -1776,127 +1765,203 @@ export default function Finance() {
               <div style={{ ...E.card, textAlign:'center', color:E.textMuted, padding:'40px', fontSize:'13px' }}>無法找到您的員工資料</div>
             </div>
           )
-          const setting = data.salarySettings?.find(s => s.empId === myEmp.id) || {}
+          // 與正式薪資單同一套算法（buildDraftSlips），即時反映當月狀態
+          const slip = buildDraftSlips(payrollMonth).find(s => s.empId === myEmp.id) || {}
+          const payType = slip.payType || 'monthly'
+          const isHourly = payType === 'hourly'
           const clockHrs = computeEmpMonthClockHours(myEmp, py, pm, data)
-          // 走法 B：補休總帳（加班自動入帳 + 月缺口扣補休/扣薪 + 季結折現）
           const ledger = computeCompLedger(myEmp, data, { year: py, month: pm })
-          const thisMonth = ledger.monthly.find(m => m.year === py && m.month === pm) || { accruedHours: 0, balHours: 0, shortfall: 0, dockHours: 0, dockAmount: 0, govtH: govtHrs }
+          const tm = ledger.monthly.find(m => m.year === py && m.month === pm) || {}
           const al = annualLeaveStatus(myEmp, py, data)
-          const quarterSettle = ledger.settlements.find(s => s.year === py && s.quarter === Math.ceil(pm/3))
-          const balance = thisMonth.balHours
-          const payType = setting.payType || 'monthly'
-          const myOTHrs = payType === 'hourly' ? computeHourlyOTHours(myEmp, py, pm, data) : 0
-          const schHrs = monthHoursFor(myEmp.id) + myOTHrs
-          const base = Number(setting.baseSalary || setting.hourlyRate || 0)
-          const computedBase = payType === 'monthly' ? base : Math.round(schHrs * base)
-          const meal = Number(setting.mealAllowance || 0)
-          const fAB = Number(setting.fullAttendanceBonus || 0)
-          const act = Number(setting.activityAttendance || 0)
-          const gross = computedBase + meal + fAB + act
-          const deduct = Number(setting.healthInsEmp||0)+Number(setting.laborInsEmp||0)+Number(setting.pensionSelf||0)+Number(setting.dependentHealth||0)+Number(setting.supplementalIns||0)+Number(setting.wireFee||0)
-          const net = gross - deduct
-          const isExpanded = salaryExpandedEmp === myEmp.id
+          const hrRate = ledger.hourlyRate
+          const curYM = todayStr.slice(0, 7)
+          const isFutureMonth = payrollMonth > curYM
+          const isCurrentMonth = payrollMonth === curYM
+          const md = s => { const [, m2, d2] = s.split('-'); return `${Number(m2)}/${Number(d2)}` }
+          const yest = new Date(); yest.setDate(yest.getDate() - 1)
+          const asOfText = isFutureMonth ? '尚未開始' : isCurrentMonth ? `即時試算・統計到 ${md(yest.toLocaleDateString('sv-SE'))}（今天之前）` : '本月已結束'
+          const officialSlip = payrolls.filter(pr => pr.month === payrollMonth).flatMap(pr => pr.slips || []).find(s => s.empId === myEmp.id)
+          const hasSetting = (slip.grossPay || 0) > 0
+          const gross = (slip.grossPay || 0) + (slip.compCashout || 0) + (slip.annualCashout || 0) + (slip.holidayPremium || 0)
+          const net = slip.netPay || 0
+          const H = v => (v > 0 ? `${v}h` : '—')
+          const D = v => (v > 0 ? `${v} 天` : '—')
+          const RED = '#c04030', AMBER = '#b45309', BLUE = '#3c6eb4'
+
+          // 本月請假
+          const leaves = leavesInMonth(myEmp, py, pm, data)
+          const yearUsed = type => (data.leaveRequests || []).filter(l => l && l.empId === myEmp.id && l.type === type && (!l.status || l.status === '已核准') && (l.startDate || l.date || '').startsWith(String(py))).reduce((s, l) => s + Number(l.days || 0), 0)
+          const leaveOnShift = l => {
+            const s0 = l.startDate || l.date, e0 = l.endDate || s0
+            return (data.schedules || []).some(sc => sc && sc.empId === myEmp.id && sc.year === py && sc.month === pm && ['出勤', 'W', '上午班', '下午班'].includes(sc.shift) && (() => { const ds = `${payrollMonth}-${String(sc.day).padStart(2, '0')}`; return ds >= s0 && ds <= e0 })())
+          }
+          const sickMap = sickLeaveFactorMap(myEmp, py, data)
+          const sickOver = l => {
+            if (l.type !== '病假' || (l.status && l.status !== '已核准')) return null
+            const s0 = l.startDate || l.date, e0 = l.endDate || s0
+            const fs = [...sickMap.entries()].filter(([ds]) => ds >= s0 && ds <= e0 && ds.startsWith(payrollMonth)).map(([, f]) => f)
+            if (!fs.length || fs.every(f => f >= 0.5)) return null
+            return fs.every(f => f === 0) ? 'all' : 'part'
+          }
+          const leaveEffect = l => {
+            if (l.status === '已駁回') return ['已駁回，不計', E.textMuted]
+            if (l.status === '待審核') return ['待審核，核准後才計入', AMBER]
+            const over = sickOver(l)
+            if (over) return [over === 'all' ? `超過病假上限・無薪${isHourly ? '・不計時數' : '・計入缺時'}` : `部分超過病假上限・超過的無薪`, RED]
+            if (isHourly) return [l.cat === 'paid' ? `全薪・計 ${l.daysInMonth * 8}h` : l.cat === 'half' ? `半薪・計 ${l.daysInMonth * 4}h` : '無薪・不計時數', l.cat === 'unpaid' ? RED : l.cat === 'half' ? AMBER : E.green]
+            if (l.type === '特休') return ['全薪・扣特休額度', E.green]
+            if (l.type === '補休') return [`全薪・扣補休 ${l.daysInMonth * 8}h`, E.green]
+            if (l.cat !== 'paid' && !leaveOnShift(l)) return ['當天排休，不影響薪資', E.textMuted]
+            if (l.cat === 'half') return ['半薪・少的一半計入缺時', AMBER]
+            if (l.cat === 'unpaid') return ['無薪・計入缺時', RED]
+            return ['全薪', E.green]
+          }
+
+          const timeItems = [
+            ['應上時數（政府）', `${tm.govtH ?? govtHrs}h`, E.textPrimary],
+            ['已排班時數（至今）', H(tm.scheduledH), E.textPrimary],
+            ['打卡時數', `${clockHrs}h`, E.textPrimary],
+            isHourly
+              ? ['加班時數（×1.0 併薪）', H(slip.hourlyOTHrs), E.green]
+              : ['本月加班 → 補休', tm.accruedHours > 0 ? `+${tm.accruedHours}h` : '—', E.green],
+            ['缺時（少做時數）', isHourly ? '—' : H(tm.deficitHours), tm.deficitHours > 0 && !isHourly ? RED : E.textPrimary],
+            ['補休抵缺時', isHourly ? '—' : H(tm.consumed), E.coffee],
+            ['缺時扣薪時數', isHourly ? '—' : H(tm.dockHours), tm.dockHours > 0 ? RED : E.textPrimary],
+            ['補休餘額', isHourly ? '—' : `${tm.balHours ?? 0}h`, E.coffee],
+            ['遲到 / 早退', D(tm.lateLeaveDays), tm.lateLeaveDays > 0 ? AMBER : E.textPrimary],
+            ['曠職', D(tm.absentDays), tm.absentDays > 0 ? RED : E.textPrimary],
+            ['停班未出勤（無薪）', D(tm.suspShortDays), tm.suspShortDays > 0 ? BLUE : E.textPrimary],
+            ['待補登（忘打下班卡）', D(tm.missingPunchDays), tm.missingPunchDays > 0 ? AMBER : E.textPrimary],
+          ]
+          const dateNotes = [
+            !isHourly && tm.deficitDates?.length ? ['缺時', [...tm.deficitDates].sort((a, b) => a.date.localeCompare(b.date)).map(x => `${md(x.date)} ${x.hours}h`).join('、'), RED] : null,
+            tm.absentDates?.length ? ['曠職', [...tm.absentDates].sort().map(md).join('、'), RED] : null,
+            tm.missingPunchDates?.length ? ['待補登', [...tm.missingPunchDates].sort().map(md).join('、') + '（補登下班卡後才會計算）', AMBER] : null,
+            tm.suspShortDates?.length ? ['停班', [...tm.suspShortDates].sort().map(md).join('、'), BLUE] : null,
+          ].filter(Boolean)
+
+          const row = (label, val, opt = {}) => (
+            <div key={label} style={{ display:'flex', justifyContent:'space-between', gap:'12px', padding:'6px 0', borderBottom:`1px solid ${E.divider}`, fontSize:'13px' }}>
+              <span style={{ color: opt.color || E.textSecond }}>{label}{opt.sub && <span style={{ fontSize:'11px', color:E.textMuted, marginLeft:'6px' }}>{opt.sub}</span>}</span>
+              <span style={{ color: opt.color || E.textPrimary, fontWeight:'500', whiteSpace:'nowrap' }}>{opt.minus ? '－ ' : ''}NT${Number(val).toLocaleString()}</span>
+            </div>
+          )
+          const secTitle = t => <div style={{ fontSize:'12px', fontWeight:'700', color:E.textSecond, letterSpacing:'0.06em', marginBottom:'10px' }}>{t}</div>
+          const deductRows = [['healthInsEmp','健保費'],['laborInsEmp','勞保費'],['pensionSelf','勞退自提'],['dependentHealth','眷屬健保'],['wireFee','匯費']]
+
           return (
             <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
               {monthNav}
-              {/* 薪資卡片 */}
-              <div style={{ ...E.card }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}
-                  onClick={() => setSalaryExpandedEmp(isExpanded ? null : myEmp.id)}>
-                  <div>
-                    <div style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary }}>{myEmp.name}</div>
-                    <div style={{ fontSize:'12px', color:E.textMuted }}>{py}年{MONTHS[pm-1]}月薪資</div>
-                  </div>
-                  <div style={{ textAlign:'right' }}>
-                    {gross > 0 ? (
-                      <>
-                        <div style={{ fontSize:'22px', fontWeight:'800', color:E.green }}>NT${net.toLocaleString()}</div>
-                        <div style={{ fontSize:'11px', color:E.textMuted }}>實領金額</div>
-                      </>
-                    ) : <div style={{ fontSize:'13px', color:E.textMuted }}>待設定</div>}
-                  </div>
-                  <span style={{ fontSize:'16px', color:E.textMuted, marginLeft:'8px' }}>{isExpanded ? '▲' : '▼'}</span>
+
+              {/* ① 實領 */}
+              <div style={{ ...E.card, background:'linear-gradient(135deg, #3a6d31 0%, #2f5a28 100%)', color:'#fff', border:'none' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:'8px', flexWrap:'wrap' }}>
+                  <span style={{ fontSize:'14px', fontWeight:'700' }}>{myEmp.name}・{py}年{pm}月</span>
+                  <span style={{ fontSize:'11px', opacity:0.85 }}>{asOfText}</span>
                 </div>
-                {isExpanded && (
-                  <div style={{ marginTop:'16px', borderTop:`1px solid ${E.divider}`, paddingTop:'16px', display:'flex', flexDirection:'column', gap:'14px' }}>
-                    <div>
-                      <div style={{ fontSize:'11px', fontWeight:'700', color:E.textSecond, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>工時</div>
-                      <div style={{ display:'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(2, 1fr)', gap:'8px' }}>
-                        {[
-                          [thisMonth.govtH < govtHrs ? '應上時數(政府,已扣停班)' : '應上時數(政府)',`${thisMonth.govtH ?? govtHrs}h`, E.textPrimary],
-                          ['打卡時數',`${clockHrs}h`, E.textPrimary],
-                          ['本月加班→補休', thisMonth.accruedHours>0?`+${thisMonth.accruedHours}h`:'—', E.green],
-                          ['補休餘額',`${balance}h`, E.coffee],
-                          ['缺時(少做時數)', thisMonth.deficitHours>0?`${thisMonth.deficitHours}h`:'—', thisMonth.deficitHours>0?'#c04030':E.textPrimary],
-                          ['遲到/早退', thisMonth.lateLeaveDays>0?`${thisMonth.lateLeaveDays}天`:'—', thisMonth.lateLeaveDays>0?'#b45309':E.textPrimary],
-                          ['停班未出勤(無薪)', thisMonth.suspShortDays>0?`${thisMonth.suspShortDays}天`:'—', thisMonth.suspShortDays>0?'#3c6eb4':E.textPrimary],
-                          ['曠職天數', thisMonth.absentDays>0?`${thisMonth.absentDays}天`:'—', thisMonth.absentDays>0?'#c04030':E.textPrimary],
-                          ['待補登(忘打卡)', thisMonth.missingPunchDays>0?`${thisMonth.missingPunchDays}天`:'—', thisMonth.missingPunchDays>0?'#b45309':E.textPrimary],
-                          ['本月缺時扣薪', thisMonth.dockAmount>0?`-NT$${thisMonth.dockAmount.toLocaleString()}`:'—', thisMonth.dockAmount>0?'#c04030':E.textPrimary],
-                        ].map(([label, value, color]) => (
-                          <div key={label} style={{ backgroundColor:E.sandLight, borderRadius:'8px', padding:'10px 12px' }}>
-                            <div style={{ fontSize:'11px', color:E.textMuted }}>{label}</div>
-                            <div style={{ fontSize:'16px', fontWeight:'700', color }}>{value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {gross > 0 && (
-                      <div>
-                        <div style={{ fontSize:'11px', fontWeight:'700', color:E.textSecond, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>薪資明細</div>
-                        <div style={{ display:'flex', flexDirection:'column', gap:'4px', fontSize:'13px' }}>
-                          <div style={{ display:'flex', justifyContent:'space-between' }}>
-                            <span style={{ color:E.textSecond }}>{payType==='monthly' ? '底薪' : `時薪 ${base} × ${schHrs}h`}</span>
-                            <span>NT${computedBase.toLocaleString()}</span>
-                          </div>
-                          {meal>0 && <div style={{ display:'flex', justifyContent:'space-between' }}><span style={{ color:E.textSecond }}>伙食津貼</span><span>NT${meal.toLocaleString()}</span></div>}
-                          {fAB>0 && <div style={{ display:'flex', justifyContent:'space-between' }}><span style={{ color:E.textSecond }}>全勤獎金</span><span>NT${fAB.toLocaleString()}</span></div>}
-                          {act>0 && <div style={{ display:'flex', justifyContent:'space-between' }}><span style={{ color:E.textSecond }}>活動出勤</span><span>NT${act.toLocaleString()}</span></div>}
-                          <div style={{ display:'flex', justifyContent:'space-between', borderTop:`1px solid ${E.divider}`, paddingTop:'4px', fontWeight:'600' }}>
-                            <span>薪資總額</span><span>NT${gross.toLocaleString()}</span>
-                          </div>
-                          {[['healthInsEmp','健保費'],['laborInsEmp','勞保費'],['pensionSelf','勞退自提'],['dependentHealth','眷屬健保'],['supplementalIns','補充保費'],['wireFee','匯費']].map(([key, label]) =>
-                            Number(setting[key]||0) > 0 ? (
-                              <div key={key} style={{ display:'flex', justifyContent:'space-between' }}>
-                                <span style={{ color:'#8a3a20' }}>— {label}</span>
-                                <span style={{ color:'#8a3a20' }}>NT${Number(setting[key]).toLocaleString()}</span>
-                              </div>
-                            ) : null
-                          )}
-                          <div style={{ display:'flex', justifyContent:'space-between', borderTop:`1px solid ${E.divider}`, paddingTop:'6px', fontWeight:'800', fontSize:'15px' }}>
-                            <span style={{ color:E.textPrimary }}>實領金額</span>
-                            <span style={{ color:E.green }}>NT${net.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                <div style={{ fontSize:'12px', opacity:0.85, marginTop:'14px' }}>本月實領</div>
+                <div style={{ fontSize:'34px', fontWeight:'800', lineHeight:1.15, letterSpacing:'0.01em' }}>{hasSetting ? `NT$${net.toLocaleString()}` : '待設定'}</div>
+                {hasSetting && (
+                  <div style={{ fontSize:'12px', opacity:0.9, marginTop:'6px' }}>
+                    應發 NT${gross.toLocaleString()}　－　扣項 NT${Number(slip.totalDeductions || 0).toLocaleString()}
+                  </div>
+                )}
+                {officialSlip && (
+                  <div style={{ fontSize:'12px', marginTop:'10px', backgroundColor:'rgba(255,255,255,0.14)', borderRadius:'8px', padding:'6px 10px' }}>
+                    本月薪資單已開立：實領 NT${Number(officialSlip.netPay || 0).toLocaleString()}{Number(officialSlip.netPay || 0) !== net ? '（與即時試算不同，以薪資單為準）' : ''}
                   </div>
                 )}
               </div>
-              {/* 補休 + 特休（走法 B）*/}
-              <div style={{ ...E.card, backgroundColor:'#f5f0e8', border:'none' }}>
-                <div style={{ fontSize:'13px', fontWeight:'600', color:E.textPrimary, marginBottom:'10px' }}>🌊 補休 / 特休</div>
-                <div style={{ display:'flex', gap:'24px', flexWrap:'wrap', marginBottom:'12px' }}>
-                  {[
-                    ['補休餘額',`${balance}h`, E.coffee],
-                    ['特休剩餘', myEmp.hireDate?`${al.remainingDays}天`:'—', E.green],
-                    ['特休已用', myEmp.hireDate?`${al.usedDays}天`:'—', '#8a3a20'],
-                  ].map(([label, value, color]) => (
-                    <div key={label}>
-                      <div style={{ fontSize:'11px', color:E.textMuted }}>{label}</div>
-                      <div style={{ fontSize:'20px', fontWeight:'800', color }}>{value}</div>
+
+              {/* ② 工時 */}
+              <div style={{ ...E.card }}>
+                {secTitle(isHourly ? '工時（時薪制）' : '工時')}
+                <div style={{ display:'grid', gridTemplateColumns: mob ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap:'8px' }}>
+                  {timeItems.map(([label, value, color]) => (
+                    <div key={label} style={{ backgroundColor:E.sandLight, borderRadius:'8px', padding:'8px 10px' }}>
+                      <div style={{ fontSize:'11px', color:E.textMuted, lineHeight:1.3 }}>{label}</div>
+                      <div style={{ fontSize:'16px', fontWeight:'700', color, marginTop:'2px' }}>{value}</div>
                     </div>
                   ))}
                 </div>
-                {quarterSettle && (
-                  <div style={{ fontSize:'12px', color:'#1a56a0', backgroundColor:'#e3ecf6', padding:'8px 12px', borderRadius:'8px', marginBottom:'8px' }}>
-                    📅 本季（Q{quarterSettle.quarter}）季底折現：{quarterSettle.hours}h → <strong>NT${quarterSettle.amount.toLocaleString()}</strong>
+                {dateNotes.length > 0 && (
+                  <div style={{ marginTop:'10px', display:'flex', flexDirection:'column', gap:'4px', fontSize:'12px' }}>
+                    {dateNotes.map(([k, v, c]) => (
+                      <div key={k}><span style={{ color:c, fontWeight:'700', marginRight:'6px' }}>{k}</span><span style={{ color:E.textSecond }}>{v}</span></div>
+                    ))}
                   </div>
                 )}
-                <div style={{ fontSize:'11px', color:E.textMuted, lineHeight:1.5 }}>
-                  加班打卡自動轉補休（國定假日 ×2）；補休可抵月缺口，季底（6/9/12月）未休折現。特休曆年制，年底未休折現。
+                <div style={{ fontSize:'11px', color:E.textMuted, marginTop:'10px', lineHeight:1.6 }}>
+                  {isHourly
+                    ? '時薪制：（實際打卡時數 ＋ 有薪假時數 ＋ 加班時數）× 時薪。有薪假一天 8h、病假一天 4h、事假不計；只有打了上下班卡的日子才有時數。'
+                    : '缺時＝排班應到而少做的時數（已扣除請假折抵）。先用補休抵，不夠才扣薪。今天和未來的日子還沒結束，不計缺時。'}
                 </div>
               </div>
+
+              {/* ③ 本月請假 */}
+              <div style={{ ...E.card }}>
+                {secTitle('本月請假')}
+                {leaves.length === 0
+                  ? <div style={{ fontSize:'13px', color:E.textMuted, padding:'4px 0 8px' }}>本月沒有請假</div>
+                  : leaves.map(l => {
+                    const s = l.startDate || l.date, e2 = l.endDate || s
+                    const [effect, effColor] = leaveEffect(l)
+                    return (
+                      <div key={l.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', padding:'8px 0', borderBottom:`1px solid ${E.divider}`, opacity: l.status === '已駁回' ? 0.55 : 1 }}>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontSize:'13px', fontWeight:'600', color:E.textPrimary }}>
+                            {md(s)}{e2 !== s ? `–${md(e2)}` : ''}　{l.type}
+                            <span style={{ fontWeight:'400', color:E.textMuted, marginLeft:'6px' }}>{l.daysInMonth} 天</span>
+                          </div>
+                          {l.reason && <div style={{ fontSize:'11px', color:E.textMuted, marginTop:'1px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.reason}</div>}
+                        </div>
+                        <span style={{ fontSize:'11px', color:effColor, fontWeight:'600', textAlign:'right', flexShrink:0, maxWidth:'55%' }}>{effect}</span>
+                      </div>
+                    )
+                  })}
+                <div style={{ display:'grid', gridTemplateColumns: mob ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap:'8px', marginTop:'12px' }}>
+                  {[
+                    [`特休剩餘（${py}）`, myEmp.hireDate ? `${al.remainingDays} 天` : '未設到職日', E.green, myEmp.hireDate ? `額度 ${al.entitledDays} 天・已用 ${al.usedDays} 天` : ''],
+                    ['補休餘額', isHourly ? '—' : `${tm.balHours ?? 0}h`, E.coffee, isHourly ? '' : '季底（3/6/9/12月）未休折現'],
+                    [`病假（${py}）`, `${yearUsed('病假')} / ${sickLeaveCap(py)} 天`, yearUsed('病假') > sickLeaveCap(py) ? RED : E.textPrimary, `${sickLeaveCap(py)} 天內半薪，超過無薪${py === 2026 ? '（系統9月上線）' : ''}`],
+                    [`事假（${py}）`, `${yearUsed('事假')} / 14 天`, yearUsed('事假') > 14 ? RED : E.textPrimary, '無薪，超過仍可請'],
+                  ].map(([label, value, color, sub]) => (
+                    <div key={label} style={{ backgroundColor:'#f5f0e8', borderRadius:'8px', padding:'8px 10px' }}>
+                      <div style={{ fontSize:'11px', color:E.textMuted }}>{label}</div>
+                      <div style={{ fontSize:'15px', fontWeight:'700', color, marginTop:'2px' }}>{value}</div>
+                      {sub && <div style={{ fontSize:'10px', color:E.textMuted, marginTop:'1px' }}>{sub}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ④ 明細 */}
+              {hasSetting && (
+                <div style={{ ...E.card }}>
+                  {secTitle('薪資明細')}
+                  <div style={{ fontSize:'11px', fontWeight:'700', color:E.green, margin:'2px 0 4px' }}>加項</div>
+                  {row(isHourly ? '時薪 × 時數' : '底薪', slip.baseSalary || 0, isHourly ? { sub: `NT$${(() => { const st = (data.salarySettings || []).find(s => s.empId === myEmp.id) || {}; return Number(st.baseSalary || st.hourlyRate || 0) })()} × ${slip.hoursWorked}h${[slip.hourlyLeaveHrs > 0 ? `請假 ${slip.hourlyLeaveHrs}h` : '', slip.hourlyOTHrs > 0 ? `加班 ${slip.hourlyOTHrs}h` : ''].filter(Boolean).map(t => `・含${t}`).join('')}` } : {})}
+                  {slip.mealAllowance > 0 && row('伙食津貼', slip.mealAllowance)}
+                  {slip.fullAttendanceBonus > 0 && row('全勤獎金', slip.fullAttendanceBonus)}
+                  {slip.activityAttendance > 0 && row('活動出勤', slip.activityAttendance)}
+                  {slip.holidayPremium > 0 && row('國定假日加給', slip.holidayPremium, { color:'#1a56a0' })}
+                  {slip.compCashout > 0 && row('補休季底折現', slip.compCashout, { color:'#1a56a0', sub: `Q${Math.ceil(pm / 3)} 未休補休` })}
+                  {slip.annualCashout > 0 && row('特休年底折現', slip.annualCashout, { color:'#1a56a0' })}
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0 4px', fontSize:'13px', fontWeight:'700' }}>
+                    <span>應發合計</span><span>NT${gross.toLocaleString()}</span>
+                  </div>
+                  <div style={{ fontSize:'11px', fontWeight:'700', color:'#8a3a20', margin:'12px 0 4px' }}>扣項</div>
+                  {deductRows.map(([k, label]) => slip[k] > 0 ? row(label, slip[k], { color:'#8a3a20', minus:true }) : null)}
+                  {!isHourly && row('缺時扣薪', slip.compDock || 0, { color: slip.compDock > 0 ? RED : E.textMuted, minus: slip.compDock > 0, sub: tm.dockHours > 0 ? `${tm.dockHours}h × 時薪 ${hrRate}` : '無' })}
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0 4px', fontSize:'13px', fontWeight:'700', color:'#8a3a20' }}>
+                    <span>扣項合計</span><span>－ NT${Number(slip.totalDeductions || 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{ backgroundColor:'#e8f0e4', borderRadius:'10px', padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'10px' }}>
+                    <span style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary }}>實領</span>
+                    <span style={{ fontSize:'20px', fontWeight:'800', color:E.green }}>NT${net.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
               {/* 薪資單記錄 */}
               {payrolls.filter(pr=>pr.slips.some(s=>s.empName===myName)).length > 0 && (
                 <div style={{ ...E.card, padding:0 }}>
