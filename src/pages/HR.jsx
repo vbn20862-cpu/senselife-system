@@ -1261,7 +1261,7 @@ export default function HR() {
         <Modal title="🎌 國定假日管理" onClose={() => setShowHolidayModal(false)} size="md">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ fontSize: '12px', color: E.textMuted, lineHeight: 1.5, backgroundColor: E.sandLight, padding: '8px 12px', borderRadius: '8px' }}>
-              已預載 2026 政府行事曆。農曆假日（春節/端午/中秋）日期請自行核對調整。國定假日當天出勤的工時，加班費以 <strong style={{ color: '#c0202a' }}>2 倍</strong> 計。
+              已預載 2026 政府行事曆。農曆假日（春節/端午/中秋）日期請自行核對調整。<strong style={{ color: '#c0202a' }}>月薪制：國定假日一律調移到其他天休</strong>，當天出勤照一般工作日計（不 ×2，2026/9/1 起）。時薪制國定假日出勤仍 ×2。
             </div>
             {/* 新增 */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>

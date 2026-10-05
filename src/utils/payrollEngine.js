@@ -531,6 +531,11 @@ export function annualLeavePayout(emp, year, data) {
 
 export const COMP_START = { year: 2026, month: 6 } // 補休新制起算
 
+// 月薪制國定假日：此日起不再 ×2（國定假日一律調移到其他天休），當一般工作日計
+//   工時照算正常工時、超過 8h 照平日加班費率、排班出勤沒來照計缺時
+export const HOLIDAY_AS_WORKDAY_FROM = '2026-09-01'
+const isDoubledHoliday = (dateStr, holidaySet) => holidaySet.has(dateStr) && dateStr < HOLIDAY_AS_WORKDAY_FROM
+
 const pad2 = (n) => String(n).padStart(2, '0')
 const round2 = (n) => Math.round(n * 100) / 100
 const nameMatch = (c, emp) => c.empName && (c.empName === emp.name || emp.name.includes(c.empName) || c.empName.includes(emp.name))
@@ -544,7 +549,7 @@ export function computeMonthNormalHours(emp, yr, mo, data, holidaySet) {
   const dates = [...new Set(recs.map(c => c.date))]
   let min = 0
   for (const date of dates) {
-    if (holidaySet.has(date)) continue // 國定假日工時歸補休，不計入正常工時
+    if (isDoubledHoliday(date, holidaySet)) continue // 舊制國定假日工時歸補休，不計入正常工時
     const { dayMin } = computeDayMinutes(recs.filter(c => c.date === date), date === todayStr)
     min += capNormalMin(dayMin) // 正常工時每日上限 8h
   }
@@ -570,7 +575,7 @@ export function computeMonthCompAccrual(emp, yr, mo, data, holidaySet) {
   for (const date of dates) {
     const dayRecs = recs.filter(c => c.date === date)
     const otMin = otMinByDate[date] || 0
-    if (holidaySet.has(date)) {
+    if (isDoubledHoliday(date, holidaySet)) {
       const { dayMin } = computeDayMinutes(dayRecs, false)
       const h = (capNormalMin(dayMin) + otMin) / 60 // 假日正常出勤上限 8h，超過要打加班卡
       hours += h; weighted += h * 2.0; lots['2'] += h
@@ -804,7 +809,7 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     const sh = SHIFT_H[sc.shift]
     if (!sh) continue
     const dateStr = `${yr}-${pad2(mo)}-${pad2(sc.day)}`
-    if (holidaySet.has(dateStr) || dateStr >= todayStr) continue // 今天與未來不算（尚未結束）
+    if (isDoubledHoliday(dateStr, holidaySet) || dateStr >= todayStr) continue // 今天與未來不算（尚未結束）
     const susp = suspensions[dateStr]
     const dayRecs = (data.clockins || []).filter(c => c.date === dateStr && nameMatch(c, emp))
     const hasIn = dayRecs.some(c => c.type === '上班')

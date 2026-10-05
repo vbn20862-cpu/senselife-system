@@ -89,6 +89,7 @@ export default function Finance() {
   const now = new Date()
   const [payrollMonth, setPayrollMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`)
   const [salaryEditEmp, setSalaryEditEmp] = useState(null)
+  const [payViewEmpId, setPayViewEmpId] = useState(null) // 管理員薪資頁：null=總覽
   // 統編發票
   const [showAddInv, setShowAddInv] = useState(false)
   const [editInv, setEditInv] = useState(null)
@@ -1622,15 +1623,8 @@ export default function Finance() {
           </div>
         )
 
-        // ── 員工視角 ──
-        if (!isAdmin) {
-          const myEmp = data.employees.find(e => e.name === myName || myName?.includes(e.name) || e.name?.includes(myName))
-          if (!myEmp) return (
-            <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-              {monthNav}
-              <div style={{ ...E.card, textAlign:'center', color:E.textMuted, padding:'40px', fontSize:'13px' }}>無法找到您的員工資料</div>
-            </div>
-          )
+        // ── 個人薪資畫面（員工看自己；管理員可點任一員工）──
+        const renderEmpPay = (myEmp) => {
           // 與管理員薪資頁同一套算法（buildDraftSlips），即時反映當月狀態
           const slip = buildDraftSlips(payrollMonth).find(s => s.empId === myEmp.id) || {}
           const payType = slip.payType || 'monthly'
@@ -1820,10 +1814,45 @@ export default function Finance() {
           )
         }
 
+        // ── 員工視角 ──
+        if (!isAdmin) {
+          const myEmp = data.employees.find(e => e.name === myName || myName?.includes(e.name) || e.name?.includes(myName))
+          if (!myEmp) return (
+            <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+              {monthNav}
+              <div style={{ ...E.card, textAlign:'center', color:E.textMuted, padding:'40px', fontSize:'13px' }}>無法找到您的員工資料</div>
+            </div>
+          )
+          return renderEmpPay(myEmp)
+        }
+
         // ── 管理員視角 ──
         const liveSlips = buildDraftSlips(payrollMonth)
+        const viewEmp = payViewEmpId != null ? data.employees.find(e => e.id === payViewEmpId) : null
+        const empPicker = (
+          <div style={{ display:'flex', gap:'6px', overflowX:'auto', paddingBottom:'2px', WebkitOverflowScrolling:'touch' }}>
+            {[{ id: null, name: '總覽' }, ...data.employees].map(e => {
+              const on = (e.id ?? null) === (viewEmp ? viewEmp.id : null)
+              const lv = e.id != null ? liveSlips.find(x => x.empId === e.id) : null
+              return (
+                <button key={e.id ?? 'all'} onClick={() => setPayViewEmpId(e.id)}
+                  style={{ flexShrink:0, padding:'7px 14px', borderRadius:'999px', fontSize:'13px', fontWeight: on ? '700' : '500', cursor:'pointer', whiteSpace:'nowrap',
+                    border: on ? '1px solid #3a6d31' : `1px solid ${E.divider}`, backgroundColor: on ? '#3a6d31' : '#fff', color: on ? '#fff' : E.textPrimary }}>
+                  {e.name}{lv && (lv.grossPay > 0 || lv.totalDeductions > 0) ? <span style={{ fontSize:'11px', opacity:0.8, marginLeft:'6px', color: on ? '#fff' : (lv.netPay < 0 ? '#c04030' : E.textMuted) }}>{Math.round(lv.netPay).toLocaleString()}</span> : null}
+                </button>
+              )
+            })}
+          </div>
+        )
+        if (viewEmp) return (
+          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+            {empPicker}
+            {renderEmpPay(viewEmp)}
+          </div>
+        )
         return (
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+            {empPicker}
             {/* 月份 */}
             <div style={{ display:'flex', gap:'8px', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap' }}>
               <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
@@ -1842,7 +1871,7 @@ export default function Finance() {
                   <div style={{ marginBottom:'12px' }}>
                     <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>🌊 補休 / 特休 / 季結總覽</h3>
                     <p style={{ fontSize:'12px', color:E.textMuted, margin:0 }}>
-                      加班打卡自動轉補休（國定假日 ×2）· 月缺口先扣補休、不足扣薪 · 季底（6/9/12月）未休折現。2026/6 起算。
+                      加班打卡自動轉補休（國定假日調移，照平日計）· 月缺口先扣補休、不足扣薪 · 季底（6/9/12月）未休折現。2026/6 起算。
                     </p>
                   </div>
                   <div style={{ overflowX:'auto' }}>
@@ -1906,7 +1935,7 @@ export default function Finance() {
                   return (
                     <div key={emp.id} style={{ padding:'14px 0', borderBottom: i < data.employees.length-1 ? `1px solid ${E.divider}` : 'none' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
-                        <div style={{ width:'76px', fontWeight:'700', fontSize:'13px', color:E.textPrimary, flexShrink:0 }}>{emp.name}</div>
+                        <div onClick={() => setPayViewEmpId(emp.id)} title="看個人薪資畫面" style={{ width:'76px', fontWeight:'700', fontSize:'13px', color:E.textPrimary, flexShrink:0, cursor:'pointer', textDecoration:'underline', textDecorationColor:E.divider, textUnderlineOffset:'3px' }}>{emp.name}</div>
                         <select value={payType} onChange={e => updateSalarySettingFor(emp, { payType: e.target.value })}
                           style={{ ...E.input, width:'72px', padding:'6px 8px', fontSize:'12px', flexShrink:0 }}>
                           <option value="monthly">月薪</option>
@@ -1953,7 +1982,7 @@ export default function Finance() {
             <div style={{ ...E.card }}>
               <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>補休 / 加班費明細</h3>
               <p style={{ fontSize:'12px', color:E.textMuted, margin:'0 0 16px', lineHeight:1.5 }}>
-                加班(超過8h部分)自動轉補休：平日前2h×1.34、超過×1.67、國定假日×2。員工可請補休休假，季底(6/9/12月)未休依各費率折現成加班費。
+                加班(超過8h部分)自動轉補休：平日前2h×1.34、超過×1.67；國定假日調移到其他天休，當天照平日計（2026/9/1 起，之前 ×2）。員工可請補休休假，季底(6/9/12月)未休依各費率折現成加班費。
               </p>
               {data.employees.map((emp, i) => {
                 const ledger = computeCompLedger(emp, data, { year: py, month: pm })
