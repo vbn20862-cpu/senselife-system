@@ -1871,7 +1871,7 @@ export default function Finance() {
                   <div style={{ marginBottom:'12px' }}>
                     <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>🌊 補休 / 特休 / 季結總覽</h3>
                     <p style={{ fontSize:'12px', color:E.textMuted, margin:0 }}>
-                      加班打卡自動轉補休（國定假日調移，照平日計）· 月缺口先扣補休、不足扣薪 · 季底（6/9/12月）未休折現。2026/6 起算。
+                      加班打卡自動轉補休 · 月缺口先扣補休、不足扣薪 · 季底（6/9/12月）未休折現。2026/6 起算。
                     </p>
                   </div>
                   <div style={{ overflowX:'auto' }}>
@@ -1982,7 +1982,7 @@ export default function Finance() {
             <div style={{ ...E.card }}>
               <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>補休 / 加班費明細</h3>
               <p style={{ fontSize:'12px', color:E.textMuted, margin:'0 0 16px', lineHeight:1.5 }}>
-                加班(超過8h部分)自動轉補休：平日前2h×1.34、超過×1.67；國定假日調移到其他天休，當天照平日計（2026/9/1 起，之前 ×2）。員工可請補休休假，季底(6/9/12月)未休依各費率折現成加班費。
+                加班(超過8h部分)自動轉補休：平日前2h×1.34、超過×1.67。員工可請補休休假，季底(6/9/12月)未休依各費率折現成加班費。
               </p>
               {data.employees.map((emp, i) => {
                 const ledger = computeCompLedger(emp, data, { year: py, month: pm })
