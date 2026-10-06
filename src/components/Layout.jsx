@@ -5,6 +5,7 @@ import logo from '../assets/logo.jpeg'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { useFirebaseConnection } from '../context/AppContext'
+import { APP_VERSION } from '../version'
 
 const NAV_MAIN = [
   { to: '/',           icon: LayoutDashboard, label: '儀表板' },
@@ -288,6 +289,11 @@ export default function Layout({ children }) {
         <main className="flex-1 overflow-y-auto p-4 md:p-6" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
           {children}
         </main>
+      </div>
+
+      {/* 版本號 */}
+      <div style={{ position: 'fixed', right: '8px', bottom: 'calc(4px + env(safe-area-inset-bottom))', fontSize: '10px', color: '#a89880', opacity: 0.8, pointerEvents: 'none', zIndex: 5, letterSpacing: '0.04em' }}>
+        {APP_VERSION}
       </div>
 
       {/* 回報 Modal */}
