@@ -4,14 +4,9 @@ import { useAuth } from '../context/AuthContext'
 import { E, useIsMobile } from '../styles/earth'
 import Modal from '../components/Modal'
 import { Plus, Check, X, Trash2, Clock } from 'lucide-react'
-import { LEAVE_TYPES, leaveTypeCat, annualLeaveStatus, computeCompLedger, sickLeaveCap } from '../utils/payrollEngine'
+import { LEAVE_TYPES, annualLeaveStatus, computeCompLedger, sickLeaveCap } from '../utils/payrollEngine'
 import { localTimestamp } from '../utils/salaryCalc'
 
-const CAT_STYLE = {
-  paid:   { label: '全薪', bg: '#e4f0e8', color: '#2e6040' },
-  half:   { label: '半薪', bg: '#fdf5e0', color: '#a07020' },
-  unpaid: { label: '無薪', bg: '#f5e8e0', color: '#8a3a20' },
-}
 const STATUS_STYLE = {
   '待審核': { bg: '#fef3cd', color: '#8a6d1a' },
   '已核准': { bg: '#e4f0e8', color: '#2e6040' },
@@ -109,7 +104,6 @@ export default function Leave() {
     })
   }
 
-  const curCat = leaveTypeCat(form.type)
 
   // 病假／事假超過年度上限：仍可請，超過部分無薪 → 送出前提示
   const capNotice = (() => {
@@ -124,7 +118,7 @@ export default function Leave() {
     const over = used + days - cap
     const base = `${yr} 年${form.type}已請 ${used} 天（含待審核），上限 ${cap} 天`
     if (over <= 0) return { warn: false, text: `${base}，這次請完剩 ${cap - used - days} 天。` }
-    return { warn: true, text: `${base}。這次請完會超過 ${Math.min(over, days)} 天${form.type === '病假' ? '，超過的部分改為無薪' : '（事假本來就無薪）'}，仍可送出。` }
+    return { warn: true, text: `${base}。這次請完會超過 ${Math.min(over, days)} 天，仍可送出。` }
   })()
 
   return (
@@ -166,7 +160,7 @@ export default function Leave() {
 
       <div style={{ fontSize: '12px', color: E.textMuted, backgroundColor: '#f8f2e8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #ede5d8', lineHeight: 1.5 }}>
         <Clock size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} />
-        請假需於<strong>事實發生前 1 小時</strong>提出。全薪假不扣薪、病假扣半薪、事假無薪照缺扣。核准後自動連動薪資計算。
+        請假需於<strong>事實發生前 1 小時</strong>提出。核准後自動連動薪資計算。
       </div>
 
       {/* 請假清單 */}
@@ -175,7 +169,6 @@ export default function Leave() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {leaves.map(l => {
-            const cat = CAT_STYLE[leaveTypeCat(l.type)] || CAT_STYLE.paid
             const st = STATUS_STYLE[l.status] || STATUS_STYLE['待審核']
             return (
               <div key={l.id} style={{ ...E.card, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -183,7 +176,6 @@ export default function Leave() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {isAdmin && <span style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary }}>{l.empName}</span>}
                     <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>{l.type}</span>
-                    <span style={{ fontSize: '10px', padding: '1px 8px', borderRadius: '999px', backgroundColor: cat.bg, color: cat.color, fontWeight: '600' }}>{cat.label}</span>
                     <span style={{ fontSize: '10px', padding: '1px 8px', borderRadius: '999px', backgroundColor: st.bg, color: st.color, fontWeight: '600' }}>{l.status || '待審核'}</span>
                   </div>
                   <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '4px' }}>
@@ -221,9 +213,8 @@ export default function Leave() {
             )}
             <Field label="假別 *">
               <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))} style={E.input}>
-                {LEAVE_TYPES.map(t => <option key={t.type} value={t.type}>{t.type}（{CAT_STYLE[t.cat].label}）</option>)}
+                {LEAVE_TYPES.map(t => <option key={t.type} value={t.type}>{t.type}</option>)}
               </select>
-              <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '4px' }}>{LEAVE_TYPES.find(t => t.type === form.type)?.desc}</div>
             </Field>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: E.textSecond, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.halfDay} onChange={e => setForm(p => ({ ...p, halfDay: e.target.checked }))} />

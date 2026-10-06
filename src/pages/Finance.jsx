@@ -1650,10 +1650,6 @@ export default function Finance() {
           // 本月請假
           const leaves = leavesInMonth(myEmp, py, pm, data)
           const yearUsed = type => (data.leaveRequests || []).filter(l => l && l.empId === myEmp.id && l.type === type && (!l.status || l.status === '已核准') && (l.startDate || l.date || '').startsWith(String(py))).reduce((s, l) => s + Number(l.days || 0), 0)
-          const leaveOnShift = l => {
-            const s0 = l.startDate || l.date, e0 = l.endDate || s0
-            return (data.schedules || []).some(sc => sc && sc.empId === myEmp.id && sc.year === py && sc.month === pm && ['出勤', 'W', '上午班', '下午班'].includes(sc.shift) && (() => { const ds = `${payrollMonth}-${String(sc.day).padStart(2, '0')}`; return ds >= s0 && ds <= e0 })())
-          }
           const sickMap = sickLeaveFactorMap(myEmp, py, data)
           const sickOver = l => {
             if (l.type !== '病假' || (l.status && l.status !== '已核准')) return null
@@ -1663,17 +1659,12 @@ export default function Finance() {
             return fs.every(f => f === 0) ? 'all' : 'part'
           }
           const leaveEffect = l => {
-            if (l.status === '已駁回') return ['已駁回，不計', E.textMuted]
-            if (l.status === '待審核') return ['待審核，核准後才計入', AMBER]
-            const over = sickOver(l)
-            if (over) return [over === 'all' ? `超過病假上限・無薪${isHourly ? '・不計時數' : '・計入缺時'}` : `部分超過病假上限・超過的無薪`, RED]
-            if (isHourly) return [l.cat === 'paid' ? `全薪・計 ${l.daysInMonth * 8}h` : l.cat === 'half' ? `半薪・計 ${l.daysInMonth * 4}h` : '無薪・不計時數', l.cat === 'unpaid' ? RED : l.cat === 'half' ? AMBER : E.green]
-            if (l.type === '特休') return ['全薪・扣特休額度', E.green]
-            if (l.type === '補休') return [`全薪・扣補休 ${l.daysInMonth * 8}h`, E.green]
-            if (l.cat !== 'paid' && !leaveOnShift(l)) return ['當天排休，不影響薪資', E.textMuted]
-            if (l.cat === 'half') return ['半薪・少的一半計入缺時', AMBER]
-            if (l.cat === 'unpaid') return ['無薪・計入缺時', RED]
-            return ['全薪', E.green]
+            if (l.status === '已駁回') return ['已駁回', E.textMuted]
+            if (l.status === '待審核') return ['待審核', AMBER]
+            if (sickOver(l)) return ['超過病假上限', RED]
+            if (l.type === '特休') return ['扣特休額度', E.textMuted]
+            if (l.type === '補休') return [`扣補休 ${l.daysInMonth * 8}h`, E.textMuted]
+            return ['', E.textMuted]
           }
 
           const timeItems = [
@@ -1771,8 +1762,8 @@ export default function Finance() {
                   {[
                     [`特休剩餘（${py}）`, myEmp.hireDate ? `${al.remainingDays} 天` : '未設到職日', E.green, myEmp.hireDate ? `額度 ${al.entitledDays} 天・已用 ${al.usedDays} 天` : ''],
                     ['補休餘額', isHourly ? '—' : `${tm.balHours ?? 0}h`, E.coffee, isHourly ? '' : '季底（3/6/9/12月）未休折現'],
-                    [`病假（${py}）`, `${yearUsed('病假')} / ${sickLeaveCap(py)} 天`, yearUsed('病假') > sickLeaveCap(py) ? RED : E.textPrimary, `${sickLeaveCap(py)} 天內半薪，超過無薪${py === 2026 ? '（系統9月上線）' : ''}`],
-                    [`事假（${py}）`, `${yearUsed('事假')} / 14 天`, yearUsed('事假') > 14 ? RED : E.textPrimary, '無薪，超過仍可請'],
+                    [`病假（${py}）`, `${yearUsed('病假')} / ${sickLeaveCap(py)} 天`, yearUsed('病假') > sickLeaveCap(py) ? RED : E.textPrimary, ''],
+                    [`事假（${py}）`, `${yearUsed('事假')} / 14 天`, yearUsed('事假') > 14 ? RED : E.textPrimary, ''],
                   ].map(([label, value, color, sub]) => (
                     <div key={label} style={{ backgroundColor:'#f5f0e8', borderRadius:'8px', padding:'8px 10px' }}>
                       <div style={{ fontSize:'11px', color:E.textMuted }}>{label}</div>
