@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import { E, useIsMobile } from '../styles/earth'
 import { exportHR } from '../utils/exportExcel'
 import { downloadCsv } from '../utils/exportCsv'
-import { MONTHS, GOVT_WORK_DAYS, roundHours, resolveEmpName, computeEmpMonthClockHours, computeAllTimeEarned, computeDayMinutes, computeOTSpans, capNormalMin } from '../utils/salaryCalc'
+import { MONTHS, GOVT_WORK_DAYS, roundHours, resolveEmpName, computeEmpMonthClockHours, computeAllTimeEarned, computeDayMinutes, computeOTSpans, normalDayMinutes } from '../utils/salaryCalc'
 import { mapLink } from '../utils/geo'
 import { holidaysInMonth, holidayOn, getHolidays, DEFAULT_HOLIDAYS } from '../utils/holidays'
 import { annualLeaveStatus } from '../utils/payrollEngine'
@@ -378,9 +378,8 @@ export default function HR() {
 
       allDates.forEach(date => {
         const dayRecs = myClockins.filter(c => c.date === date)
-        const { dayMin: baseDayMin } = computeDayMinutes(dayRecs, false)
         const cl = compLeaveForMonth.find(r => r.date === date)
-        const dayMin = capNormalMin(baseDayMin) + (cl ? Number(cl.hours) * 60 : 0) // 正常工時上限 8h
+        const dayMin = normalDayMinutes(dayRecs, date, data) + (cl ? Number(cl.hours) * 60 : 0) // 正常工時上限 8h（活動日照登打全算）
         totalHours += roundHours(dayMin)
       })
       // 加班用跨日 span 總和（避免同日配對漏掉跨午夜段）
@@ -806,8 +805,8 @@ export default function HR() {
             const isScheduledWork = scheduledWorkDates.includes(date)
 
             // 用共用 helper 算工時（含跨午夜、多段班、午休扣除）；正常工時每日上限 8h
-            const { dayMin: rawDayMin, isOngoing, pairCount } = computeDayMinutes(dayRecs, date === todayStr)
-            const baseDayMin = capNormalMin(rawDayMin)
+            const { isOngoing, pairCount } = computeDayMinutes(dayRecs, date === todayStr)
+            const baseDayMin = normalDayMinutes(dayRecs, date, data, date === todayStr) // 活動日照登打全算
             let dayMin = baseDayMin
             // 該日的加班 span（開始於這天，可能跨到隔天）
             const daySpans = otSpansByStart[date] || []

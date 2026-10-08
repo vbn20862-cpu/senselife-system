@@ -1,2 +1,2 @@
 // 版本號 V年.大版.小版：小更新小改動 → 小版+1（01→02）；大改動 → 大版+1（07→08）、小版歸 01；跨年 → 年份更新
-export const APP_VERSION = 'V26.07.02'
+export const APP_VERSION = 'V26.07.03'

@@ -77,7 +77,20 @@ export function breakMinutesFor(continuousMin) {
 // 配對某日的上班/下班並計算總工時（分鐘）
 // 支援：多段班（早班+晚班）、跨午夜（下班 < 上班 自動 +24h）、進行中（最後上班沒下班且為今天）
 // 休息扣除：每個 in→out 區段各自套 breakMinutesFor（勞基法第 35 條）
-export function computeDayMinutes(dayRecs, isToday = false) {
+// 活動日（排班表「活動備註」有填，由管理員統一登打）：2026/9/1 起照登打時間全算——
+//   不扣休息、不設每日 8h 上限；超過 8h 仍算正常工時（不轉補休／加班）
+export const ACTIVITY_RAW_FROM = '2026-09-01'
+export function isActivityDay(date, data) {
+  return !!date && date >= ACTIVITY_RAW_FROM && !!String((data?.scheduleNotes || {})[date] || '').trim()
+}
+// 某日正常工時（分鐘）：一般日扣休息＋上限 8h；活動日照登打時間全算
+export function normalDayMinutes(dayRecs, date, data, isToday = false) {
+  const raw = isActivityDay(date, data)
+  const { dayMin } = computeDayMinutes(dayRecs, isToday, { noBreak: raw })
+  return raw ? dayMin : capNormalMin(dayMin)
+}
+
+export function computeDayMinutes(dayRecs, isToday = false, opts = {}) {
   const ins  = dayRecs.filter(c => c.type === '上班').sort((a,b) => (a.time||'').localeCompare(b.time||''))
   const outs = dayRecs.filter(c => c.type === '下班').sort((a,b) => (a.time||'').localeCompare(b.time||''))
   let dayMin = 0
@@ -91,7 +104,7 @@ export function computeDayMinutes(dayRecs, isToday = false) {
     let outMin = outMinRaw
     if (outMin < inMin) outMin += 24 * 60  // 跨午夜
     const segMin = outMin - inMin
-    dayMin += Math.max(0, segMin - breakMinutesFor(segMin))
+    dayMin += Math.max(0, segMin - (opts.noBreak ? 0 : breakMinutesFor(segMin)))
   }
 
   // 上班比下班多一筆 + 今天 = 進行中（用現在時間補末筆）
@@ -199,9 +212,8 @@ export function computeEmpMonthClockHours(emp, yr, mo, data) {
   let totalHours = 0
   for (const date of allDates) {
     const dayRecs = myClockins.filter(c => c.date === date)
-    const { dayMin } = computeDayMinutes(dayRecs, date === todayStr)
-    // 正常工時每日上限 8h，超過要打加班卡才算
-    totalHours += roundHours(capNormalMin(dayMin))
+    // 正常工時每日上限 8h，超過要打加班卡才算（活動日照登打時間全算）
+    totalHours += roundHours(normalDayMinutes(dayRecs, date, data, date === todayStr))
     totalHours += roundHours(otMinByDate[date] || 0)
   }
   return totalHours

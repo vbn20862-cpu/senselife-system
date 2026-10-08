@@ -5,7 +5,7 @@
 // 設計原則：寧可多給、不可少給；寧可少扣、不可溢扣。
 // 加班費：小數無條件進位。遲到早退：金額無條件捨去。
 
-import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin } from './salaryCalc'
+import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin, normalDayMinutes } from './salaryCalc'
 import { getHolidays } from './holidays'
 
 // ── 2025–2026 國定假日（勞基法第 37 條認定）──
@@ -550,8 +550,7 @@ export function computeMonthNormalHours(emp, yr, mo, data, holidaySet) {
   let min = 0
   for (const date of dates) {
     if (isDoubledHoliday(date, holidaySet)) continue // 舊制國定假日工時歸補休，不計入正常工時
-    const { dayMin } = computeDayMinutes(recs.filter(c => c.date === date), date === todayStr)
-    min += capNormalMin(dayMin) // 正常工時每日上限 8h
+    min += normalDayMinutes(recs.filter(c => c.date === date), date, data, date === todayStr) // 正常工時每日上限 8h（活動日照登打全算）
   }
   return round2(min / 60)
 }
@@ -623,8 +622,7 @@ export function computeHourlyHolidayPremium(emp, yr, mo, data, rate) {
   let holHours = 0
   for (const date of dates) {
     const dayRecs = recs.filter(c => c.date === date)
-    const { dayMin } = computeDayMinutes(dayRecs, false)
-    holHours += (capNormalMin(dayMin) + (otMinByDate[date] || 0)) / 60 // 正常出勤上限 8h
+    holHours += (normalDayMinutes(dayRecs, date, data) + (otMinByDate[date] || 0)) / 60 // 正常出勤上限 8h（活動日照登打全算）
   }
   holHours = round2(holHours)
   return { hours: holHours, amount: Math.round(holHours * rate) }
@@ -819,7 +817,7 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     // 有上班沒下班 = 忘打卡，待補登：不計缺時、不算曠職（等補登）
     if (hasIn && !hasOut && !onLeave) { missingPunchDays++; missingPunchDates.push(dateStr); continue }
     scheduledH += sh
-    const workedMin = capNormalMin(computeDayMinutes(dayRecs, false).dayMin)
+    const workedMin = normalDayMinutes(dayRecs, dateStr, data)
     const fulfilledMin = workedMin + leaveH * 60
     let dMin = Math.max(0, sh * 60 - fulfilledMin)
     // 部分停班日：只要當日未做滿全班，停班時段整塊無薪（多留的零頭不抵扣；
