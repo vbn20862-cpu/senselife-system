@@ -21,6 +21,7 @@ export default function Checkin() {
   // 定位狀態：idle | locating | ready | denied | unavailable
   const [geoStatus, setGeoStatus] = useState('idle')
   const [geo, setGeo] = useState(null)  // { lat, lng, accuracy, address }
+  const [geoRetry, setGeoRetry] = useState(0)
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
@@ -47,7 +48,7 @@ export default function Checkin() {
         setGeoStatus(err.code === 'denied' ? 'denied' : 'unavailable')
       })
     return () => { cancelled = true }
-  }, [selectedEmp])
+  }, [selectedEmp, geoRetry])
 
   // 用「本地時區」日期，避免 toISOString() 以 UTC 計算造成早上 8 點前打卡被記成前一天
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -74,9 +75,13 @@ export default function Checkin() {
     updateItem('dispatches', d.id, { status, ...(status === '已完成' ? { completedAt: localTimestamp() } : {}) })
   }
 
+  const hasGeo = geoStatus === 'ready' && geo && Number.isFinite(geo.lat) && Number.isFinite(geo.lng)
+
   function handlePunch(type) {
     const emp = data.employees.find(e => e.id === Number(selectedEmp))
     if (!emp) return
+    // 打卡一定要有定位（管理員補登走打卡後台，不受此限）
+    if (!hasGeo) return
     const t = now.toTimeString().slice(0, 5)
     const rec = {
       id: Date.now(),
@@ -86,15 +91,12 @@ export default function Checkin() {
       time: t,
       type,
     }
-    // 有定位才寫入位置欄位（避免存 undefined 到 Firebase）
-    if (geo && Number.isFinite(geo.lat) && Number.isFinite(geo.lng)) {
-      rec.lat = geo.lat
-      rec.lng = geo.lng
-      rec.accuracy = geo.accuracy
-      if (geo.address) rec.address = geo.address
-    }
+    rec.lat = geo.lat
+    rec.lng = geo.lng
+    rec.accuracy = geo.accuracy
+    if (geo.address) rec.address = geo.address
     addItem('clockins', rec)
-    setLastPunch({ type, time: t, located: !!(geo && geo.lat) })
+    setLastPunch({ type, time: t, located: true })
     setTimeout(() => setLastPunch(null), 3000)
   }
 
@@ -103,8 +105,8 @@ export default function Checkin() {
     idle:        null,
     locating:    { icon: '🔍', text: '定位中…', color: '#9a8070' },
     ready:       { icon: '📍', text: geo?.address ? geo.address : `已取得位置（誤差約 ${geo?.accuracy ?? '?'} 公尺）`, color: '#3a6d31' },
-    denied:      { icon: '⚠️', text: '未提供位置權限（仍可打卡）', color: '#b45309' },
-    unavailable: { icon: '⚠️', text: '無法定位（仍可打卡）', color: '#b45309' },
+    denied:      { icon: '⛔', text: '未開啟定位權限，無法打卡。請到手機設定允許瀏覽器使用位置，再按「重新定位」。', color: '#b42318' },
+    unavailable: { icon: '⛔', text: '抓不到位置，無法打卡。請確認手機定位已開啟，再按「重新定位」。', color: '#b42318' },
   }[geoStatus]
 
   return (
@@ -162,6 +164,9 @@ export default function Checkin() {
           }}>
             <span style={{ fontSize: '14px' }}>{geoHint.icon}</span>
             <span style={{ fontSize: '12px', color: geoHint.color, fontWeight: '500', lineHeight: 1.4, flex: 1 }}>{geoHint.text}</span>
+            {(geoStatus === 'denied' || geoStatus === 'unavailable') && (
+              <button onClick={() => setGeoRetry(n => n + 1)} style={{ flexShrink: 0, border: '1px solid #b42318', background: '#fff', color: '#b42318', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>重新定位</button>
+            )}
           </div>
         )}
 
@@ -183,14 +188,14 @@ export default function Checkin() {
         {/* 打卡類型按鈕 */}
         {selectedEmp && !isActivityDay && (
           <>
-            <div style={{ fontSize: '12px', color: '#7a6050', fontWeight: '600' }}>選擇打卡類型</div>
+            <div style={{ fontSize: '12px', color: '#7a6050', fontWeight: '600' }}>選擇打卡類型{!hasGeo && <span style={{ fontWeight: '400', color: '#9a8070' }}>（取得定位後才能打卡）</span>}</div>
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               {PUNCH_TYPES.map(({ type, emoji, color, bg, desc }) => (
-                <button key={type} onClick={() => handlePunch(type)} style={{
+                <button key={type} onClick={() => handlePunch(type)} disabled={!hasGeo} style={{
                   backgroundColor: bg, border: `2px solid ${color}20`,
                   borderRadius: '14px', padding: '16px 10px',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  cursor: 'pointer', transition: 'all 0.15s',
+                  cursor: hasGeo ? 'pointer' : 'not-allowed', opacity: hasGeo ? 1 : 0.4, transition: 'all 0.15s',
                 }}>
                   <span style={{ fontSize: '28px' }}>{emoji}</span>
                   <span style={{ fontSize: '15px', fontWeight: '700', color }}>{type}</span>
