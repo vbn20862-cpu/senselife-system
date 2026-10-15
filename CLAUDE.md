@@ -56,8 +56,8 @@
 - 特休按日曆天扣（含排休日），阿慶確認正確，勿改
 - **不再產生月底薪資單**（2026-09 拔除）：員工頁與管理員頁的實領都是 `buildDraftSlips` 即時計算，勿另寫一套；
   舊的 `/appData/payrolls` 歷史資料保留在資料庫、僅 Excel 匯出會帶出
-- **薪資明細流程**：每月 5 號雲端例行任務（claude.ai routine `trig_01FXzMBAgk7BPWFwKSAzoYqH`）跑
-  `node ops/monthly-statements.mjs --upload` → 草稿存 `/payDrafts/<empId>/<YYYY-MM>`（只有管理員看得到）→
+- **薪資明細流程**：每月 5 號 Netlify 排程函式 `netlify/functions/monthly-drafts.mjs`（與手動版
+  `node ops/monthly-statements.mjs [YYYY-MM] --upload` 共用 `ops/lib/statements-core.mjs`）→ 草稿存 `/payDrafts/<empId>/<YYYY-MM>`（只有管理員看得到）→
   阿慶在薪資頁審核按「審核通過，發布」→ 存 `/payStatements/…`，員工點開確認；人工調整後用
   `node ops/publish-statement.mjs <姓名> <YYYY-MM> <html> --net=<實領>` 發布
 - **員工確認才入帳**：員工按「我已確認」時，實領自動記一筆 Admin_sl／人事／人事費用 支出，日期＝次月 16 日（發薪日）

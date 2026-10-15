@@ -6,6 +6,10 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# 排程函式（netlify/functions/）：monthly-drafts 每月 5 號產生薪資明細草稿；用 esbuild 打包以解析 src/utils 的無副檔名 import
+[functions]
+  node_bundler = "esbuild"
+
 # SPA fallback：所有路徑交給 React Router
 [[redirects]]
   from = "/*"
