@@ -78,6 +78,8 @@ export default function Finance() {
   // 人事類（薪資、工讀、臨時人員）僅管理員可見，其餘帳目員工都看得到以協助作帳
   const isSalaryEntry = (e) => ['人事', '薪'].some(w => (String(e.category || '') + String(e.account || '')).includes(w))
   const canSeeExpense = (e) => isAdmin || !isSalaryEntry(e)
+  // 發票號比對鍵：忽略 -、空白、大小寫；少於 6 碼（領據、收據這類文字）不比對
+  const normNo = (s) => { const n = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return n.length >= 6 ? n : '' }
   const isComplete = (e) => !!(e.project && e.project !== '待歸類' && e.category && ((e.receiptNo || '').trim() || e.noReceipt) && e.vendor && e.date)
   const EMPTY_EXP = { date: '', direction: '支出', project: '', category: '', amount: '', vendor: '', method: '現金', receiptNo: '', noReceipt: false, noReceiptNote: '', note: '', linkedSerial: '' }
   const [newExp, setNewExp] = useState(EMPTY_EXP)
@@ -678,6 +680,59 @@ export default function Finance() {
               這些是<strong>公司的錢，不算在你身上、也不會還給你</strong>；自己先墊錢要請款請走「<strong>代墊申請</strong>」分頁。
             </div>
           )}
+          {/* 重複帳檢查（管理員）：同發票號（忽略 -、空白、大小寫）＋同金額；另列編號撞號 */}
+          {isAdmin && (() => {
+            const exps = (data.expenses || []).filter(Boolean)
+            const idCount = exps.reduce((m, e) => (m[e.id] = (m[e.id] || 0) + 1, m), {})
+            const dupIds = Object.keys(idCount).filter(k => idCount[k] > 1)
+            const groups = Object.values(exps.reduce((m, e) => {
+              const n = normNo(e.receiptNo); if (!n) return m
+              const k = `${n}|${Number(e.amount)}`; (m[k] = m[k] || []).push(e); return m
+            }, {})).filter(g => g.length > 1).sort((a, b) => (b[0].date || '').localeCompare(a[0].date || ''))
+            if (!groups.length && !dupIds.length) return null
+            const tag = (t, c, bg) => <span style={{ fontSize: '10px', fontWeight: '700', color: c, backgroundColor: bg, borderRadius: '999px', padding: '1px 7px', whiteSpace: 'nowrap' }}>{t}</span>
+            return (
+              <details style={{ ...E.card, border: '1px solid #e8b0a0', backgroundColor: '#fffaf8' }}>
+                <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '800', color: '#a03020' }}>
+                  🔍 重複帳檢查：疑似重複 {groups.length} 組{dupIds.length ? `・編號撞號 ${dupIds.length} 組` : ''}（點開檢視）
+                </summary>
+                <div style={{ fontSize: '11px', color: E.textMuted, margin: '8px 0', lineHeight: 1.6 }}>
+                  同一張發票（忽略 -、空白、大小寫）且同金額的帳。代墊送出時已自動入帳，<b>保留「代墊自動」那筆，刪手動重記的</b>。兩筆都是代墊自動＝代墊申請了兩次，請到「代墊申請」處理。編號撞號的帳要先重新編號才能刪（刪一筆會連另一筆一起刪）。
+                </div>
+                {dupIds.length > 0 && (
+                  <div style={{ fontSize: '12px', color: '#a03020', backgroundColor: '#fde8e4', borderRadius: '8px', padding: '6px 10px', marginBottom: '8px' }}>
+                    ⚠ 編號撞號：{dupIds.map(id => `${id}（${exps.filter(e => e.id === id).map(e => e.vendor).join(' / ')}）`).join('、')}
+                  </div>
+                )}
+                {groups.map((g, gi) => (
+                  <div key={gi} style={{ borderTop: `1px solid ${E.divider}`, padding: '8px 0' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: E.textPrimary, marginBottom: '4px' }}>
+                      發票 {normNo(g[0].receiptNo)}・NT${Number(g[0].amount).toLocaleString()}
+                      {g.every(e => e.linkedReimbursementId) && <span style={{ marginLeft: '6px' }}>{tag('代墊重複申請？', '#8a6d1a', '#fef3cd')}</span>}
+                    </div>
+                    {g.map((e, i) => {
+                      const auto = !!e.linkedReimbursementId, idDup = idCount[e.id] > 1
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '4px 0', flexWrap: 'wrap' }}>
+                          {auto ? tag('代墊自動', '#3a6d31', '#e8f0e4') : tag('手動', '#7a5c10', '#fef6dc')}
+                          <span style={{ color: E.textSecond }}>{e.date}</span>
+                          <span style={{ fontWeight: '600' }}>{e.vendor}</span>
+                          <span style={{ color: E.textMuted }}>{e.project}・{e.category}・{e.serialNo}・{e.id}{e.createdBy ? `・${e.createdBy}` : ''}</span>
+                          {idDup && tag('編號撞號', '#a03020', '#fde8e4')}
+                          <span style={{ marginLeft: 'auto' }}>
+                            {auto ? <span style={{ fontSize: '11px', color: E.textMuted }}>保留</span>
+                              : <button disabled={idDup} title={idDup ? '編號撞號，先重新編號才能刪' : ''}
+                                  onClick={() => { if (window.confirm(`刪除這筆重複帳？\n${e.date}｜${e.vendor}｜NT$${Number(e.amount).toLocaleString()}｜${e.serialNo}`)) { deleteItem('expenses', e.id); logEdit({ user: currentUser?.name || '管理員', action: '刪除', entityType: '帳目', entityName: e.vendor, summary: `重複帳 ${e.serialNo} NT$${Number(e.amount).toLocaleString()}` }) } }}
+                                  style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', border: '1px solid #e0b8a8', background: idDup ? '#f3eeea' : '#fff', color: idDup ? E.textMuted : '#a03020', cursor: idDup ? 'not-allowed' : 'pointer' }}>刪除這筆</button>}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </details>
+            )
+          })()}
           {/* 待歸類清單：案件未定 或 代墊未還款（還款才轉正入預算）*/}
           {(() => {
             const missing = (e) => [
@@ -1271,10 +1326,10 @@ export default function Finance() {
             if (!newR.category) { setFormError('請選擇支出類別'); return }
             {
               // 發票號查重：帳目＋代墊都比對，重複直接擋下不給提報
-              const no = (newR.receiptNo || '').trim()
+              const no = normNo(newR.receiptNo)
               if (no) {
-                const dup = [...(data.expenses || []), ...(data.reimbursements || [])].find(x => (x.receiptNo || '').trim() === no)
-                if (dup) { setFormError(`⛔ 發票號碼 ${no} 已被提報過（${dup.person || dup.vendor || ''}｜${dup.date}｜NT$${Number(dup.amount).toLocaleString()}），重複的帳不能提報`); return }
+                const dup = [...(data.expenses || []), ...(data.reimbursements || [])].find(x => normNo(x.receiptNo) === no)
+                if (dup) { setFormError(`⛔ 發票號碼 ${(newR.receiptNo || '').trim()} 已被提報過（${dup.person || dup.vendor || ''}｜${dup.date}｜NT$${Number(dup.amount).toLocaleString()}），重複的帳不能提報`); return }
               }
             }
             setFormError('')
@@ -2147,10 +2202,10 @@ export default function Finance() {
             )}
             {/* 查重：發票號撞號（帳目＋代墊）紅警；同日期＋同金額 黃警 */}
             {(() => {
-              const no = (newExp.receiptNo || '').trim()
+              const no = normNo(newExp.receiptNo)
               const exact = no ? [
-                ...(data.expenses || []).filter(x => (x.receiptNo || '').trim() === no).map(x => ({ src: '帳目', who: x.vendor, date: x.date, amt: x.amount, sn: x.serialNo })),
-                ...(data.reimbursements || []).filter(x => (x.receiptNo || '').trim() === no).map(x => ({ src: '代墊', who: x.person, date: x.date, amt: x.amount, sn: x.serialNo })),
+                ...(data.expenses || []).filter(x => normNo(x.receiptNo) === no).map(x => ({ src: x.linkedReimbursementId ? '帳目（代墊已自動入帳）' : '帳目', who: x.vendor, date: x.date, amt: x.amount, sn: x.serialNo })),
+                ...(data.reimbursements || []).filter(x => normNo(x.receiptNo) === no).map(x => ({ src: `代墊（${x.person} 送出時已自動入帳，不用再記）`, who: x.vendor || x.person, date: x.date, amt: x.amount, sn: x.serialNo })),
               ] : []
               const fuzzy = (!exact.length && newExp.date && newExp.amount) ? [
                 ...(data.expenses || []).filter(x => x.date === newExp.date && Number(x.amount) === Number(newExp.amount)).map(x => ({ src: '帳目', who: x.vendor, date: x.date, amt: x.amount, sn: x.serialNo })),
@@ -2172,11 +2227,14 @@ export default function Finance() {
             <button
               onClick={() => {
                 if (!newExp.date || !newExp.vendor || !newExp.amount) return
-                const no = (newExp.receiptNo || '').trim()
-                const hasExactDup = no && [...(data.expenses || []), ...(data.reimbursements || [])].some(x => (x.receiptNo || '').trim() === no)
+                const no = normNo(newExp.receiptNo)
+                const dupR = no && (data.reimbursements || []).find(x => normNo(x.receiptNo) === no)
+                if (dupR) { alert(`⛔ 這張發票已由 ${dupR.person} 的代墊（${dupR.serialNo}）自動入帳，不用再記一次。`); return }
+                const hasExactDup = no && (data.expenses || []).some(x => normNo(x.receiptNo) === no)
                 if (hasExactDup) { alert('⛔ 這個發票號碼已存在（見上方紅色警示來源），重複的帳不能提報。若確為不同憑證請改號碼。'); return }
                 const who = currentUser?.name || currentUser?.username || '未知'
-                const maxId = (data.expenses || []).filter(e => e.id?.startsWith('slm')).length + 1
+                // 編號一律取現有最大號 +1（舊算法「筆數 +1」會跟代墊自動帳撞號）
+                const maxId = Math.max(0, ...(data.expenses || []).map(e => /^slm26-(\d+)$/.exec(e?.id || '')).filter(Boolean).map(m => Number(m[1]))) + 1
                 const id = `slm26-${String(maxId).padStart(3, '0')}`
                 const serialNo = newExp.linkedSerial || generateSerial()
                 const { _catCustom, ...cleanExp } = newExp
