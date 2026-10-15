@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { Plus, Trash2, Search, CreditCard, ChevronLeft, Pencil, Download, Receipt, Filter } from 'lucide-react'
 import Modal from '../components/Modal'
+import PayStatements from '../components/PayStatements'
 import { E, STATUS, useIsMobile } from '../styles/earth'
 import { exportFinance } from '../utils/exportExcel'
 import { MONTHS, GOVT_WORK_DAYS, computeEmpMonthClockHours } from '../utils/salaryCalc'
@@ -1695,6 +1696,7 @@ export default function Finance() {
 
           return (
             <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+              <PayStatements emp={myEmp} isAdmin={isAdmin} viewerName={currentUser?.name} />
               {monthNav}
 
               {/* ① 實領 */}

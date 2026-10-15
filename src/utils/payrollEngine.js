@@ -803,6 +803,12 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
   let scheduledH = 0, deficitMin = 0
   let absentDays = 0, missingPunchDays = 0, lateLeaveDays = 0, suspShortDays = 0
   const absentDates = [], missingPunchDates = [], deficitDates = [], suspShortDates = []
+  // 當日加班先補當日缺時（加班 span 歸開始日）；超過 8h 的部分才轉補休（見 computeMonthCompAccrual）
+  const otMinByDate = {}
+  for (const sp of computeOTSpans((data.clockins || []).filter(c => c.date?.startsWith(`${yr}-${pad2(mo)}`) && nameMatch(c, emp)))) {
+    if (sp.missingEnd || sp.missingStart || !sp.startDate) continue
+    otMinByDate[sp.startDate] = (otMinByDate[sp.startDate] || 0) + sp.minutes
+  }
   for (const sc of (data.schedules || []).filter(s => s.empId === emp.id && s.year === yr && s.month === mo)) {
     const sh = SHIFT_H[sc.shift]
     if (!sh) continue
@@ -817,7 +823,7 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     // 有上班沒下班 = 忘打卡，待補登：不計缺時、不算曠職（等補登）
     if (hasIn && !hasOut && !onLeave) { missingPunchDays++; missingPunchDates.push(dateStr); continue }
     scheduledH += sh
-    const workedMin = normalDayMinutes(dayRecs, dateStr, data)
+    const workedMin = normalDayMinutes(dayRecs, dateStr, data) + (otMinByDate[dateStr] || 0)
     const fulfilledMin = workedMin + leaveH * 60
     let dMin = Math.max(0, sh * 60 - fulfilledMin)
     // 部分停班日：只要當日未做滿全班，停班時段整塊無薪（多留的零頭不抵扣；
