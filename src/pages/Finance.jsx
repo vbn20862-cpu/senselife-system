@@ -688,7 +688,7 @@ export default function Finance() {
             const groups = Object.values(exps.reduce((m, e) => {
               const n = normNo(e.receiptNo); if (!n) return m
               const k = `${n}|${Number(e.amount)}`; (m[k] = m[k] || []).push(e); return m
-            }, {})).filter(g => g.length > 1).sort((a, b) => (b[0].date || '').localeCompare(a[0].date || ''))
+            }, {})).filter(g => g.length > 1 && !g.every(e => e.dupOk)).sort((a, b) => (b[0].date || '').localeCompare(a[0].date || ''))  // dupOk＝已確認非重複（例：兩趟車資共用單據）
             if (!groups.length && !dupIds.length) return null
             const tag = (t, c, bg) => <span style={{ fontSize: '10px', fontWeight: '700', color: c, backgroundColor: bg, borderRadius: '999px', padding: '1px 7px', whiteSpace: 'nowrap' }}>{t}</span>
             return (
