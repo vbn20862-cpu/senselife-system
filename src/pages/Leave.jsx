@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { E, useIsMobile } from '../styles/earth'
 import Modal from '../components/Modal'
 import { Plus, Check, X, Trash2, Clock } from 'lucide-react'
-import { LEAVE_TYPES, annualLeaveStatus, computeCompLedger, sickLeaveCap } from '../utils/payrollEngine'
+import { LEAVE_TYPES, annualLeaveStatus, computeCompLedger, sickLeaveCap, annualLeaveHoursOf } from '../utils/payrollEngine'
 import { localTimestamp } from '../utils/salaryCalc'
 
 const STATUS_STYLE = {
@@ -65,7 +65,13 @@ export default function Leave() {
     }
 
     const emp = data.employees.find(e => e.id === empId)
-    const days = form.halfDay ? 0.5 : daysBetween(form.startDate, end)
+    let days = form.halfDay ? 0.5 : daysBetween(form.startDate, end)
+    // 特休只扣有排班的工作日：days 記實際扣的天數
+    if (form.type === '特休' && emp) {
+      const h = annualLeaveHoursOf(emp, { startDate: form.startDate, endDate: end, days }, new Date(form.startDate).getFullYear(), data)
+      days = Math.round(h / 8 * 10) / 10
+      if (days <= 0) { setFormErr('這段期間沒有排班的工作日，不需要請特休'); return }
+    }
 
     // 餘額檢查：特休不能超過剩餘額度、補休不能超過餘額
     if (emp) {
@@ -105,6 +111,17 @@ export default function Leave() {
   }
 
 
+  // 特休提示：排休日不扣，顯示實際會扣幾天
+  const annualNotice = (() => {
+    if (form.type !== '特休' || !form.startDate) return null
+    const empId = isAdmin ? Number(form.empId) : myEmp?.id
+    const emp = data.employees.find(e => e.id === empId); if (!emp) return null
+    const end = form.halfDay ? form.startDate : (form.endDate || form.startDate)
+    if (end < form.startDate) return null
+    const cal = form.halfDay ? 0.5 : daysBetween(form.startDate, end)
+    const eff = Math.round(annualLeaveHoursOf(emp, { startDate: form.startDate, endDate: end, days: cal }, new Date(form.startDate).getFullYear(), data) / 8 * 10) / 10
+    return eff === cal ? `這次會扣特休 ${eff} 天。` : `期間共 ${cal} 天，其中有排班的工作日 ${eff} 天，只扣特休 ${eff} 天（排休日不扣）。`
+  })()
   // 病假／事假超過年度上限：仍可請，超過部分無薪 → 送出前提示
   const capNotice = (() => {
     if (!['病假', '事假'].includes(form.type) || !form.startDate) return null
@@ -233,6 +250,7 @@ export default function Leave() {
             <Field label="事由（選填）">
               <textarea value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} rows={2} style={{ ...E.input, resize: 'vertical', fontFamily: 'inherit' }} />
             </Field>
+            {annualNotice && <div style={{ fontSize: '12px', lineHeight: 1.5, color: E.textMuted }}>{annualNotice}</div>}
             {capNotice && <div style={{ fontSize: '12px', lineHeight: 1.5, color: capNotice.warn ? '#8a6d1a' : E.textMuted, backgroundColor: capNotice.warn ? '#fef3cd' : 'transparent', padding: capNotice.warn ? '8px 12px' : 0, borderRadius: '8px' }}>{capNotice.text}</div>}
             {formErr && <div style={{ fontSize: '13px', color: '#c04030', backgroundColor: '#fce8e0', padding: '8px 12px', borderRadius: '8px' }}>⚠ {formErr}</div>}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

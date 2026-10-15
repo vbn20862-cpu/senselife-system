@@ -476,22 +476,39 @@ export function annualLeaveEntitlement(hireDate, year) {
 // 已用(usedHours) = 僅「已核准」；待審核(pendingHours) 另計。
 // remaining（可申請）= 額度 − 已核准 − 待審核（保守，避免重複佔額度）
 // payableHours（年底折現基準）= 額度 − 已核准（待審核不預先扣）
+// 特休只扣「有排班的工作日」（排休日、例假、國定假日不扣）：
+//   該日有排班 → 班別時數（出勤 8h、上午/下午班 4h）；尚未排班的月份 → 平日 8h、週末與國定假日 0
+//   半天假（單日 days=0.5）→ 上限 4h
+export function annualLeaveHoursOnDate(emp, dateStr, data, halfDay = false) {
+  const cap = halfDay ? 4 : 8
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const sc = (data.schedules || []).find(s => s && s.empId === emp.id && s.year === y && s.month === m && s.day === d)
+  const SH = { '出勤': 8, 'W': 8, '上午班': 4, '下午班': 4 }
+  if (sc) return Math.min(cap, SH[sc.shift] || 0)
+  const dow = new Date(dateStr + 'T00:00:00').getDay()
+  if (dow === 0 || dow === 6) return 0
+  if (getHolidays(data).some(h => h.date === dateStr)) return 0
+  return cap
+}
+// 一筆特休在某年內實際扣的時數
+export function annualLeaveHoursOf(emp, l, year, data) {
+  const start = l.startDate || l.date
+  const end = l.endDate || l.startDate || l.date
+  if (!start) return 0
+  const half = start === end && Number(l.days) === 0.5
+  let h = 0
+  const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
+  while (d <= last) {
+    const ds = d.toLocaleDateString('sv-SE')
+    if (ds.startsWith(String(year))) h += annualLeaveHoursOnDate(emp, ds, data, half)
+    d.setDate(d.getDate() + 1)
+  }
+  return h
+}
+
 export function annualLeaveStatus(emp, year, data) {
   const entitledDays = annualLeaveEntitlement(emp?.hireDate, year)
-  const hoursOf = (l) => {
-    // 請假以 startDate/endDate/days 記錄，計入該年的天數 ×8 小時
-    const start = l.startDate || l.date
-    const end = l.endDate || l.startDate || l.date
-    if (!start) return 0
-    if (start === end && Number(l.days) === 0.5) return new Date(start).getFullYear() === year ? 4 : 0
-    let h = 0
-    const d = new Date(start), last = new Date(end)
-    while (d <= last) {
-      if (d.getFullYear() === year) h += 8
-      d.setDate(d.getDate() + 1)
-    }
-    return h
-  }
+  const hoursOf = (l) => emp ? annualLeaveHoursOf(emp, l, year, data) : 0
   let usedHours = 0, pendingHours = 0
   for (const l of (data.leaveRequests || [])) {
     if (l.empId !== emp?.id || l.type !== '特休') continue
@@ -869,9 +886,11 @@ function annualLeaveUsedInMonth(emp, yr, mo, data) {
     const start = l.startDate || l.date
     const end = l.endDate || l.startDate || l.date
     if (!start) continue
-    const d = new Date(start), last = new Date(end)
+    const half = start === end && Number(l.days) === 0.5
+    const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
     while (d <= last) {
-      if (d.toLocaleDateString('sv-SE').startsWith(monthStr)) hours += 8
+      const ds = d.toLocaleDateString('sv-SE')
+      if (ds.startsWith(monthStr)) hours += annualLeaveHoursOnDate(emp, ds, data, half)
       d.setDate(d.getDate() + 1)
     }
   }
