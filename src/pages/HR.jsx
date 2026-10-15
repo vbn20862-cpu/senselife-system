@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { Plus, Trash2, Phone, Mail, User, Pencil, Shield, Eye, EyeOff, KeyRound, Download } from 'lucide-react'
@@ -173,7 +173,8 @@ export default function HR() {
   const { currentUser, isAdmin, accounts, addAccount, updateAccount, deleteAccount } = useAuth()
   const mob = useIsMobile()
   const [tab, setTab] = useState('schedule')
-  const [mobSelDay, setMobSelDay] = useState(null)
+  // 手機班表：打開時自動捲到今天那一欄
+  const schedScrollRef = useRef(null)
   const [mobSchedMode, setMobSchedMode] = useState('cal') // cal=月曆看 edit=排班編
   const [mobEditEmp, setMobEditEmp] = useState(null)
   const [scheduleMonth, setScheduleMonth] = useState(() => {
@@ -198,6 +199,15 @@ export default function HR() {
 
   const { year, month } = scheduleMonth
   const days = daysInMonth(year, month)
+  useEffect(() => {
+    if (!mob || mobSchedMode !== 'cal') return
+    const box = schedScrollRef.current; if (!box) return
+    const today = new Date()
+    if (today.getFullYear() !== year || today.getMonth() + 1 !== month) { box.scrollLeft = 0; return }
+    const th = box.querySelector(`th[data-day="${today.getDate()}"]`)
+    const stickyW = box.querySelector('th')?.offsetWidth || 56
+    if (th) box.scrollLeft = Math.max(0, th.offsetLeft - stickyW)
+  }, [mob, mobSchedMode, year, month])
 
   function getSchedule(empId, day) {
     return data.schedules.find(s => s.empId === empId && s.year === year && s.month === month && s.day === day)?.shift || ''
@@ -478,7 +488,7 @@ export default function HR() {
           {/* 手機版：月曆看 / 排班編 切換 */}
           {mob && (
             <div style={{ display: 'flex', gap: '4px', backgroundColor: E.cardBg, borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}` }}>
-              {[['cal', '📅 月曆看'], ['edit', '✏️ 排班編']].map(([key, label]) => (
+              {[['cal', '📋 班表'], ['edit', '✏️ 排班編']].map(([key, label]) => (
                 <button key={key} onClick={() => setMobSchedMode(key)} style={{ ...E.tab(mobSchedMode === key), flex: 1 }}>{label}</button>
               ))}
             </div>
@@ -546,82 +556,12 @@ export default function HR() {
               </div>
             )
           })()}
-          {/* 手機版：月曆格式（點日看當天） */}
-          {mob && mobSchedMode === 'cal' && (() => {
-            const todayStr = new Date().toLocaleDateString('sv-SE')
-            const monthPrefix = `${year}-${String(month).padStart(2, '0')}`
-            const sel = (mobSelDay && mobSelDay <= days) ? mobSelDay : (todayStr.startsWith(monthPrefix) ? Number(todayStr.slice(-2)) : 1)
-            // 與儀表板 MiniCalendar 同一套規則：週日開頭、今天淺綠底、選中綠底白字
-            const lead = getDayOfWeek(year, month, 1)
-            const countOn = d => data.employees.filter(e => (getShift(getSchedule(e.id, d))?.hours || 0) > 0).length
-            const cells = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ ...E.card, padding: '10px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '2px' }}>
-                    {WEEKDAYS.map(w => (
-                      <div key={w} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#b09070', padding: '4px 0' }}>{w}</div>
-                    ))}
-                    {cells.map((d, idx) => {
-                      if (d === null) return <div key={'b' + idx} />
-                      const dow = getDayOfWeek(year, month, d)
-                      const isHol = !!holidayByDay[d]
-                      const isSusp = !!suspByDay[d]
-                      const cnt = countOn(d)
-                      const isSel = d === sel
-                      const isToday = `${monthPrefix}-${String(d).padStart(2, '0')}` === todayStr
-                      const numColor = isSel ? '#fff' : isHol ? '#c0202a' : isToday ? '#3a6d31' : isSusp ? '#3c6eb4' : dow === 0 ? '#c04030' : E.textPrimary
-                      return (
-                        <button key={d} onClick={() => setMobSelDay(d)} style={{
-                          aspectRatio: '1', border: 'none', borderRadius: '8px',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', cursor: 'pointer', padding: 0,
-                          backgroundColor: isSel ? '#3a6d31' : isToday ? '#edf2ea' : isHol ? 'rgba(192,32,42,0.08)' : isSusp ? 'rgba(60,110,180,0.08)' : 'transparent',
-                        }}>
-                          <span style={{ fontSize: '13px', fontWeight: isSel || isToday ? '800' : '600', color: numColor }}>{isHol ? '🎌' : isSusp ? '🌧️' : ''}{d}</span>
-                          {cnt > 0 && <span style={{ fontSize: '9px', fontWeight: '700', color: isSel ? 'rgba(255,255,255,0.9)' : '#3a6d31' }}>{cnt}人</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div style={{ ...E.card }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '15px', fontWeight: '700', color: E.textPrimary }}>{month}/{sel}（{WEEKDAYS[getDayOfWeek(year, month, sel)]}）</span>
-                    {holidayByDay[sel] && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: '#fbecea', color: '#c0202a', fontWeight: '700' }}>🎌 {holidayByDay[sel]}</span>}
-                    {suspByDay[sel] && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: '#eaf0f8', color: '#3c6eb4', fontWeight: '700' }}>🌧️ {suspLabel(suspByDay[sel])}</span>}
-                  </div>
-                  {isAdmin && !isScheduleLocked && <div style={{ fontSize: '11px', color: E.textMuted, marginBottom: '8px' }}>點右側班別可切換：出勤 → 休假 → 上午 → 下午</div>}
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {data.employees.map(emp => {
-                      const shift = getSchedule(emp.id, sel)
-                      const s = shift ? getShift(shift) : null
-                      return (
-                        <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 2px', borderBottom: `1px solid ${E.divider}` }}>
-                          <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#efe6db', color: E.coffee, fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{emp.name.slice(0, 1)}</div>
-                          <span style={{ flex: 1, fontSize: '13px', color: E.textPrimary }}>{emp.name}</span>
-                          <button
-                            onClick={() => { if (isAdmin && !isScheduleLocked) setSchedule(emp.id, sel, nextShift(shift)) }}
-                            disabled={!isAdmin || isScheduleLocked}
-                            style={{ minWidth: '60px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', backgroundColor: s ? s.bg : '#f0ece5', color: s ? s.color : '#b0a090', cursor: (isAdmin && !isScheduleLocked) ? 'pointer' : 'default' }}>
-                            {s ? s.label : '休'}
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', fontSize: '12px', color: E.textSecond }}>
-                    當日出勤 <strong style={{ color: E.green, margin: '0 3px' }}>{countOn(sel)}</strong> 人
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-          {!mob && (
-          <div style={{ ...E.card, padding: 0, overflowX: 'auto' }}>
+          {(!mob || mobSchedMode === 'cal') && (
+          <div ref={schedScrollRef} style={{ ...E.card, padding: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: 'max-content' }}>
               <thead style={{ backgroundColor: E.sandLight, borderBottom: `1px solid ${E.divider}` }}>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '10px 14px', color: E.textSecond, fontWeight: '600', position: 'sticky', left: 0, backgroundColor: E.sandLight, minWidth: '80px' }}>員工</th>
+                  <th style={{ textAlign: 'left', padding: mob ? '8px 8px' : '10px 14px', color: E.textSecond, fontWeight: '600', position: 'sticky', left: 0, zIndex: 1, backgroundColor: E.sandLight, minWidth: mob ? '56px' : '80px' }}>員工</th>
                   {Array.from({ length: days }, (_, i) => i+1).map(d => {
                     const dow = getDayOfWeek(year, month, d)
                     const isSun = dow === 0
@@ -629,13 +569,13 @@ export default function HR() {
                     const isHol = !!holidayByDay[d]
                     const color = isHol ? '#c0202a' : isSun ? '#c04030' : isSat ? '#4a70a0' : E.textMuted
                     return (
-                      <th key={d} style={{ padding: '6px 2px', textAlign: 'center', minWidth: '36px', backgroundColor: isHol ? 'rgba(192,32,42,0.10)' : suspByDay[d] ? 'rgba(60,110,180,0.10)' : (isSun || isSat) ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
+                      <th key={d} data-day={d} style={{ padding: mob ? '5px 1px' : '6px 2px', textAlign: 'center', minWidth: mob ? '31px' : '36px', backgroundColor: isHol ? 'rgba(192,32,42,0.10)' : suspByDay[d] ? 'rgba(60,110,180,0.10)' : (isSun || isSat) ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
                         <div style={{ fontSize: '11px', fontWeight: '700', color }}>{isHol ? '🎌' : suspByDay[d] ? '🌧️' : ''}{d}</div>
                         <div style={{ fontSize: '9px', fontWeight: '500', color, opacity: 0.8 }}>{WEEKDAYS[dow]}</div>
                       </th>
                     )
                   })}
-                  <th style={{ padding: '10px 14px', color: E.textSecond, fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap' }}>月時數</th>
+                  <th style={{ padding: mob ? '8px 8px' : '10px 14px', color: E.textSecond, fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', fontSize: mob ? '10px' : undefined }}>月時數</th>
                 </tr>
               </thead>
               <tbody>
@@ -646,8 +586,8 @@ export default function HR() {
                     {Array.from({ length: days }, (_, i) => i+1).map(d => (
                       <td key={d} style={{ padding: '2px 1px', textAlign: 'center', backgroundColor: holidayByDay[d] ? 'rgba(192,32,42,0.10)' : 'transparent' }}>
                         {holidayByDay[d] && (
-                          <span title={holidayByDay[d]} style={{ fontSize: '8px', color: '#c0202a', fontWeight: '700', lineHeight: 1.1, display: 'inline-block', maxWidth: '34px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {holidayByDay[d].length > 3 ? holidayByDay[d].slice(0, 3) : holidayByDay[d]}
+                          <span title={holidayByDay[d]} style={{ fontSize: '8px', color: '#c0202a', fontWeight: '700', lineHeight: 1.1, display: 'inline-block', whiteSpace: 'nowrap', padding: '0 2px' }}>
+                            {holidayByDay[d]}
                           </span>
                         )}
                       </td>
@@ -674,31 +614,46 @@ export default function HR() {
                 {/* 活動備註列 */}
                 <tr style={{ borderBottom: `1px solid ${E.divider}`, backgroundColor: '#f5f0e8' }}>
                   <td style={{ padding: '4px 14px', fontWeight: '600', color: E.coffee, position: 'sticky', left: 0, backgroundColor: '#f5f0e8', borderRight: `1px solid ${E.divider}`, fontSize: '10px', whiteSpace: 'nowrap' }}>活動備註</td>
-                  {Array.from({ length: days }, (_, i) => i+1).map(d => {
-                    const noteKey = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-                    const noteVal = (data.scheduleNotes || {})[noteKey] || ''
-                    return (
-                      <td key={d} style={{ padding: '2px 1px', textAlign: 'center' }}>
-                        <input
-                          key={noteKey}
-                          defaultValue={noteVal}
-                          onBlur={e => {
-                            // 離開欄位才寫入（避免每輸入一字打一次 Firebase）
-                            if (e.target.value === noteVal) return
-                            update('scheduleNotes', { ...(data.scheduleNotes || {}), [noteKey]: e.target.value })
-                          }}
-                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                          placeholder="·"
-                          style={{ width: '34px', height: '22px', border: 'none', borderRadius: '4px', fontSize: '9px', textAlign: 'center', backgroundColor: noteVal ? '#fff3cd' : 'transparent', color: E.textPrimary, outline: 'none', padding: '0 1px' }}
-                        />
-                      </td>
-                    )
-                  })}
+                  {(() => {
+                    const keyOf = d => `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+                    const noteOf = d => ((data.scheduleNotes || {})[keyOf(d)] || '').trim()
+                    const colW = mob ? 29 : 34
+                    const cells = []
+                    for (let d = 1; d <= days; ) {
+                      const noteVal = noteOf(d)
+                      let span = 1
+                      if (noteVal) while (d + span <= days && noteOf(d + span) === noteVal) span++   // 連續同備註 → 合併
+                      const runDays = Array.from({ length: span }, (_, i) => d + i)
+                      const width = Math.max(colW * span + (span - 1) * 2, noteVal ? noteVal.length * 10 + 8 : 0)
+                      cells.push(
+                        <td key={d} colSpan={span} style={{ padding: '2px 1px', textAlign: 'center' }}>
+                          <input
+                            key={keyOf(d) + noteVal}
+                            defaultValue={noteVal}
+                            title={noteVal && span > 1 ? `${month}/${d}–${month}/${d + span - 1}：${noteVal}（修改會套用整段）` : noteVal}
+                            onBlur={e => {
+                              // 離開欄位才寫入；合併段一起改
+                              const v = e.target.value
+                              if (v === noteVal) return
+                              const next = { ...(data.scheduleNotes || {}) }
+                              runDays.forEach(x => { next[keyOf(x)] = v })
+                              update('scheduleNotes', next)
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                            placeholder="·"
+                            style={{ width: `${width}px`, height: '22px', border: 'none', borderRadius: '4px', fontSize: '9px', textAlign: 'center', backgroundColor: noteVal ? '#fff3cd' : 'transparent', color: E.textPrimary, outline: 'none', padding: '0 1px' }}
+                          />
+                        </td>
+                      )
+                      d += span
+                    }
+                    return cells
+                  })()}
                   <td />
                 </tr>
                 {data.employees.map((emp, ri) => (
                   <tr key={emp.id} style={{ borderBottom: `1px solid ${E.divider}`, backgroundColor: ri % 2 === 0 ? 'transparent' : '#faf7f2' }}>
-                    <td style={{ padding: '8px 14px', fontWeight: '600', color: E.textPrimary, position: 'sticky', left: 0, backgroundColor: ri % 2 === 0 ? E.cardBg : '#faf7f2', borderRight: `1px solid ${E.divider}` }}>{emp.name}</td>
+                    <td style={{ padding: mob ? '6px 8px' : '8px 14px', fontWeight: '600', fontSize: mob ? '11px' : undefined, whiteSpace: 'nowrap', color: E.textPrimary, position: 'sticky', left: 0, zIndex: 1, backgroundColor: ri % 2 === 0 ? E.cardBg : '#faf7f2', borderRight: `1px solid ${E.divider}` }}>{emp.name}</td>
                     {Array.from({ length: days }, (_, i) => i+1).map(d => {
                       const shift = getSchedule(emp.id, d)
                       const s = shift ? getShift(shift) : null
@@ -706,18 +661,18 @@ export default function HR() {
                       const isWeekend = dow === 0 || dow === 6
                       const cellLocked = isScheduleLocked || !canEditSchedule(emp)
                       return (
-                        <td key={d} style={{ padding: '3px 2px', textAlign: 'center', backgroundColor: isWeekend ? 'rgba(0,0,0,0.025)' : 'transparent' }}>
+                        <td key={d} style={{ padding: mob ? '3px 1px' : '3px 2px', textAlign: 'center', backgroundColor: isWeekend ? 'rgba(0,0,0,0.025)' : 'transparent' }}>
                           <button
                             onClick={() => !cellLocked && setSchedule(emp.id, d, nextShift(shift))}
                             disabled={cellLocked}
                             title={isScheduleLocked ? '當月5日後僅管理員可編輯' : !canEditSchedule(emp) ? '僅能編輯自己的排班' : ''}
-                            style={{ width: '34px', height: '26px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', border: 'none', transition: 'all 0.1s', backgroundColor: s ? s.bg : 'transparent', color: s ? s.color : '#d0c0b0', cursor: cellLocked ? 'not-allowed' : 'pointer', opacity: cellLocked ? 0.8 : 1 }}>
+                            style={{ width: mob ? '29px' : '34px', height: mob ? '24px' : '26px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', border: 'none', transition: 'all 0.1s', backgroundColor: s ? s.bg : 'transparent', color: s ? s.color : '#d0c0b0', cursor: cellLocked ? 'not-allowed' : 'pointer', opacity: cellLocked ? 0.8 : 1 }}>
                             {s ? s.short : '·'}
                           </button>
                         </td>
                       )
                     })}
-                    <td style={{ padding: '8px 14px', textAlign: 'right', fontWeight: '700', color: E.green }}>{monthHours(emp.id)}h</td>
+                    <td style={{ padding: mob ? '6px 8px' : '8px 14px', textAlign: 'right', fontWeight: '700', color: E.green, fontSize: mob ? '11px' : undefined, whiteSpace: 'nowrap' }}>{monthHours(emp.id)}h</td>
                   </tr>
                 ))}
               </tbody>
