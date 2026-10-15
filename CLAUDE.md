@@ -56,6 +56,12 @@
 - 特休按日曆天扣（含排休日），阿慶確認正確，勿改
 - **不再產生月底薪資單**（2026-09 拔除）：員工頁與管理員頁的實領都是 `buildDraftSlips` 即時計算，勿另寫一套；
   舊的 `/appData/payrolls` 歷史資料保留在資料庫、僅 Excel 匯出會帶出
+- **薪資明細流程**：每月 5 號雲端例行任務（claude.ai routine `trig_01FXzMBAgk7BPWFwKSAzoYqH`）跑
+  `node ops/monthly-statements.mjs --upload` → 草稿存 `/payDrafts/<empId>/<YYYY-MM>`（只有管理員看得到）→
+  阿慶在薪資頁審核按「審核通過，發布」→ 存 `/payStatements/…`，員工點開確認；人工調整後用
+  `node ops/publish-statement.mjs <姓名> <YYYY-MM> <html> --net=<實領>` 發布
+- **員工確認才入帳**：員工按「我已確認」時，實領自動記一筆 Admin_sl／人事／人事費用 支出，日期＝次月 16 日（發薪日）
+  （`payStatementKey=<empId>/<YYYY-MM>`，重發後再確認只更新不重複）；發布時要帶實領（草稿自帶 net、手動用 `--net`）
 - 休息扣除：每連續段照勞基法 §35（>4h 扣 30 分、>8h 扣 60 分、>12h 扣 90 分）
 - **活動日**（排班表「活動備註」有填，阿慶統一登打）2026/9/1 起：照登打時間全算——不扣休息、不設 8h 上限，
   超過 8h 仍算正常工時（不轉補休／加班；另打加班卡才算加班）。`salaryCalc.normalDayMinutes`／`ACTIVITY_RAW_FROM`

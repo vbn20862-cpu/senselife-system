@@ -4,15 +4,19 @@ import { db } from '../firebase'
 import Modal from './Modal'
 import { E } from '../styles/earth'
 import { localTimestamp } from '../utils/salaryCalc'
+import { useApp } from '../context/AppContext'
 
 // 已審核薪資明細：存在 /payStatements/<empId>/<YYYY-MM>（不放 appData，點開才讀，避免拖慢全站同步）
 // 草稿：每月 5 號雲端例行任務跑 ops/monthly-statements.mjs --upload 寫入 /payDrafts/<empId>/<YYYY-MM>
-//   只有管理員看得到；審核後按「發布」→ 複製到 payStatements（加上已審核標記）並刪除草稿
+//   只有管理員看得到；審核後按「發布」→ 複製到 payStatements（加上已審核標記）並刪除草稿，
+// 記帳：員工按「我已確認」時，把實領記一筆 Admin_sl／人事／人事費用 支出帳，日期＝薪資月份的次月 16 日（發薪日）
+//   同員工同月份已有則更新該筆，不重複
 export function stampReviewed(html, at) {
   return html.replace(/(<div class="date">[^<]*)(<\/div>)/, `$1｜<b style="color:#3a6d31">✔ 已審核版本（${at} 發布）</b>$2`)
 }
 
 export default function PayStatements({ emp, isAdmin, viewerName }) {
+  const { data, addItem, updateItem, logEdit, generateSerial } = useApp()
   const [items, setItems] = useState([])
   const [drafts, setDrafts] = useState([])
   const [open, setOpen] = useState(null)
@@ -30,16 +34,38 @@ export default function PayStatements({ emp, isAdmin, viewerName }) {
   const pending = items.filter(s => !s.ackAt)
 
   function confirm(s) {
-    update(ref(db, `payStatements/${emp.id}/${s.key}`), { ackAt: localTimestamp(), ackBy: viewerName || emp.name })
+    const expenseId = s.net != null && Number.isFinite(Number(s.net)) ? bookSalary(s) : null
+    update(ref(db, `payStatements/${emp.id}/${s.key}`), { ackAt: localTimestamp(), ackBy: viewerName || emp.name, ...(expenseId ? { expenseId } : {}) })
     setOpen(null)
   }
   async function publish(d) {
     const replacing = items.some(s => s.key === d.key)
-    if (!window.confirm(`發布「${emp.name} ${d.title}」給員工？${replacing ? '\n（會取代已發布的同月版本，員工需重新確認）' : ''}`)) return
+    if (!window.confirm(`發布「${emp.name} ${d.title}」給員工？${d.net != null ? `\n員工確認後，實領 NT$${Number(d.net).toLocaleString()} 會自動記入 Admin_sl 人事費用帳目（日期為次月 16 日）。` : ''}${replacing ? '\n（會取代已發布的同月版本，員工需重新確認）' : ''}`)) return
     const at = localTimestamp()
-    await set(ref(db, `payStatements/${emp.id}/${d.key}`), { month: d.month || d.key, title: d.title, html: stampReviewed(d.html, at), publishedAt: at, publishedBy: viewerName || '管理員' })
+    await set(ref(db, `payStatements/${emp.id}/${d.key}`), { month: d.month || d.key, title: d.title, html: stampReviewed(d.html, at), publishedAt: at, publishedBy: viewerName || '管理員', ...(d.net != null ? { net: Number(d.net) } : {}) })
     await remove(ref(db, `payDrafts/${emp.id}/${d.key}`))
     setOpen(null)
+  }
+
+  // 員工確認後入帳（Admin_sl 行政用／人事／人事費用；照過去薪資帳的記法），日期＝次月 16 日
+  function bookSalary(d) {
+    const key = `${emp.id}/${d.key}`, [y, m] = (d.month || d.key).split('-').map(Number)
+    const payDate = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-16`
+    const fields = { date: payDate, direction: '支出', project: 'Admin_sl', category: '人事', account: '人事費用',
+      amount: Math.round(Number(d.net)), vendor: emp.name, method: '轉帳', receiptNo: '', noReceipt: true, noReceiptNote: '薪資',
+      note: `${y} 年 ${m} 月薪資（員工確認薪資明細後自動入帳）`, payStatementKey: key }
+    const who = viewerName || emp.name
+    const old = (data.expenses || []).find(e => e && e.payStatementKey === key)
+    if (old) {
+      updateItem('expenses', old.id, fields)
+      logEdit({ user: who, action: '編輯', entityType: '帳目', entityName: emp.name, summary: `${y}/${m} 薪資重發 NT$${fields.amount.toLocaleString()}` })
+      return old.id
+    }
+    const maxNo = Math.max(0, ...(data.expenses || []).map(e => /^slm26-(\d+)$/.exec(e?.id || '')).filter(Boolean).map(x => Number(x[1])))
+    const id = `slm26-${String(maxNo + 1).padStart(3, '0')}`
+    addItem('expenses', { id, ...fields, serialNo: generateSerial(), createdBy: `${who}（確認薪資明細）` })
+    logEdit({ user: who, action: '新增', entityType: '帳目', entityName: emp.name, summary: `Admin_sl ${y}/${m} 薪資 NT$${fields.amount.toLocaleString()}` })
+    return id
   }
 
   const row = (s, draft) => (
@@ -51,7 +77,7 @@ export default function PayStatements({ emp, isAdmin, viewerName }) {
       {draft
         ? <span style={{ fontSize: '12px', fontWeight: '700', color: '#8a6d1a', backgroundColor: '#fef3cd', border: '1px solid #f0d78c', borderRadius: '999px', padding: '4px 11px', flexShrink: 0 }}>待審核</span>
         : s.ackAt
-          ? <span style={{ fontSize: '11px', color: E.green, fontWeight: '600', textAlign: 'right', flexShrink: 0 }}>✓ 已確認<br /><span style={{ fontWeight: '400', color: E.textMuted }}>{s.ackAt}</span></span>
+          ? <span style={{ fontSize: '11px', color: E.green, fontWeight: '600', textAlign: 'right', flexShrink: 0 }}>✓ 已確認{isAdmin && s.expenseId ? '・已記帳' : ''}<br /><span style={{ fontWeight: '400', color: E.textMuted }}>{s.ackAt}</span></span>
           : <span style={{ fontSize: '12px', fontWeight: '700', color: '#fff', backgroundColor: isAdmin ? '#b9a98f' : '#3a6d31', borderRadius: '999px', padding: '5px 12px', flexShrink: 0 }}>{isAdmin ? '員工未確認' : '點開確認'}</span>}
     </div>
   )
@@ -71,7 +97,7 @@ export default function PayStatements({ emp, isAdmin, viewerName }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {open.draft
               ? <div style={{ fontSize: '12px', color: '#8a6d1a', backgroundColor: '#fef3cd', border: '1px solid #f0d78c', borderRadius: '8px', padding: '8px 12px' }}>
-                  草稿（{open.generatedAt} 系統產生），員工看不到。只含系統計算；若有上月補扣等人工調整，請先請 Claude 修改再發布。
+                  草稿（{open.generatedAt} 系統產生），員工看不到。只含系統計算；若有上月補扣等人工調整，請先請 Claude 修改再發布。員工確認後，實領{open.net != null ? ` NT$${Number(open.net).toLocaleString()}` : ''}會自動記入 Admin_sl 人事費用帳目（次月 16 日）。
                 </div>
               : <div style={{ fontSize: '12px', color: '#3a6d31', backgroundColor: '#edf2ea', border: '1px solid #cfe0c8', borderRadius: '8px', padding: '8px 12px' }}>
                   ✔ 此為審核過的版本（{open.publishedAt} 發布），金額以本文件為準。
