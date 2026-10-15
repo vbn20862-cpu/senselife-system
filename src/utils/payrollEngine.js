@@ -5,7 +5,7 @@
 // 設計原則：寧可多給、不可少給；寧可少扣、不可溢扣。
 // 加班費：小數無條件進位。遲到早退：金額無條件捨去。
 
-import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin, normalDayMinutes } from './salaryCalc'
+import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin, normalDayMinutes, activityExtraOTMinutes } from './salaryCalc'
 import { getHolidays } from './holidays'
 
 // ── 2025–2026 國定假日（勞基法第 37 條認定）──
@@ -573,7 +573,7 @@ export function computeMonthCompAccrual(emp, yr, mo, data, holidaySet) {
   const lots = { '1.34': 0, '1.67': 0, '2': 0 }
   for (const date of dates) {
     const dayRecs = recs.filter(c => c.date === date)
-    const otMin = otMinByDate[date] || 0
+    const otMin = (otMinByDate[date] || 0) + activityExtraOTMinutes(dayRecs, date, data)
     if (isDoubledHoliday(date, holidaySet)) {
       const { dayMin } = computeDayMinutes(dayRecs, false)
       const h = (capNormalMin(dayMin) + otMin) / 60 // 假日正常出勤上限 8h，超過要打加班卡
@@ -581,8 +581,7 @@ export function computeMonthCompAccrual(emp, yr, mo, data, holidaySet) {
     } else {
       // 加班費級距只算「當天總工時超過 8h」的部分。
       // 正常工時(上班/下班)填滿前 8h，加班打卡疊在上面，超過 8h 才算加班。
-      const { dayMin: regMin } = computeDayMinutes(dayRecs, false)
-      const otBeyond8Min = Math.max(0, capNormalMin(regMin) + otMin - 480)
+      const otBeyond8Min = Math.max(0, normalDayMinutes(dayRecs, date, data) + otMin - 480) // 活動日正常工時不扣休息
       const h = otBeyond8Min / 60
       const t1 = Math.min(h, 2), t2 = Math.max(0, h - 2)
       hours += h
@@ -605,6 +604,7 @@ export function computeHourlyOTHours(emp, yr, mo, data) {
     if (!sp.startDate.startsWith(monthStr)) continue
     min += sp.minutes
   }
+  for (const date of new Set(recs.map(c => c.date))) min += activityExtraOTMinutes(recs.filter(c => c.date === date), date, data)
   return round2(min / 60)
 }
 
@@ -622,7 +622,7 @@ export function computeHourlyHolidayPremium(emp, yr, mo, data, rate) {
   let holHours = 0
   for (const date of dates) {
     const dayRecs = recs.filter(c => c.date === date)
-    holHours += (normalDayMinutes(dayRecs, date, data) + (otMinByDate[date] || 0)) / 60 // 正常出勤上限 8h（活動日照登打全算）
+    holHours += (normalDayMinutes(dayRecs, date, data) + activityExtraOTMinutes(dayRecs, date, data) + (otMinByDate[date] || 0)) / 60 // 正常出勤上限 8h（活動日照登打全算）
   }
   holHours = round2(holHours)
   return { hours: holHours, amount: Math.round(holHours * rate) }
@@ -823,7 +823,7 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     // 有上班沒下班 = 忘打卡，待補登：不計缺時、不算曠職（等補登）
     if (hasIn && !hasOut && !onLeave) { missingPunchDays++; missingPunchDates.push(dateStr); continue }
     scheduledH += sh
-    const workedMin = normalDayMinutes(dayRecs, dateStr, data) + (otMinByDate[dateStr] || 0)
+    const workedMin = normalDayMinutes(dayRecs, dateStr, data) + activityExtraOTMinutes(dayRecs, dateStr, data) + (otMinByDate[dateStr] || 0)
     const fulfilledMin = workedMin + leaveH * 60
     let dMin = Math.max(0, sh * 60 - fulfilledMin)
     // 部分停班日：只要當日未做滿全班，停班時段整塊無薪（多留的零頭不抵扣；

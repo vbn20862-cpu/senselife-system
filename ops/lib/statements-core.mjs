@@ -39,7 +39,7 @@ for (const e of data.employees) {
   const rows = dates.map(d => {
     const dr = recs.filter(c => c.date === d).sort((a, b) => a.time.localeCompare(b.time))
     const pick = t => dr.filter(c => c.type === t).map(c => c.time + (c.note && /補登|更正|統一/.test(c.note) ? '*' : '')).join('/')
-    const nm = SC.normalDayMinutes(dr, d, data), om = ot[d] || 0, lv = leaves(d)
+    const nm = SC.normalDayMinutes(dr, d, data), om = (ot[d] || 0) + SC.activityExtraOTMinutes(dr, d, data), lv = leaves(d)
     const lvH = Math.min(SH[sched[d]] || 0, lv.reduce((a, l) => a + ((l.startDate === l.endDate && Number(l.days) === 0.5) ? 4 : 8), 0))
     const hasIn = dr.some(c => c.type === '上班'), hasOut = dr.some(c => c.type === '下班')
     const flag = !dr.length ? (lv.length ? '' : '無打卡') : (hasIn && !hasOut) ? '缺下班卡' : (!hasIn && hasOut) ? '缺上班卡' : ''

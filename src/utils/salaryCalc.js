@@ -77,17 +77,23 @@ export function breakMinutesFor(continuousMin) {
 // 配對某日的上班/下班並計算總工時（分鐘）
 // 支援：多段班（早班+晚班）、跨午夜（下班 < 上班 自動 +24h）、進行中（最後上班沒下班且為今天）
 // 休息扣除：每個 in→out 區段各自套 breakMinutesFor（勞基法第 35 條）
-// 活動日（排班表「活動備註」有填，由管理員統一登打）：2026/9/1 起照登打時間全算——
-//   不扣休息、不設每日 8h 上限；超過 8h 仍算正常工時（不轉補休／加班）
+// 活動日（排班表「活動備註」有填，由管理員統一登打）：2026/9/1 起照登打時間全算（不扣休息）——
+//   前 8h 為正常工時，超過 8h 的部分自動算加班（勞基法第 24 條）；另打的加班卡照常另計
 export const ACTIVITY_RAW_FROM = '2026-09-01'
 export function isActivityDay(date, data) {
   return !!date && date >= ACTIVITY_RAW_FROM && !!String((data?.scheduleNotes || {})[date] || '').trim()
 }
-// 某日正常工時（分鐘）：一般日扣休息＋上限 8h；活動日照登打時間全算
+// 某日正常工時（分鐘）：一般日扣休息＋上限 8h；活動日不扣休息、上限 8h
 export function normalDayMinutes(dayRecs, date, data, isToday = false) {
   const raw = isActivityDay(date, data)
   const { dayMin } = computeDayMinutes(dayRecs, isToday, { noBreak: raw })
-  return raw ? dayMin : capNormalMin(dayMin)
+  return capNormalMin(dayMin)
+}
+// 活動日登打時間超過 8h 的部分（分鐘）→ 自動算加班；非活動日為 0
+export function activityExtraOTMinutes(dayRecs, date, data, isToday = false) {
+  if (!isActivityDay(date, data)) return 0
+  const { dayMin } = computeDayMinutes(dayRecs, isToday, { noBreak: true })
+  return Math.max(0, dayMin - NORMAL_DAILY_CAP_MIN)
 }
 
 export function computeDayMinutes(dayRecs, isToday = false, opts = {}) {
@@ -214,6 +220,7 @@ export function computeEmpMonthClockHours(emp, yr, mo, data) {
     const dayRecs = myClockins.filter(c => c.date === date)
     // 正常工時每日上限 8h，超過要打加班卡才算（活動日照登打時間全算）
     totalHours += roundHours(normalDayMinutes(dayRecs, date, data, date === todayStr))
+    totalHours += roundHours(activityExtraOTMinutes(dayRecs, date, data, date === todayStr))
     totalHours += roundHours(otMinByDate[date] || 0)
   }
   return totalHours

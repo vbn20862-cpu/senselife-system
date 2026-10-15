@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import { E, useIsMobile } from '../styles/earth'
 import { exportHR } from '../utils/exportExcel'
 import { downloadCsv } from '../utils/exportCsv'
-import { MONTHS, GOVT_WORK_DAYS, roundHours, resolveEmpName, computeEmpMonthClockHours, computeAllTimeEarned, computeDayMinutes, computeOTSpans, normalDayMinutes } from '../utils/salaryCalc'
+import { MONTHS, GOVT_WORK_DAYS, roundHours, resolveEmpName, computeEmpMonthClockHours, computeAllTimeEarned, computeDayMinutes, computeOTSpans, normalDayMinutes, activityExtraOTMinutes } from '../utils/salaryCalc'
 import { mapLink } from '../utils/geo'
 import { holidaysInMonth, holidayOn, getHolidays, DEFAULT_HOLIDAYS } from '../utils/holidays'
 import { annualLeaveStatus } from '../utils/payrollEngine'
@@ -383,7 +383,8 @@ export default function HR() {
         totalHours += roundHours(dayMin)
       })
       // 加班用跨日 span 總和（避免同日配對漏掉跨午夜段）
-      totalOTHours = roundHours(computeOTSpans(myClockins).reduce((sum, sp) => sum + sp.minutes, 0))
+      totalOTHours = roundHours(computeOTSpans(myClockins).reduce((sum, sp) => sum + sp.minutes, 0)
+        + [...new Set(myClockins.map(c => c.date))].reduce((sum, d) => sum + activityExtraOTMinutes(myClockins.filter(c => c.date === d), d, data), 0))
 
       const leaveDays = data.schedules.filter(s => s.empId === emp?.id && s.year === year && s.month === month && s.shift === '休假').length
       return {
@@ -810,7 +811,7 @@ export default function HR() {
             let dayMin = baseDayMin
             // 該日的加班 span（開始於這天，可能跨到隔天）
             const daySpans = otSpansByStart[date] || []
-            const otMin = daySpans.reduce((sum, sp) => sum + sp.minutes, 0)
+            const otMin = daySpans.reduce((sum, sp) => sum + sp.minutes, 0) + activityExtraOTMinutes(dayRecs, date, data, date === todayStr) // 活動日超過 8h 自動算加班
             const hasRegularPunch = clockInRecs.length > 0 || clockOutRecs.length > 0
             const hasOTPunch = daySpans.length > 0
 
