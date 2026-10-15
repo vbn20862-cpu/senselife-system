@@ -1,9 +1,11 @@
 // 每月薪資明細草稿：替每位員工產出上個月的工時統計＋薪資計算（HTML＋PDF），供阿慶審核
-// 用法：node ops/monthly-statements.mjs [YYYY-MM]　（省略＝上個月）
+// 用法：node ops/monthly-statements.mjs [YYYY-MM] [--upload]　（省略月份＝上個月）
+//   --upload：同時把草稿存到 Firebase /payDrafts/<empId>/<YYYY-MM>（員工看不到），阿慶在系統薪資頁審核後按「發布」
 // 輸出：~/senselife-statements/<YYYY-MM>/<姓名>.html／.pdf＋摘要.txt（含個資，放 repo 外）
 // 審核後發布：node ops/publish-statement.mjs <姓名> <YYYY-MM> ~/senselife-statements/<YYYY-MM>/<姓名>.html
 // 數字全部來自系統薪資引擎（src/utils），與薪資頁一致；「上月補扣」等人工調整不在自動範圍，需另外加註
-import { fbGet } from './_fb.mjs'
+process.env.TZ = 'Asia/Taipei' // 雲端執行環境是 UTC，日期一律以台灣時間計
+import { fbGet, fbWrite } from './_fb.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -11,7 +13,8 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const target = process.argv[2] || (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString('sv-SE').slice(0, 7) })()
+const argv = process.argv.slice(2), UPLOAD = argv.includes('--upload')
+const target = argv.find(a => /^\d{4}-\d{2}$/.test(a)) || (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString('sv-SE').slice(0, 7) })()
 if (!/^\d{4}-\d{2}$/.test(target)) { console.error('月份格式：YYYY-MM'); process.exit(1) }
 const [YR, MO] = target.split('-').map(Number)
 
@@ -121,9 +124,11 @@ ${rows.map(r => `<tr${r.note.includes('無打卡') ? ' class="bad"' : r.lv ? ' c
   const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   if (fs.existsSync(chrome)) { try { execFileSync(chrome, ['--headless=new', '--disable-gpu', '--no-pdf-header-footer', `--print-to-pdf=${base_}.pdf`, 'file://' + base_ + '.html'], { stdio: 'ignore', timeout: 60000 }) } catch {} }
   const alerts = [rows.filter(r => r.note.includes('無打卡')).length && `無打卡 ${rows.filter(r => r.note.includes('無打卡')).map(r => r.d).join('、')}`, (tm.missingPunchDates || []).length && `待補登 ${tm.missingPunchDates.length} 天`].filter(Boolean)
+  if (UPLOAD) await fbWrite('PUT', `/payDrafts/${e.id}/${target}.json`, { month: target, empName: e.name, title: `${YR} 年 ${MO} 月薪資明細`, html, generatedAt: new Date().toLocaleString('sv-SE').slice(0, 16), net: Math.round(net) })
   summary.push(`${e.name}｜實際 ${act}h、請假 ${lvH}h、缺 ${short}h｜系統缺時 ${tm.deficitHours || 0}h 扣 ${dock.toLocaleString()}｜實領 ${Math.round(net).toLocaleString()}${alerts.length ? '｜⚠ ' + alerts.join('；') : ''}`)
 }
 fs.writeFileSync(path.join(outDir, '摘要.txt'), summary.join('\n') + '\n')
+if (UPLOAD) await fbWrite('PUT', `/payDrafts/_runs/${target}.json`, { generatedAt: new Date().toLocaleString('sv-SE').slice(0, 16), summary: summary.join('\n') })
 fs.rmSync(eng, { recursive: true, force: true })
 console.log(summary.join('\n'))
 console.log(`\n輸出：${outDir}`)
