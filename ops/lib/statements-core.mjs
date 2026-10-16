@@ -70,7 +70,7 @@ for (const e of data.employees) {
     ...(annual ? [['特休年底折現', money(annual), '']] : []),
     ...(holPrem ? [['國定假日加給', money(holPrem), '']] : []),
     ...(ded ? [[dedItems.map(([k, v]) => `${k} ${v}`).join('、'), '－ ' + money(ded), '']] : []),
-    ...(!hourly ? [[`缺時扣薪：${tm.dockHours || 0} 小時 × 時薪 ${rateTxt}（${gross.toLocaleString()} ÷ 240）${tm.consumed ? `（已先用補休抵 ${tm.consumed} 小時）` : ''}`, dock ? '－ ' + money(dock) : 'NT$ 0', 'miss']] : []),
+    ...(!hourly ? [[`缺時扣薪：${tm.dockHours || 0} 小時 × 時薪 ${rateTxt}（${gross.toLocaleString()} ÷ 240）${tm.consumed ? (tm.weightedOffset ? `（已先用補休 ${tm.consumedHours} 小時依費率加權抵 ${tm.consumed} 小時）` : `（已先用補休抵 ${tm.consumed} 小時）`) : ''}`, dock ? '－ ' + money(dock) : 'NT$ 0', 'miss']] : []),
   ]
   const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${e.name} ${MO} 月工時統計</title><style>
 @page{size:A4;margin:12mm 15mm}body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;color:#2c1a0e;font-size:10pt}

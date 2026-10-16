@@ -1730,7 +1730,7 @@ export default function Finance() {
               ? ['加班時數（×1.0 併薪）', H(slip.hourlyOTHrs), E.green]
               : ['本月加班 → 補休', tm.accruedHours > 0 ? `+${tm.accruedHours}h` : '—', E.green],
             ['缺時（少做時數）', isHourly ? '—' : H(tm.deficitHours), tm.deficitHours > 0 && !isHourly ? RED : E.textPrimary],
-            ['補休抵缺時', isHourly ? '—' : H(tm.consumed), E.coffee],
+            ['補休抵缺時', isHourly ? '—' : H(tm.consumed), E.coffee, (!isHourly && tm.weightedOffset && tm.consumedHours) ? `補休 ${tm.consumedHours}h × 費率` : ''],
             ['缺時扣薪時數', isHourly ? '—' : H(tm.dockHours), tm.dockHours > 0 ? RED : E.textPrimary],
             ['補休餘額', isHourly ? '—' : `${tm.balHours ?? 0}h`, E.coffee],
             ['遲到 / 早退', D(tm.lateLeaveDays), tm.lateLeaveDays > 0 ? AMBER : E.textPrimary],

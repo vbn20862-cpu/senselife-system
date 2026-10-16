@@ -914,6 +914,9 @@ function proratedGovtHours(emp, yr, mo) {
 
 // 補休水庫總帳：從 2026-06 逐月走到 asOf，回傳逐月明細 + 季結 + 餘額
 //   asOf = { year, month }
+// 補休抵缺時改為「先加權再抵」的起算月（之前月份維持 1:1，不回溯已發薪資）
+export const WEIGHTED_OFFSET_FROM = { year: 2026, month: 9 }
+
 export function computeCompLedger(emp, data, asOf) {
   const holidaySet = new Set(getHolidays(data).map(h => h.date))
   const setting = (data.salarySettings || []).find(s => s.empId === emp.id)
@@ -965,14 +968,20 @@ export function computeCompLedger(emp, data, asOf) {
     const sched = computeScheduledStats(emp, year, month, data, holidaySet)
     const shortfall = isHourly ? 0 : sched.deficitHours
     // 缺口優先扣低費率補休（1.34 → 1.67 → 2）
+    // 2026-09 起「先加權再抵」：1 小時 1.34 桶的補休可抵 1.34 小時缺時（等於加班費照倍率發、缺時照 1 倍扣的淨額）
+    const weightedOffset = year > WEIGHTED_OFFSET_FROM.year || (year === WEIGHTED_OFFSET_FROM.year && month >= WEIGHTED_OFFSET_FROM.month)
     let remain = shortfall
-    let consumed = 0
+    let consumed = 0       // 抵掉的缺時（加權後）
+    let consumedHours = 0  // 實際消耗的補休時數
     for (const r of RATE_ORDER) {
       if (remain <= 0) break
-      const take = Math.min(remain, bal[r])
-      bal[r] = round2(bal[r] - take)
+      const rate = weightedOffset ? Number(r) : 1
+      const take = Math.min(remain, round2(bal[r] * rate))
+      const hrs = round2(take / rate)
+      bal[r] = round2(bal[r] - hrs)
       remain = round2(remain - take)
       consumed = round2(consumed + take)
+      consumedHours = round2(consumedHours + hrs)
     }
     const dockHours = round2(shortfall - consumed)
     const dockAmount = isHourly ? 0 : Math.floor(dockHours * hr) // 扣薪無條件捨去（少扣）；時薪制不扣
@@ -985,7 +994,7 @@ export function computeCompLedger(emp, data, asOf) {
       suspShortDays: sched.suspShortDays, suspShortDates: sched.suspShortDates,
       normalH, compTaken,
       accruedHours: accr.hours, manualHours: manual,
-      shortfall, consumed, dockHours, dockAmount,
+      shortfall, consumed, consumedHours, weightedOffset, dockHours, dockAmount,
       balHours: round2(sumLots()),
     })
 
