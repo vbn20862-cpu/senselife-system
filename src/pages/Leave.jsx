@@ -5,6 +5,13 @@ import { E, useIsMobile } from '../styles/earth'
 import Modal from '../components/Modal'
 import { Plus, Check, X, Trash2, Clock } from 'lucide-react'
 import { LEAVE_TYPES, annualLeaveStatus, computeCompLedger, sickLeaveCap, annualLeaveHoursOf } from '../utils/payrollEngine'
+
+// 喪假天數（勞工請假規則第 3 條），依親屬關係，工資照給
+const BEREAVEMENT_DAYS = {
+  '父母、養父母、繼父母、配偶': 8,
+  '祖父母、子女、配偶之父母、配偶之養父母或繼父母': 6,
+  '曾祖父母、兄弟姊妹、配偶之祖父母': 3,
+}
 import { localTimestamp } from '../utils/salaryCalc'
 
 const STATUS_STYLE = {
@@ -27,7 +34,7 @@ export default function Leave() {
   const { currentUser, isAdmin } = useAuth()
   const mob = useIsMobile()
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ empId: '', type: '特休', startDate: '', endDate: '', halfDay: false, reason: '' })
+  const [form, setForm] = useState({ empId: '', type: '特休', startDate: '', endDate: '', halfDay: false, reason: '', relation: '' })
   const [formErr, setFormErr] = useState('')
 
   const myEmp = useMemo(() =>
@@ -43,7 +50,7 @@ export default function Leave() {
   const pendingCount = (data.leaveRequests || []).filter(l => l.status === '待審核').length
 
   function openForm() {
-    setForm({ empId: isAdmin ? '' : (myEmp?.id || ''), type: '特休', startDate: '', endDate: '', halfDay: false, reason: '' })
+    setForm({ empId: isAdmin ? '' : (myEmp?.id || ''), type: '特休', startDate: '', endDate: '', halfDay: false, reason: '', relation: '' })
     setFormErr('')
     setShowForm(true)
   }
@@ -66,6 +73,12 @@ export default function Leave() {
 
     const emp = data.employees.find(e => e.id === empId)
     let days = form.halfDay ? 0.5 : daysBetween(form.startDate, end)
+    // 喪假：勞工請假規則第 3 條，依親等 8／6／3 天，單次事件不得超過
+    if (form.type === '喪假') {
+      const cap = BEREAVEMENT_DAYS[form.relation]
+      if (!cap) { setFormErr('喪假請選擇親屬關係'); return }
+      if (days > cap) { setFormErr(`${form.relation}喪假上限 ${cap} 天，不足以請 ${days} 天（可分次請）`); return }
+    }
     // 特休只扣有排班的工作日：days 記實際扣的天數
     if (form.type === '特休' && emp) {
       const h = annualLeaveHoursOf(emp, { startDate: form.startDate, endDate: end, days }, new Date(form.startDate).getFullYear(), data)
@@ -93,6 +106,7 @@ export default function Leave() {
       days,
       halfDay: form.halfDay,
       reason: form.reason.trim(),
+      ...(form.type === '喪假' && form.relation ? { relation: form.relation } : {}),
       status: isAdmin ? '已核准' : '待審核', // 管理員補登直接核准
       submittedAt: localTimestamp(),
       reviewedBy: isAdmin ? (currentUser?.name || '管理員') : '',
@@ -121,6 +135,15 @@ export default function Leave() {
     const cal = form.halfDay ? 0.5 : daysBetween(form.startDate, end)
     const eff = Math.round(annualLeaveHoursOf(emp, { startDate: form.startDate, endDate: end, days: cal }, new Date(form.startDate).getFullYear(), data) / 8 * 10) / 10
     return eff === cal ? `這次會扣特休 ${eff} 天。` : `期間共 ${cal} 天，其中有排班的工作日 ${eff} 天，只扣特休 ${eff} 天（排休日不扣）。`
+  })()
+  // 喪假／公假：依勞工請假規則，工資照給，不計入病假／事假額度
+  const paidNotice = (() => {
+    if (form.type === '喪假') {
+      const cap = BEREAVEMENT_DAYS[form.relation]
+      return cap ? `喪假依勞工請假規則第 3 條：${form.relation}喪亡 ${cap} 天，工資照給；可分次請，請於百日內請畢。` : '喪假依親屬關係 8／6／3 天，工資照給，請先選擇親屬關係。'
+    }
+    if (form.type === '公假') return '公假（教育召集、兵役、法定選舉投票、法院傳喚等）依勞工請假規則第 8 條，工資照給，不計入任何額度。'
+    return null
   })()
   // 病假／事假超過年度上限：仍可請，超過部分無薪 → 送出前提示
   const capNotice = (() => {
@@ -192,7 +215,7 @@ export default function Leave() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {isAdmin && <span style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary }}>{l.empName}</span>}
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>{l.type}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>{l.type}{l.relation ? `（${l.relation}）` : ''}</span>
                     <span style={{ fontSize: '10px', padding: '1px 8px', borderRadius: '999px', backgroundColor: st.bg, color: st.color, fontWeight: '600' }}>{l.status || '待審核'}</span>
                   </div>
                   <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '4px' }}>
@@ -233,6 +256,14 @@ export default function Leave() {
                 {LEAVE_TYPES.map(t => <option key={t.type} value={t.type}>{t.type}</option>)}
               </select>
             </Field>
+            {form.type === '喪假' && (
+              <Field label="親屬關係 *">
+                <select value={form.relation} onChange={e => setForm(p => ({ ...p, relation: e.target.value }))} style={E.input}>
+                  <option value="">選擇親屬關係</option>
+                  {Object.entries(BEREAVEMENT_DAYS).map(([k, v]) => <option key={k} value={k}>{k}（{v} 天）</option>)}
+                </select>
+              </Field>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: E.textSecond, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.halfDay} onChange={e => setForm(p => ({ ...p, halfDay: e.target.checked }))} />
               半天假（單日 0.5 天）
@@ -251,6 +282,7 @@ export default function Leave() {
               <textarea value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} rows={2} style={{ ...E.input, resize: 'vertical', fontFamily: 'inherit' }} />
             </Field>
             {annualNotice && <div style={{ fontSize: '12px', lineHeight: 1.5, color: E.textMuted }}>{annualNotice}</div>}
+            {paidNotice && <div style={{ fontSize: '12px', lineHeight: 1.5, color: E.textMuted }}>{paidNotice}</div>}
             {capNotice && <div style={{ fontSize: '12px', lineHeight: 1.5, color: capNotice.warn ? '#8a6d1a' : E.textMuted, backgroundColor: capNotice.warn ? '#fef3cd' : 'transparent', padding: capNotice.warn ? '8px 12px' : 0, borderRadius: '8px' }}>{capNotice.text}</div>}
             {formErr && <div style={{ fontSize: '13px', color: '#c04030', backgroundColor: '#fce8e0', padding: '8px 12px', borderRadius: '8px' }}>⚠ {formErr}</div>}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

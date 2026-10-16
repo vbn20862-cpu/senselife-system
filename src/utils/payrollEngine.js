@@ -5,7 +5,7 @@
 // 設計原則：寧可多給、不可少給；寧可少扣、不可溢扣。
 // 加班費：小數無條件進位。遲到早退：金額無條件捨去。
 
-import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin, normalDayMinutes, activityExtraOTMinutes } from './salaryCalc'
+import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin, normalDayMinutes, activityExtraOTMinutes, isActivityDay } from './salaryCalc'
 import { getHolidays } from './holidays'
 
 // ── 2025–2026 國定假日（勞基法第 37 條認定）──
@@ -843,6 +843,9 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     const workedMin = normalDayMinutes(dayRecs, dateStr, data) + activityExtraOTMinutes(dayRecs, dateStr, data) + (otMinByDate[dateStr] || 0)
     const fulfilledMin = workedMin + leaveH * 60
     let dMin = Math.max(0, sh * 60 - fulfilledMin)
+    // 活動日（排班表活動備註有填）：集合／解散時間由公司統一登打，提早解散是公司的決定，
+    // 有出勤就不算缺時（民法受領遲延）；整天沒出勤照扣（2026-10-16 阿慶定）
+    if (dMin > 0 && isActivityDay(dateStr, data) && (hasIn || hasOut)) dMin = 0
     // 部分停班日：只要當日未做滿全班，停班時段整塊無薪（多留的零頭不抵扣；
     // 停班時段內有出勤要給的，一律走手動補休入帳，如 6/25 傍晚案例）
     if (dMin > 0 && susp && susp.scope === 'partial') {
