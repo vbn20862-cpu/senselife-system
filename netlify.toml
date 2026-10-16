@@ -8,6 +8,9 @@
   # VITE_ 開頭的變數本來就會打進前端 bundle（Google Calendar 瀏覽器金鑰，靠 referer 限制），
   # 跳過 Netlify secrets scanning 對這兩把的檢查，否則雲端建置會被擋（2026-10-16 升級 Pro 後首次發生）
   SECRETS_SCAN_OMIT_KEYS = "VITE_GOOGLE_CALENDAR_API_KEY,VITE_GOOGLE_CALENDAR_ID"
+  # 模式偵測把 Firebase web API key（src/firebase.js，本來就公開在前端與 repo）當成疑似金鑰而擋建置；
+  # 只豁免這一把的值，其他偵測照常。安全靠 RTDB 規則（待辦 🔴），不靠這把。
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyDyhe4L4Q0SFWox0XCdm1g2JZWtu-pQHLI"
 
 # 排程函式（netlify/functions/）：monthly-drafts 每月 5 號產生薪資明細草稿；用 esbuild 打包以解析 src/utils 的無副檔名 import
 [functions]
