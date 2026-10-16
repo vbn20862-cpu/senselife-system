@@ -1,4 +1,22 @@
 import { useState, useEffect } from 'react'
+
+// 可打卡地點（公司所在地）：依歷史打卡定位群集設定，半徑 SITE_RADIUS_M 公尺內才能打卡
+export const PUNCH_SITES = [
+  { name: '公司（瑪家鄉和平路一段 65 號）', lat: 22.70707, lng: 120.61939 },
+]
+export const SITE_RADIUS_M = 100
+export const GEO_TOLERANCE_M = 50
+function distanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toRad = x => x * Math.PI / 180
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+function nearestSite(lat, lng) {
+  let best = null
+  for (const st of PUNCH_SITES) { const dist = distanceM(lat, lng, st.lat, st.lng); if (!best || dist < best.dist) best = { ...st, dist } }
+  return best
+}
 import { useApp } from '../context/AppContext'
 import { useIsMobile } from '../styles/earth'
 import { getCurrentCoords, reverseGeocode } from '../utils/geo'
@@ -76,12 +94,18 @@ export default function Checkin() {
   }
 
   const hasGeo = geoStatus === 'ready' && geo && Number.isFinite(geo.lat) && Number.isFinite(geo.lng)
+  // 打卡地點限制：公司所在地半徑 100 公尺內才能打卡（2026-10-16 阿慶定）；定位誤差最多再寬限 50 公尺
+  // 活動日、外勤由管理員在打卡後台統一登記，不受此限
+  const site = hasGeo ? nearestSite(geo.lat, geo.lng) : null
+  const tolerance = hasGeo ? Math.min(Number(geo.accuracy) || 0, GEO_TOLERANCE_M) : 0
+  const inRange = !!site && site.dist <= SITE_RADIUS_M + tolerance
+  const canPunch = hasGeo && inRange
 
   function handlePunch(type) {
     const emp = data.employees.find(e => e.id === Number(selectedEmp))
     if (!emp) return
-    // 打卡一定要有定位（管理員補登走打卡後台，不受此限）
-    if (!hasGeo) return
+    // 打卡一定要有定位，且在公司半徑 100 公尺內（管理員補登走打卡後台，不受此限）
+    if (!canPunch) return
     const t = now.toTimeString().slice(0, 5)
     const rec = {
       id: Date.now(),
@@ -104,7 +128,9 @@ export default function Checkin() {
   const geoHint = {
     idle:        null,
     locating:    { icon: '🔍', text: '定位中…', color: '#9a8070' },
-    ready:       { icon: '📍', text: geo?.address ? geo.address : `已取得位置（誤差約 ${geo?.accuracy ?? '?'} 公尺）`, color: '#3a6d31' },
+    ready:       inRange
+      ? { icon: '📍', text: `${site.name}（距離 ${Math.round(site.dist)} 公尺，誤差約 ${geo?.accuracy ?? '?'} 公尺）`, color: '#3a6d31' }
+      : { icon: '⛔', text: `不在公司範圍內，無法打卡：距離${site ? site.name : '公司'} ${site ? Math.round(site.dist) : '?'} 公尺（限 ${SITE_RADIUS_M} 公尺內，誤差約 ${geo?.accuracy ?? '?'} 公尺）。外勤或活動請於打卡時間通知管理員登記。`, color: '#b42318' },
     denied:      { icon: '⛔', text: '未開啟定位權限，無法打卡。請到手機設定允許瀏覽器使用位置，再按「重新定位」。', color: '#b42318' },
     unavailable: { icon: '⛔', text: '抓不到位置，無法打卡。請確認手機定位已開啟，再按「重新定位」。', color: '#b42318' },
   }[geoStatus]
@@ -159,12 +185,12 @@ export default function Checkin() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '8px 12px', borderRadius: '10px',
-            backgroundColor: geoStatus === 'ready' ? '#edf2ea' : geoStatus === 'locating' ? '#f5f0e8' : '#fef3e0',
-            border: `1px solid ${geoStatus === 'ready' ? '#cfe0c8' : geoStatus === 'locating' ? '#e6dcc8' : '#f0d0a0'}`,
+            backgroundColor: (geoStatus === 'ready' && inRange) ? '#edf2ea' : geoStatus === 'locating' ? '#f5f0e8' : '#fef3e0',
+            border: `1px solid ${(geoStatus === 'ready' && inRange) ? '#cfe0c8' : geoStatus === 'locating' ? '#e6dcc8' : '#f0d0a0'}`,
           }}>
             <span style={{ fontSize: '14px' }}>{geoHint.icon}</span>
             <span style={{ fontSize: '12px', color: geoHint.color, fontWeight: '500', lineHeight: 1.4, flex: 1 }}>{geoHint.text}</span>
-            {(geoStatus === 'denied' || geoStatus === 'unavailable') && (
+            {(geoStatus === 'denied' || geoStatus === 'unavailable' || (geoStatus === 'ready' && !inRange)) && (
               <button onClick={() => setGeoRetry(n => n + 1)} style={{ flexShrink: 0, border: '1px solid #b42318', background: '#fff', color: '#b42318', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>重新定位</button>
             )}
           </div>
@@ -188,14 +214,14 @@ export default function Checkin() {
         {/* 打卡類型按鈕 */}
         {selectedEmp && !isActivityDay && (
           <>
-            <div style={{ fontSize: '12px', color: '#7a6050', fontWeight: '600' }}>選擇打卡類型{!hasGeo && <span style={{ fontWeight: '400', color: '#9a8070' }}>（取得定位後才能打卡）</span>}</div>
+            <div style={{ fontSize: '12px', color: '#7a6050', fontWeight: '600' }}>選擇打卡類型{!hasGeo ? <span style={{ fontWeight: '400', color: '#9a8070' }}>（取得定位後才能打卡）</span> : null}</div>
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               {PUNCH_TYPES.map(({ type, emoji, color, bg, desc }) => (
-                <button key={type} onClick={() => handlePunch(type)} disabled={!hasGeo} style={{
+                <button key={type} onClick={() => handlePunch(type)} disabled={!canPunch} style={{
                   backgroundColor: bg, border: `2px solid ${color}20`,
                   borderRadius: '14px', padding: '16px 10px',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  cursor: hasGeo ? 'pointer' : 'not-allowed', opacity: hasGeo ? 1 : 0.4, transition: 'all 0.15s',
+                  cursor: canPunch ? 'pointer' : 'not-allowed', opacity: canPunch ? 1 : 0.4, transition: 'all 0.15s',
                 }}>
                   <span style={{ fontSize: '28px' }}>{emoji}</span>
                   <span style={{ fontSize: '15px', fontWeight: '700', color }}>{type}</span>
