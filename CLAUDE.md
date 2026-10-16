@@ -95,8 +95,10 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
 - 活動日有出勤不算缺時已上線 V26.08.03（2026-10-16）。休息日活動不進補休：公司採「原則週休二日、配合活動調休」，
   排班表活動日排「出勤」、調休日排「休假」，缺時只算有排班的日子（computeScheduledStats）
 - 喪假需選親屬關係（8／6／3 天，Leave.jsx BEREAVEMENT_DAYS），公假全薪不計額度；兩者引擎皆 cat paid
-- 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）；
-  姿晴 9 月即時比已發明細多 290，等她回覆補時數選項（一）／（二）再重發 9 月明細
+- 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）
+- 🔴 姿晴 7–8 月缺 84h 分三期（9、10、11 月各 28h，2026-10-16 雙方約定）：9 月明細已重發（本次應領 22,665，含第 1 期扣 3,441）；
+  **10 月、11 月草稿要各加第 2、3 期**：當期以勞務補足的時數 × 122.92 退還、未補足的扣回（無條件捨去）。
+  monthly-drafts 自動草稿不會自己加這段，11/5 後人工補進去再發布（用 ops/publish-statement.mjs）
 - Netlify 已升級 Pro（2026-10-16），push main 自動部署恢復；雲端建置若被 secrets scanning 擋，看 netlify.toml 的
   SECRETS_SCAN_* 設定（Firebase web key、VITE_ 金鑰皆為前端公開值）；備援仍可 `npx netlify-cli deploy --prod --dir=dist`
 - 10/19–10/25 整週排出勤無休假日（員工自願，阿慶決定不調）；七休一責任在雇主，已告知
