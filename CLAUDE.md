@@ -94,7 +94,8 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
 - npm audit：剩 5 個 braces（建置期）放著
 - 🔴 11/5 產 10 月明細前要改好（2026-10-16 已答應寶琳）：休息日／國定假日活動出勤全部時數進補休（契約「擇日補休」）、
   補休日／調移補假日可在排班表標記不算缺時、活動日（公司定集合解散時間）不扣缺時；10/3（六）寶琳 8.5h 目前只記 0.5h
-- 本機已改未上線（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM），上線前跳 V26.08.02；
-  姿晴 9 月即時會比已發明細多 290，等她回覆補時數選項（一）／（二）再重發 9 月明細
-- Netlify build 額度用完：上線改走 `npm run build && npx netlify-cli deploy --prod --dir=dist`
+- 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）；
+  姿晴 9 月即時比已發明細多 290，等她回覆補時數選項（一）／（二）再重發 9 月明細
+- Netlify 已升級 Pro（2026-10-16），push main 自動部署恢復；雲端建置若被 secrets scanning 擋，看 netlify.toml 的
+  SECRETS_SCAN_* 設定（Firebase web key、VITE_ 金鑰皆為前端公開值）；備援仍可 `npx netlify-cli deploy --prod --dir=dist`
 - 10/25（日）慢慢活動：例假日不可出勤（§40），建議只排 10/24
