@@ -1,20 +1,38 @@
 import { useState, useEffect } from 'react'
 
-// 可打卡地點（公司所在地）：依歷史打卡定位群集設定，半徑 SITE_RADIUS_M 公尺內才能打卡
-export const PUNCH_SITES = [
-  { name: '公司（瑪家鄉和平路一段 65 號）', lat: 22.70707, lng: 120.61939 },
+// 可打卡區域（公司所在地）：阿慶 2026-10-16 在地圖上畫的多邊形（涵蓋瑪家和平路與北葉辦公室），區域內才能打卡；
+// 手機定位誤差最多再寬限 GEO_TOLERANCE_M 公尺（離邊界不超過此距離也算在內）
+export const PUNCH_ZONES = [
+  { name: '公司範圍', points: [[22.68118, 120.63623], [22.70478, 120.60722], [22.71444, 120.63108], [22.7089, 120.65237]] },
 ]
-export const SITE_RADIUS_M = 100
 export const GEO_TOLERANCE_M = 50
-function distanceM(lat1, lng1, lat2, lng2) {
-  const R = 6371000, toRad = x => x * Math.PI / 180
-  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1)
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(a))
+// 經緯度 → 以區域中心為原點的公尺座標（等距圓柱近似，區域只有幾公里，誤差可忽略）
+function toXY(lat, lng, lat0) { const k = 111320; return [(lng) * k * Math.cos(lat0 * Math.PI / 180), lat * k] }
+function pointInPolygon(p, poly) {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j]
+    if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
 }
+function distToSegment(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1]; const l2 = dx * dx + dy * dy
+  const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+}
+// 回傳 { name, inside, edgeDist }：inside＝在區域內；edgeDist＝到最近邊界的公尺數
 function nearestSite(lat, lng) {
   let best = null
-  for (const st of PUNCH_SITES) { const dist = distanceM(lat, lng, st.lat, st.lng); if (!best || dist < best.dist) best = { ...st, dist } }
+  for (const z of PUNCH_ZONES) {
+    const lat0 = z.points.reduce((s, q) => s + q[0], 0) / z.points.length
+    const poly = z.points.map(q => toXY(q[0], q[1], lat0)), p = toXY(lat, lng, lat0)
+    const inside = pointInPolygon(p, poly)
+    let edgeDist = Infinity
+    for (let i = 0; i < poly.length; i++) edgeDist = Math.min(edgeDist, distToSegment(p, poly[i], poly[(i + 1) % poly.length]))
+    const dist = inside ? 0 : edgeDist
+    if (!best || dist < best.dist) best = { name: z.name, inside, dist }
+  }
   return best
 }
 import { useApp } from '../context/AppContext'
@@ -98,7 +116,7 @@ export default function Checkin() {
   // 活動日、外勤由管理員在打卡後台統一登記，不受此限
   const site = hasGeo ? nearestSite(geo.lat, geo.lng) : null
   const tolerance = hasGeo ? Math.min(Number(geo.accuracy) || 0, GEO_TOLERANCE_M) : 0
-  const inRange = !!site && site.dist <= SITE_RADIUS_M + tolerance
+  const inRange = !!site && (site.inside || site.dist <= tolerance)
   const canPunch = hasGeo && inRange
 
   function handlePunch(type) {
@@ -129,8 +147,8 @@ export default function Checkin() {
     idle:        null,
     locating:    { icon: '🔍', text: '定位中…', color: '#9a8070' },
     ready:       inRange
-      ? { icon: '📍', text: `${site.name}（距離 ${Math.round(site.dist)} 公尺，誤差約 ${geo?.accuracy ?? '?'} 公尺）`, color: '#3a6d31' }
-      : { icon: '⛔', text: `不在公司範圍內，無法打卡：距離${site ? site.name : '公司'} ${site ? Math.round(site.dist) : '?'} 公尺（限 ${SITE_RADIUS_M} 公尺內，誤差約 ${geo?.accuracy ?? '?'} 公尺）。外勤或活動請於打卡時間通知管理員登記。`, color: '#b42318' },
+      ? { icon: '📍', text: `${site.name}內（誤差約 ${geo?.accuracy ?? '?'} 公尺）`, color: '#3a6d31' }
+      : { icon: '⛔', text: `不在公司範圍內，無法打卡：距範圍邊界約 ${site ? Math.round(site.dist) : '?'} 公尺（誤差約 ${geo?.accuracy ?? '?'} 公尺）。外勤或活動請於打卡時間通知管理員登記。`, color: '#b42318' },
     denied:      { icon: '⛔', text: '未開啟定位權限，無法打卡。請到手機設定允許瀏覽器使用位置，再按「重新定位」。', color: '#b42318' },
     unavailable: { icon: '⛔', text: '抓不到位置，無法打卡。請確認手機定位已開啟，再按「重新定位」。', color: '#b42318' },
   }[geoStatus]
