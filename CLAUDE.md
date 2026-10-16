@@ -101,7 +101,7 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
   prevSetting＝原月薪快照；勞健保級距待會計重算。10 月明細仍為月薪制。
 - 喪假需選親屬關係（8／6／3 天，Leave.jsx BEREAVEMENT_DAYS），公假全薪不計額度；兩者引擎皆 cat paid
 - 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）
-- 🔴 姿晴 7–8 月缺 84h 分三期（9、10、11 月各 28h，2026-10-16 雙方約定）：9 月明細已重發（本次應領 22,665，含第 1 期扣 3,441）；
+- 🔴 姿晴 7–8 月缺 72h 分三期（9、10、11 月各 24h，2026-10-16 雙方約定）：9 月明細已重發（本次應領 23,156，含第 1 期扣 2,950；8/11、8/12 喪假 12h 已補入，缺 72h）；
   **10 月、11 月草稿要各加第 2、3 期**：當期以勞務補足的時數 × 122.92 退還、未補足的扣回（無條件捨去）。
   monthly-drafts 自動草稿不會自己加這段，11/5 後人工補進去再發布（用 ops/publish-statement.mjs）
 - Netlify 已升級 Pro（2026-10-16），push main 自動部署恢復；雲端建置若被 secrets scanning 擋，看 netlify.toml 的
