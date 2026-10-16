@@ -121,6 +121,23 @@ export function monthlyTotalRegularPay(setting) {
        + Number(setting.activityAttendance || 0)
 }
 
+// 薪制切換生效月：setting.payTypeFrom（YYYY-MM-DD）之前的月份用 setting.prevSetting 覆蓋（舊薪制快照），
+// 讓「11/1 起改時薪」不影響之前月份的即時計算與草稿（2026-10-16 寶琳轉 PT）
+export function effectiveSetting(setting, yr, mo) {
+  if (!setting?.payTypeFrom || !setting.prevSetting) return setting
+  return `${yr}-${pad2(mo)}` < setting.payTypeFrom.slice(0, 7) ? { ...setting, ...setting.prevSetting } : setting
+}
+export const isHourlyFor = (emp, data, yr, mo) =>
+  (effectiveSetting((data.salarySettings || []).find(x => x && x.empId === emp.id), yr, mo)?.payType || 'monthly') === 'hourly'
+
+// 班別時數；某日排班時數（無排班或休假 → 0）
+export const SHIFT_HOURS = { '出勤': 8, 'W': 8, '上午班': 4, '下午班': 4 }
+export function scheduledHoursOn(emp, dateStr, data) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const sc = (data.schedules || []).find(x => x && x.empId === emp.id && x.year === y && x.month === m && x.day === d)
+  return SHIFT_HOURS[sc?.shift] || 0
+}
+
 // 平日每小時工資（時薪基準）：月工資總額 ÷ 240
 // 時薪制員工直接用 hourlyRate
 export function hourlyRate(setting) {
@@ -625,6 +642,26 @@ export function computeHourlyOTHours(emp, yr, mo, data) {
   return round2(min / 60)
 }
 
+// 時薪制延長工時加給（勞基法 §24）：當日正常＋加班超過 8h 的部分，前 2h 加給 1/3、之後加給 2/3
+//   回傳「加給的等值時數」（打卡時數已把加班以 ×1.0 計入，這裡只補差額）
+export function computeHourlyOTPremiumHours(emp, yr, mo, data) {
+  const monthStr = `${yr}-${pad2(mo)}`
+  const recs = (data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp))
+  const otMinByDate = {}
+  for (const sp of computeOTSpans(recs)) {
+    if (sp.missingEnd || sp.missingStart || !sp.startDate) continue
+    otMinByDate[sp.startDate] = (otMinByDate[sp.startDate] || 0) + sp.minutes
+  }
+  let premium = 0
+  for (const date of new Set(recs.map(c => c.date))) {
+    const dayRecs = recs.filter(c => c.date === date)
+    const total = normalDayMinutes(dayRecs, date, data) + activityExtraOTMinutes(dayRecs, date, data) + (otMinByDate[date] || 0)
+    const beyond = Math.max(0, total - 480)
+    premium += Math.min(beyond, 120) * 0.34 + Math.max(0, beyond - 120) * 0.67
+  }
+  return round2(premium / 60)
+}
+
 export function computeHourlyHolidayPremium(emp, yr, mo, data, rate) {
   const holidaySet = new Set(getHolidays(data).map(h => h.date))
   const monthStr = `${yr}-${pad2(mo)}`
@@ -743,10 +780,12 @@ export function leaveEffectiveHoursInMonth(emp, yr, mo, data) {
     const start = l.startDate || l.date
     const end = l.endDate || start
     if (!start) continue
-    const dayHours = (start === end && Number(l.days) === 0.5) ? 4 : 8
+    const half = (start === end && Number(l.days) === 0.5)
     const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
     while (d <= last) {
       const ds = d.toLocaleDateString('sv-SE')
+      // 時薪制（部分工時）：請假折算按當日排班時數（沒排班的日子請假不給薪）；月薪制固定 8h／半天 4h
+      const dayHours = isHourlyFor(emp, data, yr, mo) ? scheduledHoursOn(emp, ds, data) * (half ? 0.5 : 1) : (half ? 4 : 8)
       if (ds.startsWith(monthStr)) hours += dayHours * leaveFactorOn(l, emp, ds, data, sickMaps)
       d.setDate(d.getDate() + 1)
     }
@@ -922,9 +961,10 @@ export const WEIGHTED_OFFSET_FROM = { year: 2026, month: 9 }
 
 export function computeCompLedger(emp, data, asOf) {
   const holidaySet = new Set(getHolidays(data).map(h => h.date))
-  const setting = (data.salarySettings || []).find(s => s.empId === emp.id)
-  const hr = hourlyRate(setting)
-  const isHourly = (setting?.payType || 'monthly') === 'hourly' // 時薪制：按時數給薪，不另扣缺口
+  const setting0 = (data.salarySettings || []).find(s => s.empId === emp.id)
+  let setting = effectiveSetting(setting0, asOf.year, asOf.month)
+  let hr = hourlyRate(setting)
+  let isHourly = (setting?.payType || 'monthly') === 'hourly' // 時薪制：按時數給薪，不另扣缺口
 
   // 月份序列 2026-06 → asOf
   const months = []
@@ -943,6 +983,7 @@ export function computeCompLedger(emp, data, asOf) {
   const settlements = []
 
   for (const { year, month } of months) {
+    setting = effectiveSetting(setting0, year, month); hr = hourlyRate(setting); isHourly = (setting?.payType || 'monthly') === 'hourly'
     // 時薪制：加班已含在時薪內（時數×時薪），不另累積補休，避免加班付兩次
     const accr = isHourly ? { hours: 0, weighted: 0, lots: { '1.34': 0, '1.67': 0, '2': 0 } } : computeMonthCompAccrual(emp, year, month, data, holidaySet)
     RATE_ORDER.forEach(r => { bal[r] += accr.lots[r] || 0 })

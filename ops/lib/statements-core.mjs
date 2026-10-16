@@ -26,7 +26,8 @@ const expected = govt - suspH
 const summary = [`${YR} 年 ${MO} 月薪資明細草稿（產生於 ${new Date().toLocaleString('sv-SE').slice(0, 16)}）`, `應上班時數 ${expected}h（行政機關 ${govt}h${suspH ? ` − 停班 ${suspH}h：${suspDays.map(([d]) => d.slice(5)).join('、')}` : ''}）`, '']
 
 for (const e of data.employees) {
-  const s = data.salarySettings.find(x => x.empId === e.id); if (!s) continue
+  const s0 = data.salarySettings.find(x => x.empId === e.id); if (!s0) continue
+  const s = PE.effectiveSetting(s0, YR, MO)
   const hire = e.hireDate && e.hireDate > `${target}-31` ; if (hire) continue
   const hourly = (s.payType || 'monthly') === 'hourly'
   const recs = data.clockins.filter(c => c.date?.startsWith(target) && c.empName === e.name)
@@ -54,7 +55,8 @@ for (const e of data.employees) {
   const extras = [['伙食', N('mealAllowance')], ['全勤', N('fullAttendanceBonus')], ['活動出勤', N('activityAttendance')]].filter(([, v]) => v)
   const dedItems = [['健保', N('healthInsEmp')], ['勞保', N('laborInsEmp')], ['勞退自提', N('pensionSelf')], ['眷屬健保', N('dependentHealth')], ['匯費', N('wireFee')]].filter(([, v]) => v)
   const ded = dedItems.reduce((a, [, v]) => a + v, 0)
-  const hourlyHrs = hourly ? r2(SC.computeEmpMonthClockHours(e, YR, MO, data) + PE.leaveEffectiveHoursInMonth(e, YR, MO, data)) : 0
+  const hClock = hourly ? SC.computeEmpMonthClockHours(e, YR, MO, data, { exact: true }) : 0, hLeave = hourly ? PE.leaveEffectiveHoursInMonth(e, YR, MO, data) : 0, hPrem = hourly ? PE.computeHourlyOTPremiumHours(e, YR, MO, data) : 0
+  const hourlyHrs = hourly ? r2(hClock + hLeave + hPrem) : 0
   const base = hourly ? Math.round(hourlyHrs * N('baseSalary') || hourlyHrs * N('hourlyRate')) : N('baseSalary')
   const gross = base + extras.reduce((a, [, v]) => a + v, 0)
   const isQEnd = [3, 6, 9, 12].includes(MO); const settle = isQEnd ? L.settlements.find(x => x.year === YR && x.quarter === Math.ceil(MO / 3)) : null
@@ -65,7 +67,7 @@ for (const e of data.employees) {
   const rateTxt = r2(L.hourlyRate)
 
   const pay = [
-    [hourly ? `時薪 ${N('baseSalary') || N('hourlyRate')} × ${hourlyHrs} 小時` : `底薪 ${base.toLocaleString()}${extras.length ? '＋' + extras.map(([k, v]) => `${k} ${v}`).join('＋') : ''}`, money(gross), ''],
+    [hourly ? `時薪 ${N('baseSalary') || N('hourlyRate')} × ${hourlyHrs} 小時（打卡 ${r2(hClock)}＋有薪假 ${r2(hLeave)}${hPrem ? `＋延長工時加給 ${r2(hPrem)}` : ''}）` : `底薪 ${base.toLocaleString()}${extras.length ? '＋' + extras.map(([k, v]) => `${k} ${v}`).join('＋') : ''}`, money(gross), ''],
     ...(cash ? [[`補休季底折現（Q${Math.ceil(MO / 3)} 未休 ${settle.hours} 小時）`, money(cash), '']] : []),
     ...(annual ? [['特休年底折現', money(annual), '']] : []),
     ...(holPrem ? [['國定假日加給', money(holPrem), '']] : []),
@@ -92,7 +94,7 @@ ${pay.map(([k, v, c]) => `<tr><td>${esc(k)}</td><td${c ? ` class="${c}"` : ''}>$
 <tr class="tot"><td>實領</td><td>${money(net)}</td></tr></table>
 <div class="note"><b>說明</b>
 <div>・實際上班時數：系統打卡紀錄（時間後標 * 者為補登或更正）。一般日依勞基法第 35 條扣休息、正常工時每日上限 8 小時；活動日照登打時間全算。計入時數＝正常工時與加班各取至 0.5 小時後相加。</div>
-${hourly ? '<div>・時薪制：（實際打卡時數＋有薪假時數＋加班時數）× 時薪。</div>' : `<div>・系統缺時（扣薪基準）＝排班應到時數 − 實際工時（當日加班先補當日缺時）− 請假折抵；特休全額、病假一半、事假不折抵。本月系統缺時 ${tm.deficitHours || 0} 小時，先用補休抵，不足才扣薪。</div>`}
+${hourly ? '<div>・時薪制（部分工時）：（實際打卡時數按分鐘計［含加班 ×1.0］＋有薪假依當日排班時數折算＋當日超過 8 小時部分之加給：前 2 小時 ×0.34、之後 ×0.67）× 時薪；國定假日有排班出勤者加倍。</div>' : `<div>・系統缺時（扣薪基準）＝排班應到時數 − 實際工時（當日加班先補當日缺時）− 請假折抵；特休全額、病假一半、事假不折抵。本月系統缺時 ${tm.deficitHours || 0} 小時，先用補休抵，不足才扣薪。</div>`}
 ${(tm.missingPunchDates || []).length ? `<div>・待補登（缺下班卡，尚未計入）：${tm.missingPunchDates.map(d => `${MO}/${Number(d.slice(8))}`).join('、')}。</div>` : ''}
 </div>
 <h2>逐日明細｜${YR} 年 ${MO} 月</h2><table class="d"><tr><th>日期</th><th>星期</th><th>排班</th><th>上班</th><th>下班</th><th>當日工時</th><th>加班</th><th>計入時數</th><th>請假</th><th>系統缺時</th><th>備註</th></tr>

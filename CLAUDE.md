@@ -94,6 +94,11 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
 - npm audit：剩 5 個 braces（建置期）放著
 - 活動日有出勤不算缺時已上線 V26.08.03（2026-10-16）。休息日活動不進補休：公司採「原則週休二日、配合活動調休」，
   排班表活動日排「出勤」、調休日排「休假」，缺時只算有排班的日子（computeScheduledStats）
+- 🔴 寶琳 2026-11-01 起轉部分工時（時薪 200，每週一般班上限 3 日、活動日另計、不另給津貼）：契約定稿在
+  ~/Desktop/勞動契約範本-2026-部分工時（PT）.docx（取消班次條款已刪除；增班須經乙方同意保留）。
+  順序：先上線 V26.08.04（薪制生效月 effectiveSetting／時薪制請假按排班折算／超過 8h 加給／按分鐘計／說明頁管理規範）
+  → 再寫她的 salarySettings：payType hourly、baseSalary＝hourlyRate＝200、津貼全 0、payTypeFrom 2026-11-01、
+  prevSetting＝原月薪快照；勞健保級距待會計重算。10 月明細仍為月薪制。
 - 喪假需選親屬關係（8／6／3 天，Leave.jsx BEREAVEMENT_DAYS），公假全薪不計額度；兩者引擎皆 cat paid
 - 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）
 - 🔴 姿晴 7–8 月缺 84h 分三期（9、10、11 月各 28h，2026-10-16 雙方約定）：9 月明細已重發（本次應領 22,665，含第 1 期扣 3,441）；

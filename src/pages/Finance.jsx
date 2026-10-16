@@ -7,7 +7,7 @@ import PayStatements, { PayDraftsOverview } from '../components/PayStatements'
 import { E, STATUS, useIsMobile } from '../styles/earth'
 import { exportFinance } from '../utils/exportExcel'
 import { MONTHS, GOVT_WORK_DAYS, computeEmpMonthClockHours } from '../utils/salaryCalc'
-import { hourlyRate, computeCompLedger, annualLeaveStatus, annualLeavePayout, computeHourlyHolidayPremium, computeHourlyOTHours, leavesInMonth, leaveEffectiveHoursInMonth, sickLeaveCap, sickLeaveFactorMap } from '../utils/payrollEngine'
+import { hourlyRate, computeCompLedger, annualLeaveStatus, annualLeavePayout, computeHourlyHolidayPremium, computeHourlyOTHours, computeHourlyOTPremiumHours, effectiveSetting, leavesInMonth, leaveEffectiveHoursInMonth, sickLeaveCap, sickLeaveFactorMap } from '../utils/payrollEngine'
 
 const CHART_COLORS = ['#4d8843','#5b7ec9','#c89040','#8a5cb0','#c04030','#3a9080','#b06030','#607060']
 
@@ -170,7 +170,7 @@ export default function Finance() {
   function buildDraftSlips(ym) {
     const [y, m] = ym.split('-').map(Number)
     return (data.employees || []).map(emp => {
-      const s = (data.salarySettings || []).find(x => x.empId === emp.id) || {}
+      const s = effectiveSetting((data.salarySettings || []).find(x => x.empId === emp.id) || {}, y, m)
       const payType = s.payType || 'monthly'
       const baseSalary = Number(s.baseSalary || s.hourlyRate || 0)
       const mealAllowance = Number(s.mealAllowance || 0)
@@ -220,10 +220,11 @@ export default function Finance() {
     })
   }
   function hourlyPayHours(emp, y, m) {
-    const clockHrs = computeEmpMonthClockHours(emp, y, m, data)
+    const clockHrs = computeEmpMonthClockHours(emp, y, m, data, { exact: true }) // 時薪制按分鐘計
     const leaveHrs = leaveEffectiveHoursInMonth(emp, y, m, data)
-    const otHrs = computeHourlyOTHours(emp, y, m, data)
-    return { clockHrs, leaveHrs, otHrs, total: Math.round((clockHrs + leaveHrs + otHrs) * 100) / 100 }
+    const otHrs = computeHourlyOTHours(emp, y, m, data)            // 顯示用：加班時數（已含在 clockHrs 內，×1.0）
+    const premiumHrs = computeHourlyOTPremiumHours(emp, y, m, data) // 超過 8h 的加給差額（勞基法 §24）
+    return { clockHrs, leaveHrs, otHrs, premiumHrs, total: Math.round((clockHrs + leaveHrs + premiumHrs) * 100) / 100 }
   }
   function updateSalarySettingFor(emp, updates) {
     const existing = (data.salarySettings || []).find(s => s.empId === emp.id)
@@ -1990,6 +1991,7 @@ export default function Finance() {
                           <option value="monthly">月薪</option>
                           <option value="hourly">時薪</option>
                         </select>
+                        {setting.payTypeFrom && <span style={{ fontSize:'11px', color:E.textSecond, whiteSpace:'nowrap' }}>{setting.payTypeFrom.slice(5).replace('-', '/')} 起</span>}
                         <div style={{ display:'flex', alignItems:'center', gap:'4px', flexShrink:0 }}>
                           {payType === 'monthly' ? (
                             <div style={{ ...E.input, width:'90px', padding:'6px 10px', fontSize:'13px', fontWeight:'700', color:E.textPrimary, background:'#f7f4ee', cursor:'default', userSelect:'none' }}>

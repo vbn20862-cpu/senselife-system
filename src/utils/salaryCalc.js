@@ -201,7 +201,9 @@ export function computeOTMinutes(dayRecs) {
 
 // 計算員工某月純打卡時數（含休息扣除，不含補休）
 // 使用「每日各自 roundHours → 加總」以與 HR.jsx 卡片顯示一致，避免 floor 誤差累積
-export function computeEmpMonthClockHours(emp, yr, mo, data) {
+// opts.exact=true：按分鐘計（時薪制／部分工時用，不捨去到 0.5h；勞動部：工資應按實際出勤時間計算）
+export function computeEmpMonthClockHours(emp, yr, mo, data, opts = {}) {
+  const rh = opts.exact ? minutesToDecimalHours : roundHours
   const monthStr = `${yr}-${String(mo).padStart(2,'0')}`
   const todayStr = new Date().toLocaleDateString('sv-SE')
   const myClockins = data.clockins.filter(c =>
@@ -219,11 +221,11 @@ export function computeEmpMonthClockHours(emp, yr, mo, data) {
   for (const date of allDates) {
     const dayRecs = myClockins.filter(c => c.date === date)
     // 正常工時每日上限 8h，超過要打加班卡才算（活動日照登打時間全算）
-    totalHours += roundHours(normalDayMinutes(dayRecs, date, data, date === todayStr))
-    totalHours += roundHours(activityExtraOTMinutes(dayRecs, date, data, date === todayStr))
-    totalHours += roundHours(otMinByDate[date] || 0)
+    totalHours += rh(normalDayMinutes(dayRecs, date, data, date === todayStr))
+    totalHours += rh(activityExtraOTMinutes(dayRecs, date, data, date === todayStr))
+    totalHours += rh(otMinByDate[date] || 0)
   }
-  return totalHours
+  return Math.round(totalHours * 100) / 100
 }
 
 // 累計補休時數（僅計算「員工申請、雇主同意」之 compLeaveManual）
