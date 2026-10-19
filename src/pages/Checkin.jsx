@@ -54,6 +54,8 @@ export default function Checkin() {
   const [selectedEmp, setSelectedEmp] = useState('')
   const [now, setNow] = useState(new Date())
   const [lastPunch, setLastPunch] = useState(null)
+  const [otNoteOpen, setOtNoteOpen] = useState(false) // 加班結束：填加班內容
+  const [otNote, setOtNote] = useState('')
   // 定位狀態：idle | locating | ready | denied | unavailable
   const [geoStatus, setGeoStatus] = useState('idle')
   const [geo, setGeo] = useState(null)  // { lat, lng, accuracy, address }
@@ -118,12 +120,16 @@ export default function Checkin() {
   const tolerance = hasGeo ? Math.min(Number(geo.accuracy) || 0, GEO_TOLERANCE_M) : 0
   const inRange = !!site && (site.inside || site.dist <= tolerance)
   const canPunch = hasGeo && inRange
+  // 加班卡（加班開始／加班結束）不設定位置限制（2026-10-19 阿慶定）；加班結束必須填加班內容
+  const isOTType = t => t === '加班開始' || t === '加班結束'
+  const canPunchType = t => isOTType(t) ? true : canPunch
 
-  function handlePunch(type) {
+  function handlePunch(type, note) {
     const emp = data.employees.find(e => e.id === Number(selectedEmp))
     if (!emp) return
-    // 打卡一定要有定位，且在公司半徑 100 公尺內（管理員補登走打卡後台，不受此限）
-    if (!canPunch) return
+    // 上班／下班：一定要有定位且在公司範圍內；加班卡不限位置（管理員補登走打卡後台，不受此限）
+    if (!canPunchType(type)) return
+    if (type === '加班結束' && !note) { setOtNoteOpen(true); return } // 先填加班內容
     const t = now.toTimeString().slice(0, 5)
     const rec = {
       id: Date.now(),
@@ -133,12 +139,16 @@ export default function Checkin() {
       time: t,
       type,
     }
-    rec.lat = geo.lat
-    rec.lng = geo.lng
-    rec.accuracy = geo.accuracy
-    if (geo.address) rec.address = geo.address
+    if (hasGeo) {
+      rec.lat = geo.lat
+      rec.lng = geo.lng
+      rec.accuracy = geo.accuracy
+      if (geo.address) rec.address = geo.address
+    }
+    if (note) rec.note = `加班內容：${note}`
     addItem('clockins', rec)
-    setLastPunch({ type, time: t, located: true })
+    setLastPunch({ type, time: t, located: hasGeo })
+    setOtNoteOpen(false); setOtNote('')
     setTimeout(() => setLastPunch(null), 3000)
   }
 
@@ -235,18 +245,32 @@ export default function Checkin() {
             <div style={{ fontSize: '12px', color: '#7a6050', fontWeight: '600' }}>選擇打卡類型{!hasGeo ? <span style={{ fontWeight: '400', color: '#9a8070' }}>（取得定位後才能打卡）</span> : null}</div>
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               {PUNCH_TYPES.map(({ type, emoji, color, bg, desc }) => (
-                <button key={type} onClick={() => handlePunch(type)} disabled={!canPunch} style={{
+                <button key={type} onClick={() => handlePunch(type)} disabled={!canPunchType(type)} style={{
                   backgroundColor: bg, border: `2px solid ${color}20`,
                   borderRadius: '14px', padding: '16px 10px',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  cursor: canPunch ? 'pointer' : 'not-allowed', opacity: canPunch ? 1 : 0.4, transition: 'all 0.15s',
+                  cursor: canPunchType(type) ? 'pointer' : 'not-allowed', opacity: canPunchType(type) ? 1 : 0.4, transition: 'all 0.15s',
                 }}>
                   <span style={{ fontSize: '28px' }}>{emoji}</span>
                   <span style={{ fontSize: '15px', fontWeight: '700', color }}>{type}</span>
-                  <span style={{ fontSize: '11px', color: '#9a8070' }}>{desc}</span>
+                  <span style={{ fontSize: '11px', color: '#9a8070' }}>{type === '加班結束' ? '結束後填加班內容' : desc}</span>
                 </button>
               ))}
             </div>
+
+            {/* 加班結束：必填加班內容 */}
+            {otNoteOpen && (
+              <div style={{ backgroundColor: '#e0f2fe', border: '1px solid #7fb8d8', borderRadius: '12px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0369a1' }}>✅ 加班結束：請說明這次加班做了什麼（必填）</div>
+                <textarea value={otNote} onChange={e => setOtNote(e.target.value)} rows={3} placeholder="例：慢城活動器材整理、報告修改到 20:30"
+                  style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #b8d4e4', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }} />
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => { setOtNoteOpen(false); setOtNote('') }} style={{ border: '1px solid #b8d4e4', background: '#fff', color: '#5a6a7a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>取消</button>
+                  <button onClick={() => { const n = otNote.trim(); if (n.length < 4) { alert('加班內容至少 4 個字'); return } handlePunch('加班結束', n) }}
+                    style={{ border: 'none', background: '#0369a1', color: '#fff', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>送出並打加班結束卡</button>
+                </div>
+              </div>
+            )}
 
             {/* 成功提示 */}
             {lastPunch && (
