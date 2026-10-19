@@ -584,10 +584,10 @@ export default function HR() {
                   <tr style={{ borderBottom: `1px solid ${E.divider}`, backgroundColor: '#fbeceA' }}>
                     <td style={{ padding: '3px 14px', fontWeight: '700', color: '#c0202a', position: 'sticky', left: 0, backgroundColor: '#fbecea', borderRight: `1px solid ${E.divider}`, fontSize: '10px', whiteSpace: 'nowrap' }}>🎌 國定假日</td>
                     {Array.from({ length: days }, (_, i) => i+1).map(d => (
-                      <td key={d} style={{ padding: '2px 1px', textAlign: 'center', backgroundColor: holidayByDay[d] ? 'rgba(192,32,42,0.10)' : 'transparent' }}>
+                      <td key={d} style={{ padding: '2px 1px', textAlign: 'center', verticalAlign: 'top', backgroundColor: holidayByDay[d] ? 'rgba(192,32,42,0.10)' : 'transparent', maxWidth: mob ? 29 : 34 }}>
                         {holidayByDay[d] && (
-                          <span title={holidayByDay[d]} style={{ fontSize: '8px', color: '#c0202a', fontWeight: '700', lineHeight: 1.1, display: 'inline-block', whiteSpace: 'nowrap', padding: '0 2px' }}>
-                            {holidayByDay[d]}
+                          <span title={holidayByDay[d]} style={{ fontSize: '8px', color: '#c0202a', fontWeight: '700', lineHeight: 1.15, display: 'block', whiteSpace: 'normal', wordBreak: 'break-all', padding: '0 1px' }}>
+                            {holidayByDay[d].replace(/[（(](.*?)[）)]/, '$1')}
                           </span>
                         )}
                       </td>
