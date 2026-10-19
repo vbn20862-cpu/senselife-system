@@ -96,11 +96,9 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
 - npm audit：剩 5 個 braces（建置期）放著
 - 活動日有出勤不算缺時已上線 V26.08.03（2026-10-16）。休息日活動不進補休：公司採「原則週休二日、配合活動調休」，
   排班表活動日排「出勤」、調休日排「休假」，缺時只算有排班的日子（computeScheduledStats）
-- 🔴 寶琳 2026-11-01 起轉部分工時（時薪 200，每週一般班上限 3 日、活動日另計、不另給津貼）：契約定稿在
-  ~/Desktop/勞動契約範本-2026-部分工時（PT）.docx（取消班次條款已刪除；增班須經乙方同意保留）。
-  順序：先上線 V26.08.04（薪制生效月 effectiveSetting／時薪制請假按排班折算／超過 8h 加給／按分鐘計／說明頁管理規範）
-  → 再寫她的 salarySettings：payType hourly、baseSalary＝hourlyRate＝200、津貼全 0、payTypeFrom 2026-11-01、
-  prevSetting＝原月薪快照；勞健保級距待會計重算。10 月明細仍為月薪制，特休 16h 由她選：移轉或 10 月折發 2,067（她 LINE 回覆為準；選折發才在 10 月明細加一筆）。
+- 寶琳轉 PT **暫緩**（2026-10-19，她自己的決定）：薪資設定已恢復月薪（29,500＋津貼）；PT 契約定稿備在
+  ~/Desktop/勞動契約範本-2026-部分工時（PT）.docx（時薪 200、一般班週 3 日原則、時數帳餘額離職月結清），她要轉時再用。
+  轉換程序：先把 salarySettings 改 payType hourly、baseSalary＝hourlyRate＝200、津貼 0、payTypeFrom＝生效日、prevSetting＝月薪快照（引擎 effectiveSetting 會讓之前月份照舊）
 - 喪假需選親屬關係（8／6／3 天，Leave.jsx BEREAVEMENT_DAYS），公假全薪不計額度；兩者引擎皆 cat paid
 - 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）
 - 🔴 姿晴 7–8 月缺 72h 分三期（9、10、11 月各 24h，2026-10-16 雙方約定）：9 月明細已重發第 4 版（本次應領 23,805，含第 1 期扣 2,950；喪假 12h 補入缺 72h；9 月 13 筆上班時間更正為 10:00）；
