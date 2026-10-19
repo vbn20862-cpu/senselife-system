@@ -210,7 +210,7 @@ export default function Finance() {
         empId: emp.id, empName: emp.name, hoursWorked: hrs, hourlyOTHrs, hourlyLeaveHrs, payType,
         baseSalary: computedBase, mealAllowance,
         fullAttendanceBonus, activityAttendance, overtime: 0, advance: 0,
-        compDock, compCashout, annualCashout, holidayPremium,
+        compDock, compCashout, annualCashout, holidayPremium, ledger: tm.ledgerOn ? tm.ledger : null,
         grossPay, healthInsEmp, laborInsEmp, pensionSelf, dependentHealth, wireFee,
         totalDeductions: totalDeductionsB, netPay,
         healthInsEmployer, laborInsEmployer, pensionEmployer,
@@ -1732,7 +1732,9 @@ export default function Finance() {
               : ['本月加班 → 補休', tm.accruedHours > 0 ? `+${tm.accruedHours}h` : '—', E.green],
             ['缺時（少做時數）', isHourly ? '—' : H(tm.deficitHours), tm.deficitHours > 0 && !isHourly ? RED : E.textPrimary],
             ['補休抵缺時', isHourly ? '—' : H(tm.consumed), E.coffee, (!isHourly && tm.weightedOffset && tm.consumedHours) ? `補休 ${tm.consumedHours}h × 費率` : ''],
-            ['缺時扣薪時數', isHourly ? '—' : H(tm.dockHours), tm.dockHours > 0 ? RED : E.textPrimary],
+            ...(tm.ledgerOn
+              ? [['記入時數帳', H(tm.ledger?.add || 0), (tm.ledger?.add || 0) > 0 ? RED : E.textPrimary, '缺時不扣薪'], ['時數帳餘額', `欠 ${tm.ledger?.close ?? 0}h`, (tm.ledger?.close || 0) > 0 ? RED : E.textPrimary, `期初 ${tm.ledger?.open ?? 0}h${tm.ledger?.opening ? `＋${tm.ledger.opening}h` : ''}${tm.ledger?.offsetByComp ? `，補休抵 ${tm.ledger.offsetByComp}h` : ''}`]]
+              : [['缺時扣薪時數', isHourly ? '—' : H(tm.dockHours), tm.dockHours > 0 ? RED : E.textPrimary]]),
             ['補休餘額', isHourly ? '—' : `${tm.balHours ?? 0}h`, E.coffee],
             ['遲到 / 早退', D(tm.lateLeaveDays), tm.lateLeaveDays > 0 ? AMBER : E.textPrimary],
           ]
@@ -1791,7 +1793,7 @@ export default function Finance() {
                 <div style={{ fontSize:'11px', color:E.textMuted, marginTop:'10px', lineHeight:1.6 }}>
                   {isHourly
                     ? '時薪制：（實際打卡時數 ＋ 有薪假時數 ＋ 加班時數）× 時薪。有薪假一天 8h、病假一天 4h、事假不計；只有打了上下班卡的日子才有時數。'
-                    : '缺時＝排班應到而少做的時數（已扣除請假折抵）。先用補休抵，不夠才扣薪。今天和未來的日子還沒結束，不計缺時。'}
+                    : (tm.ledgerOn ? '缺時＝排班應到而少做的時數（已扣除請假折抵）。先用補休抵，剩下的記入時數帳、不扣薪。今天和未來的日子還沒結束，不計缺時。' : '缺時＝排班應到而少做的時數（已扣除請假折抵）。先用補休抵，不夠才扣薪。今天和未來的日子還沒結束，不計缺時。')}
                 </div>
               </div>
 
@@ -1849,7 +1851,9 @@ export default function Finance() {
                   </div>
                   <div style={{ fontSize:'11px', fontWeight:'700', color:'#8a3a20', margin:'12px 0 4px' }}>扣項</div>
                   {deductRows.map(([k, label]) => slip[k] > 0 ? row(label, slip[k], { color:'#8a3a20', minus:true }) : null)}
-                  {!isHourly && row('缺時扣薪', slip.compDock || 0, { color: slip.compDock > 0 ? RED : E.textMuted, minus: slip.compDock > 0, sub: tm.dockHours > 0 ? `${tm.dockHours}h × 時薪 ${hrRate}` : '無' })}
+                  {!isHourly && (tm.ledgerOn
+                    ? row('缺時扣薪', 0, { color: E.textMuted, minus: false, sub: `經雙方商議協商，缺時不扣薪，本月 ${tm.ledger?.add || 0}h 記入時數帳，餘額欠 ${tm.ledger?.close ?? 0}h` })
+                    : row('缺時扣薪', slip.compDock || 0, { color: slip.compDock > 0 ? RED : E.textMuted, minus: slip.compDock > 0, sub: tm.dockHours > 0 ? `${tm.dockHours}h × 時薪 ${hrRate}` : '無' }))}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0 4px', fontSize:'13px', fontWeight:'700', color:'#8a3a20' }}>
                     <span>扣項合計</span><span>－ NT${Number(slip.totalDeductions || 0).toLocaleString()}</span>
                   </div>
@@ -1946,7 +1950,7 @@ export default function Finance() {
                               <td style={{ padding:'8px 12px', textAlign:'right', color: thisMonth.accruedHours>0?E.green:E.textMuted, fontWeight: thisMonth.accruedHours>0?'700':'400' }}>{thisMonth.accruedHours>0?`+${thisMonth.accruedHours}h`:'—'}</td>
                               <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:'700', color:E.coffee }}>{thisMonth.balHours}h</td>
                               <td style={{ padding:'8px 12px', textAlign:'right', color: thisMonth.shortfall>0?'#b45309':E.textMuted }}>{thisMonth.shortfall>0?`${thisMonth.shortfall}h`:'—'}</td>
-                              <td style={{ padding:'8px 12px', textAlign:'right', color: thisMonth.dockAmount>0?'#c04030':E.textMuted, fontWeight: thisMonth.dockAmount>0?'700':'400' }}>{thisMonth.dockAmount>0?`-NT$${thisMonth.dockAmount.toLocaleString()}`:'—'}</td>
+                              <td style={{ padding:'8px 12px', textAlign:'right', color: thisMonth.ledgerOn ? '#b45309' : thisMonth.dockAmount>0?'#c04030':E.textMuted, fontWeight: (thisMonth.ledgerOn || thisMonth.dockAmount>0)?'700':'400' }}>{thisMonth.ledgerOn ? `時數帳 欠${thisMonth.ledger?.close ?? 0}h` : thisMonth.dockAmount>0?`-NT${thisMonth.dockAmount.toLocaleString()}`:'—'}</td>
                               <td style={{ padding:'8px 12px', textAlign:'right', color: emp.hireDate?E.textSecond:'#c08a30' }}>{emp.hireDate?`${al.remainingDays}天`:'未填到職日'}</td>
                               {isQuarterEnd && <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:'700', color: settle?'#1a56a0':E.textMuted }}>{settle?`NT$${settle.amount.toLocaleString()}`:'—'}</td>}
                             </tr>

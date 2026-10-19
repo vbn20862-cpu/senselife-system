@@ -99,9 +99,13 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
 - 寶琳轉 PT **暫緩**（2026-10-19，她自己的決定）：薪資設定已恢復月薪（29,500＋津貼）；PT 契約定稿備在
   ~/Desktop/勞動契約範本-2026-部分工時（PT）.docx（時薪 200、一般班週 3 日原則、時數帳餘額離職月結清），她要轉時再用。
   轉換程序：先把 salarySettings 改 payType hourly、baseSalary＝hourlyRate＝200、津貼 0、payTypeFrom＝生效日、prevSetting＝月薪快照（引擎 effectiveSetting 會讓之前月份照舊）
+- **時數帳模式**（2026-10-19，目前只有寶琳）：salarySettings.hoursLedger={from:'2026-09-01',openingHours:13,openingNote}
+  → 自 from 起缺時不扣薪，記入時數帳逐月累計（computeCompLedger 回傳 monthly[].ledger{open,opening,add,offsetByComp,close}）；
+  補休先抵當月缺時、剩餘再抵餘額；餘額以勞務補足、離職月結清。薪資頁與明細自動顯示；9 月明細為手動版（52.52h），10 月起草稿自帶
+- 生理假假別：半薪，每月 1 天、全年 3 天內不併入病假（V26.08.07）
 - 喪假需選親屬關係（8／6／3 天，Leave.jsx BEREAVEMENT_DAYS），公假全薪不計額度；兩者引擎皆 cat paid
 - 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）
-- 🔴 姿晴 7–8 月缺 72h 分三期（9、10、11 月各 24h，2026-10-16 雙方約定）：9 月明細已重發第 4 版（本次應領 23,805，含第 1 期扣 2,950；喪假 12h 補入缺 72h；9 月 13 筆上班時間更正為 10:00）；
+- 🔴 姿晴 7–8 月缺 72h 分三期（第 1 期 24h、第 2、3 期各 22h（68h 含喪假、生理假後），2026-10-16 雙方約定）：9 月明細已重發第 4 版（本次應領 23,805，含第 1 期扣 2,950；喪假 12h 補入缺 72h；9 月 13 筆上班時間更正為 10:00）；
   **10 月、11 月草稿要各加第 2、3 期**：當期以勞務補足的時數 × 122.92 退還、未補足的扣回（無條件捨去）。
   monthly-drafts 自動草稿不會自己加這段，11/5 後人工補進去再發布（用 ops/publish-statement.mjs）
 - Netlify 已升級 Pro（2026-10-16），push main 自動部署恢復；雲端建置若被 secrets scanning 擋，看 netlify.toml 的

@@ -693,6 +693,7 @@ export const LEAVE_TYPES = [
   { type: '產假',    cat: 'paid',   desc: '8 週，全薪' },
   { type: '陪產假',  cat: 'paid',   desc: '7 天，全薪' },
   { type: '病假',    cat: 'half',   desc: '一年 30 天內半薪（2026 年 12 天），超過仍可請、無薪' },
+  { type: '生理假',  cat: 'half',   desc: '每月 1 天，半薪；全年 3 天內不併入病假，超過併入病假額度（性別平等工作法 §14）' },
   { type: '事假',    cat: 'unpaid', desc: '一年 14 天，無薪（超過仍可請）' },
 ]
 export const PAY_FACTOR = { paid: 1.0, half: 0.5, unpaid: 0 }
@@ -981,9 +982,14 @@ export function computeCompLedger(emp, data, asOf) {
   const weightedLots = () => RATE_ORDER.reduce((s, r) => s + bal[r] * Number(r), 0)
   const monthly = []
   const settlements = []
+  // 時數帳模式（setting.hoursLedger = { from:'YYYY-MM-DD', openingHours, openingNote }）：
+  // 自 from 起缺時不扣薪，改記入時數帳逐月累計；補休先抵缺時、剩餘再抵時數帳餘額；餘額以後續勞務補足，離職月結清
+  const HL = setting0?.hoursLedger && setting0.hoursLedger.from ? setting0.hoursLedger : null
+  let ledgerBal = 0, ledgerStarted = false
 
   for (const { year, month } of months) {
     setting = effectiveSetting(setting0, year, month); hr = hourlyRate(setting); isHourly = (setting?.payType || 'monthly') === 'hourly'
+    const ledgerOn = !!HL && !isHourly && `${year}-${pad2(month)}` >= HL.from.slice(0, 7)
     // 時薪制：加班已含在時薪內（時數×時薪），不另累積補休，避免加班付兩次
     const accr = isHourly ? { hours: 0, weighted: 0, lots: { '1.34': 0, '1.67': 0, '2': 0 } } : computeMonthCompAccrual(emp, year, month, data, holidaySet)
     RATE_ORDER.forEach(r => { bal[r] += accr.lots[r] || 0 })
@@ -1027,8 +1033,29 @@ export function computeCompLedger(emp, data, asOf) {
       consumed = round2(consumed + take)
       consumedHours = round2(consumedHours + hrs)
     }
-    const dockHours = round2(shortfall - consumed)
-    const dockAmount = isHourly ? 0 : Math.floor(dockHours * hr) // 扣薪無條件捨去（少扣）；時薪制不扣
+    let dockHours = round2(shortfall - consumed)
+    let dockAmount = isHourly ? 0 : Math.floor(dockHours * hr) // 扣薪無條件捨去（少扣）；時薪制不扣
+    // 時數帳：缺時不扣薪 → 記入餘額；剩餘補休（加權）再抵餘額
+    let ledger = null
+    if (ledgerOn) {
+      const opening = !ledgerStarted ? Number(HL.openingHours || 0) : 0
+      const open = round2(ledgerBal)
+      ledgerStarted = true
+      const add = dockHours
+      ledgerBal = round2(ledgerBal + opening + add)
+      let offsetByComp = 0, offsetHours = 0
+      for (const r of RATE_ORDER) {
+        if (ledgerBal <= 0) break
+        const rate = Number(r)
+        const take = Math.min(ledgerBal, round2(bal[r] * rate))
+        const hrs = round2(take / rate)
+        bal[r] = round2(bal[r] - hrs)
+        ledgerBal = round2(ledgerBal - take)
+        offsetByComp = round2(offsetByComp + take); offsetHours = round2(offsetHours + hrs)
+      }
+      ledger = { open, opening, openingNote: opening ? (HL.openingNote || '') : '', add, offsetByComp, offsetHours, close: round2(ledgerBal), rate: round2(hr) }
+      dockHours = 0; dockAmount = 0
+    }
 
     monthly.push({
       year, month, govtH, scheduledH: sched.scheduledH,
@@ -1038,7 +1065,7 @@ export function computeCompLedger(emp, data, asOf) {
       suspShortDays: sched.suspShortDays, suspShortDates: sched.suspShortDates,
       normalH, compTaken,
       accruedHours: accr.hours, manualHours: manual,
-      shortfall, consumed, consumedHours, weightedOffset, dockHours, dockAmount,
+      shortfall, consumed, consumedHours, weightedOffset, dockHours, dockAmount, ledgerOn, ledger,
       balHours: round2(sumLots()),
     })
 
@@ -1058,7 +1085,7 @@ export function computeCompLedger(emp, data, asOf) {
     }
   }
 
-  return { balanceHours: round2(sumLots()), monthly, settlements, hourlyRate: round2(hr) }
+  return { balanceHours: round2(sumLots()), monthly, settlements, hourlyRate: round2(hr), ledgerBalance: round2(ledgerBal), ledgerOn: !!HL }
 }
 
 // 把舊資料的「行政機關辦公時數」做為參考（顯示用，不再當基準）

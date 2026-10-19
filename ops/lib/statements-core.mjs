@@ -50,7 +50,7 @@ for (const e of data.employees) {
   })
   const act = r2(rows.reduce((a, r) => a + r.cnt, 0)), lvH = rows.reduce((a, r) => a + r.lvH, 0), short = r2(expected - act - lvH)
   const lvBy = t => rows.filter(r => r.lv.startsWith(t)).reduce((a, r) => a + r.lvH, 0)
-  const lvText = ['特休', '補休', '病假', '事假', '婚假', '喪假', '公假'].map(t => [t, lvBy(t)]).filter(([, h]) => h).map(([t, h]) => `${t} ${h}h`).join('、')
+  const lvText = ['特休', '補休', '病假', '生理假', '事假', '婚假', '喪假', '公假'].map(t => [t, lvBy(t)]).filter(([, h]) => h).map(([t, h]) => `${t} ${h}h`).join('、')
   const N = k => Number(s[k] || 0)
   const extras = [['伙食', N('mealAllowance')], ['全勤', N('fullAttendanceBonus')], ['活動出勤', N('activityAttendance')]].filter(([, v]) => v)
   const dedItems = [['健保', N('healthInsEmp')], ['勞保', N('laborInsEmp')], ['勞退自提', N('pensionSelf')], ['眷屬健保', N('dependentHealth')], ['匯費', N('wireFee')]].filter(([, v]) => v)
@@ -72,8 +72,19 @@ for (const e of data.employees) {
     ...(annual ? [['特休年底折現', money(annual), '']] : []),
     ...(holPrem ? [['國定假日加給', money(holPrem), '']] : []),
     ...(ded ? [[dedItems.map(([k, v]) => `${k} ${v}`).join('、'), '－ ' + money(ded), '']] : []),
-    ...(!hourly ? [[`缺時扣薪：${tm.dockHours || 0} 小時 × 時薪 ${rateTxt}（${gross.toLocaleString()} ÷ 240）${tm.consumed ? (tm.weightedOffset ? `（已先用補休 ${tm.consumedHours} 小時依費率加權抵 ${tm.consumed} 小時）` : `（已先用補休抵 ${tm.consumed} 小時）`) : ''}`, dock ? '－ ' + money(dock) : 'NT$ 0', 'miss']] : []),
+    ...(!hourly ? (tm.ledgerOn
+      ? [[`缺時扣薪（經雙方商議協商，自 ${Number(s0.hoursLedger.from.slice(0, 4))} 年 ${Number(s0.hoursLedger.from.slice(5, 7))} 月起缺時不扣薪，改記入下方「時數帳」逐月累計）`, 'NT$ 0', '']]
+      : [[`缺時扣薪：${tm.dockHours || 0} 小時 × 時薪 ${rateTxt}（${gross.toLocaleString()} ÷ 240）${tm.consumed ? (tm.weightedOffset ? `（已先用補休 ${tm.consumedHours} 小時依費率加權抵 ${tm.consumed} 小時）` : `（已先用補休抵 ${tm.consumed} 小時）`) : ''}`, dock ? '－ ' + money(dock) : 'NT$ 0', 'miss']]) : []),
   ]
+  const LG = tm.ledgerOn ? tm.ledger : null
+  const ledgerHtml = LG ? `<h3>時數帳（${Number(s0.hoursLedger.from.slice(0, 4))} 年 ${Number(s0.hoursLedger.from.slice(5, 7))} 月起累計）</h3>
+<table class="sum"><tr><th>項目</th><th>時數</th><th>說明</th></tr>
+<tr><td>期初餘額</td><td>${LG.open ? `欠公司 ${LG.open} 小時` : '0 小時'}</td><td>上月結轉</td></tr>
+${LG.opening ? `<tr><td>期初補計（欠公司）</td><td class="miss">＋ ${LG.opening} 小時</td><td>${esc(LG.openingNote || '')}</td></tr>` : ''}
+<tr><td>本月缺時（欠公司）</td><td class="miss">＋ ${LG.add} 小時</td><td>排班應到 − 實際 − 請假折抵${tm.consumed ? `（已先以補休 ${tm.consumedHours} 小時加權抵 ${tm.consumed} 小時）` : ''}</td></tr>
+<tr><td>補休抵扣餘額（公司欠你）</td><td>－ ${LG.offsetByComp} 小時</td><td>${LG.offsetHours ? `補休 ${LG.offsetHours} 小時依費率加權` : '本月無剩餘補休可抵'}</td></tr>
+<tr class="tot"><td>月底餘額</td><td class="miss">欠公司 ${LG.close} 小時</td><td>折算參考：${LG.close} × ${LG.rate} ＝ ${money(Math.round(LG.close * LG.rate))}</td></tr></table>
+<div class="note"><div>・時數帳：每月缺時不扣薪，記入時數帳；當月超過應上班時數的部分（含加班）先抵餘額，餘額逐月往下累計。餘額以後續勞務補足；未補足的餘額於離職月份依當時時薪一併結清。</div></div>` : ''
   const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${e.name} ${MO} 月工時統計</title><style>
 @page{size:A4;margin:12mm 15mm}body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;color:#2c1a0e;font-size:10pt}
 h1{font-size:16pt;margin:0 0 2px}.date{color:#7a6a56;font-size:9pt;margin-bottom:10px}h3{font-size:11.5pt;margin:12px 0 5px}
@@ -92,6 +103,7 @@ h2{font-size:13pt;margin:0 0 8px;break-before:page}.d{font-size:8.3pt}.d td,.d t
 <table class="sum"><tr><th>項目</th><th>金額</th></tr>
 ${pay.map(([k, v, c]) => `<tr><td>${esc(k)}</td><td${c ? ` class="${c}"` : ''}>${v}</td></tr>`).join('')}
 <tr class="tot"><td>實領</td><td>${money(net)}</td></tr></table>
+${ledgerHtml}
 <div class="note"><b>說明</b>
 <div>・實際上班時數：系統打卡紀錄（時間後標 * 者為補登或更正）。一般日依勞基法第 35 條扣休息、正常工時每日上限 8 小時；活動日照登打時間全算。計入時數＝正常工時與加班各取至 0.5 小時後相加。</div>
 ${hourly ? '<div>・時薪制（部分工時）：（實際打卡時數按分鐘計［含加班 ×1.0］＋有薪假依當日排班時數折算＋當日超過 8 小時部分之加給：前 2 小時 ×0.34、之後 ×0.67）× 時薪；國定假日有排班出勤者加倍。</div>' : `<div>・系統缺時（扣薪基準）＝排班應到時數 − 實際工時（當日加班先補當日缺時）− 請假折抵；特休全額、病假一半、事假不折抵。本月系統缺時 ${tm.deficitHours || 0} 小時，先用補休抵，不足才扣薪。</div>`}
