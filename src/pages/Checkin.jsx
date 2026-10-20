@@ -38,7 +38,8 @@ function nearestSite(lat, lng) {
 import { useApp } from '../context/AppContext'
 import { useIsMobile } from '../styles/earth'
 import { getCurrentCoords, reverseGeocode } from '../utils/geo'
-import { localTimestamp } from '../utils/salaryCalc'
+import { localTimestamp, extendedOTInfo } from '../utils/salaryCalc'
+import { myMissingPunches } from './AttendanceReview'
 import logo from '../assets/logo.jpeg'
 
 const PUNCH_TYPES = [
@@ -54,7 +55,8 @@ export default function Checkin() {
   const [selectedEmp, setSelectedEmp] = useState('')
   const [now, setNow] = useState(new Date())
   const [lastPunch, setLastPunch] = useState(null)
-  const [otNoteOpen, setOtNoteOpen] = useState(false) // 加班結束：填加班內容
+  const [otNoteOpen, setOtNoteOpen] = useState(false) // 加班結束（'加班結束'）或延續加班下班（'下班'）：填原因
+  const [extInfo, setExtInfo] = useState(null)        // 延續加班試算 { hours, start }
   const [otNote, setOtNote] = useState('')
   // 定位狀態：idle | locating | ready | denied | unavailable
   const [geoStatus, setGeoStatus] = useState('idle')
@@ -129,15 +131,36 @@ export default function Checkin() {
     if (!emp) return
     // 上班／下班：一定要有定位且在公司範圍內；加班卡不限位置（管理員補登走打卡後台，不受此限）
     if (!canPunchType(type)) return
-    if (type === '加班結束' && !note) { setOtNoteOpen(true); return } // 先填加班內容
+    if (type === '加班結束' && !note) { setExtInfo(null); setOtNoteOpen('加班結束'); return } // 先填加班內容
     const t = now.toTimeString().slice(0, 5)
+    // 跨日下班：凌晨 06:00 前打「下班」，且今天沒有上班卡、前一天有上班沒下班 → 記在前一天（工時計算會自動跨午夜）
+    let punchDate = today, crossNote = ''
+    if (type === '下班' && t < '06:00') {
+      const y = new Date(now); y.setDate(y.getDate() - 1)
+      const yday = y.toLocaleDateString('sv-SE')
+      const mine = c => c.empId === emp.id
+      const todayIn = data.clockins.some(c => mine(c) && c.date === today && c.type === '上班')
+      const yIn = data.clockins.some(c => mine(c) && c.date === yday && c.type === '上班')
+      const yOut = data.clockins.some(c => mine(c) && c.date === yday && c.type === '下班')
+      if (!todayIn && yIn && !yOut) { punchDate = yday; crossNote = `跨日下班（實際 ${today.slice(5).replace('-', '/')} ${t}）` }
+    }
     const rec = {
       id: Date.now(),
       empId: emp.id,
       empName: emp.name,
-      date: today,
+      date: punchDate,
       time: t,
       type,
+      ...(crossNote ? { note: crossNote } : {}),
+    }
+    // 延續加班：下班時從上班起算超過 10 小時 → 第 10 小時之後進加班池（待核准），必填原因
+    if (type === '下班') {
+      const dayRecs = data.clockins.filter(c => c.empId === emp.id && c.date === punchDate)
+      const info = extendedOTInfo([...dayRecs, rec], punchDate, data)
+      if (info) {
+        if (!note) { setExtInfo({ hours: Math.round(info.extMin / 6) / 10 }); setOtNoteOpen('下班'); return }
+        rec.otReason = note; rec.otStatus = '待核准'
+      }
     }
     if (hasGeo) {
       rec.lat = geo.lat
@@ -145,7 +168,7 @@ export default function Checkin() {
       rec.accuracy = geo.accuracy
       if (geo.address) rec.address = geo.address
     }
-    if (note) rec.note = `加班內容：${note}`
+    if (note && type === '加班結束') rec.note = `加班內容：${note}`
     addItem('clockins', rec)
     setLastPunch({ type, time: t, located: hasGeo })
     setOtNoteOpen(false); setOtNote('')
@@ -239,6 +262,17 @@ export default function Checkin() {
           </div>
         )}
 
+        {/* 缺下班卡提醒 */}
+        {selectedEmp && (() => {
+          const miss = myMissingPunches(data, Number(selectedEmp))
+          if (!miss.length) return null
+          return (
+            <div style={{ background: '#fef3c7', border: '1px solid #f0d080', borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', color: '#7a5a20', lineHeight: 1.6 }}>
+              <b style={{ color: '#8a5a10' }}>⚠ 你有 {miss.length} 天缺下班卡：</b>{miss.map(d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`).join('、')}。這幾天目前不計工時，請用 LINE 告訴管理員實際下班時間並附佐證。
+            </div>
+          )
+        })()}
+
         {/* 打卡類型按鈕 */}
         {selectedEmp && !isActivityDay && (
           <>
@@ -261,13 +295,13 @@ export default function Checkin() {
             {/* 加班結束：必填加班內容 */}
             {otNoteOpen && (
               <div style={{ backgroundColor: '#e0f2fe', border: '1px solid #7fb8d8', borderRadius: '12px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0369a1' }}>✅ 加班結束：請說明這次加班做了什麼（必填）</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0369a1' }}>{otNoteOpen === '下班' ? `🌙 今天從上班起算已超過 10 小時，第 10 小時之後約 ${extInfo?.hours ?? ''} 小時會進加班池，請說明延續加班原因（必填，主管核准後計入）` : '✅ 加班結束：請說明這次加班做了什麼（必填）'}</div>
                 <textarea value={otNote} onChange={e => setOtNote(e.target.value)} rows={3} placeholder="例：慢城活動器材整理、報告修改到 20:30"
                   style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #b8d4e4', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }} />
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                   <button onClick={() => { setOtNoteOpen(false); setOtNote('') }} style={{ border: '1px solid #b8d4e4', background: '#fff', color: '#5a6a7a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>取消</button>
-                  <button onClick={() => { const n = otNote.trim(); if (n.length < 4) { alert('加班內容至少 4 個字'); return } handlePunch('加班結束', n) }}
-                    style={{ border: 'none', background: '#0369a1', color: '#fff', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>送出並打加班結束卡</button>
+                  <button onClick={() => { const n = otNote.trim(); if (n.length < 4) { alert('加班內容至少 4 個字'); return } handlePunch(otNoteOpen === '下班' ? '下班' : '加班結束', n) }}
+                    style={{ border: 'none', background: '#0369a1', color: '#fff', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>{otNoteOpen === '下班' ? '送出並打下班卡' : '送出並打加班結束卡'}</button>
                 </div>
               </div>
             )}

@@ -70,7 +70,11 @@
 - 員工排班：當月 1–5 號可自編，之後鎖定僅管理員
 - 打卡地理圍欄（2026-10-16）：只能在 `Checkin.jsx` PUNCH_ZONES 多邊形區域內打卡（阿慶在地圖上畫的四角區域，涵蓋瑪家和平路
   與北葉辦公室；離邊界 ≤ 手機誤差且 ≤50 公尺也算）。地圖工具在 company-system/_map/（git 忽略）。活動日、外勤由管理員在打卡後台登記。
-  **加班開始／加班結束不受定位限制**（有定位照記）；加班結束必填「加班內容」（≥4 字，存在 clockin.note「加班內容：…」）（2026-10-19）
+  **加班開始／加班結束不受定位限制**（有定位照記）；加班結束必填「加班內容」（≥4 字，存在 clockin.note「加班內容：…」）（2026-10-19）。
+  **延續加班**（2026-10-20）：只打上下班、從上班起算第 9～10 小時為休息，第 10 小時後進加班池（`salaryCalc.extendedOTInfo`），下班打卡必填原因，
+  存在下班卡 otReason/otStatus（待核准／核准／駁回）＋otRejectReason；核准才計入（併入 activityExtraOTMinutes），10/1 起回溯、活動日不適用。
+  管理員「出勤審核」頁 /attendance-review（選單紅點＝待核准＋缺下班卡）：核准／駁回（5 個法定理由＋其他）、缺卡補登、加班卡內容、跨日、補登更正。
+  跨日下班：06:00 前打下班、今天無上班卡、前一天有上班沒下班 → 記在前一天，note「跨日下班（實際 MM/DD HH:MM）」（2026-10-20）
 - **Google 日曆同步**（2026-10-20，老闆只看日曆）：`netlify/functions/calendar-sync.mjs` 每天 06:00 排程（排程函式正式站不接受網址呼叫）＋`calendar-sync-now.mjs` 供前端在核准請假／補登／改班表時 POST 觸發，共用 `netlify/lib/calendar-sync-core.mjs`，
   把「已核准請假」與「排班表平日休假（週一～五、非國定假日）」寫成公司日曆的全天事件（標題「姓名 假別」「姓名 休假」，一律紅色 colorId 11），
   用 extendedProperties.private.slSource/slKey 認領，改了、刪了會跟著更新。需 Netlify 環境變數 GOOGLE_SA_JSON_B64（服務帳號金鑰 base64，
@@ -89,6 +93,9 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
 建議排程：每天 08:30 跑 backup + health-check，異常摘要推 LINE/Discord 給阿慶。
 
 ## 帳號
+
+人事管理頁籤（2026-10-20 整合）：班表／出勤（src/components/hr/AttendanceTab.jsx：審核＋打卡清單改刪增，取代打卡後台）／工時（WorkHoursTab.jsx，用薪資引擎）／員工（含登入帳號、重設密碼；改名雙向同步帳號）／操作紀錄。
+HR.jsx 內舊的 attendance_old、clockin_old、accounts 區塊已不顯示，確認穩定後可刪。
 
 管理員 `admin`／員工帳號見 `/accounts`（明文，待改雜湊）。員工登入靠
 `accounts.name === employees.name` 對應，改名要兩邊同步。

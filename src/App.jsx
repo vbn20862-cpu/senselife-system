@@ -10,6 +10,7 @@ import Design from './pages/Design'
 import Finance from './pages/Finance'
 import HR from './pages/HR'
 import Leave from './pages/Leave'
+import AttendanceReview from './pages/AttendanceReview'
 import Dispatch from './pages/Dispatch'
 import Guide from './pages/Guide'
 import Assets from './pages/Assets'
@@ -98,6 +99,7 @@ export default function App() {
                         <Route path="/finance"      element={<Finance />} />
                         <Route path="/hr"           element={<HR />} />
                         <Route path="/leave"        element={<Leave />} />
+                        <Route path="/attendance-review" element={<RequireAdmin><AttendanceReview /></RequireAdmin>} />
                         <Route path="/guide"        element={<Guide />} />
                         <Route path="/assets"       element={<Assets />} />
                         <Route path="/history"       element={<History />} />

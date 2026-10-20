@@ -11,6 +11,8 @@ import { mapLink } from '../utils/geo'
 import { holidaysInMonth, holidayOn, getHolidays, DEFAULT_HOLIDAYS } from '../utils/holidays'
 import { triggerCalendarSync } from '../utils/calendarSync'
 import { annualLeaveStatus } from '../utils/payrollEngine'
+import AttendanceTab from '../components/hr/AttendanceTab'
+import WorkHoursTab from '../components/hr/WorkHoursTab'
 
 // 出勤統計列（展開細節）
 function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, textMuted, sandLight, card, mob }) {
@@ -321,11 +323,10 @@ export default function HR() {
     : [...data.clockins].filter(c => c.empName === currentUser?.name)
 
   const TABS = [
-    ['schedule',  '排班表'],
-    ['attendance', '工時統計'],
-    ['clockin',   '打卡記錄'],
+    ['schedule',  '班表'],
+    ['clockin',   '出勤'],
+    ['attendance', '工時'],
     ...(isAdmin ? [['employees', '員工']] : []),
-    ...(isAdmin ? [['accounts', '帳號管理']] : []),
     ...(isAdmin ? [['logs', '操作紀錄']] : []),
   ]
 
@@ -346,8 +347,11 @@ export default function HR() {
     const updates = { name: editAcc.name, email: editAcc.email, role: editAcc.role }
     if (isAdmin && editAcc.username?.trim()) updates.username = editAcc.username.trim()
     if (editAcc.password) updates.password = editAcc.password
+    const prevName = accounts.find(a => a.id === editAcc.id)?.name
     const res = updateAccount(editAcc.id, updates)
     if (res?.error) { setAccMsg(res.error); return }
+    const linkedEmp = prevName && prevName !== editAcc.name && data.employees.find(e => e.name === prevName)
+    if (linkedEmp) updateItem('employees', linkedEmp.id, { name: editAcc.name })
     const who = currentUser?.name || currentUser?.username || '未知'
     logEdit({ user: who, action: '編輯', entityType: '帳號', entityName: editAcc.name, summary: `角色：${editAcc.role === 'admin' ? '管理員' : '員工'}` })
     setEditAcc(null); setAccMsg('')
@@ -704,7 +708,9 @@ export default function HR() {
       )}
 
       {/* 出缺勤 — 根據打卡紀錄統計 */}
-      {tab === 'attendance' && (() => {
+      {tab === 'attendance' && <WorkHoursTab />}
+      {tab === 'clockin' && <AttendanceTab />}
+      {tab === 'attendance_old' && (() => {
         const [attYear, setAttYear] = [scheduleMonth.year, (y) => setScheduleMonth(p => ({...p, year: y}))]
         const [attMonth, setAttMonth] = [scheduleMonth.month, (m) => setScheduleMonth(p => ({...p, month: m}))]
 
@@ -894,7 +900,7 @@ export default function HR() {
                   </div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button onClick={() => setEditEmployee({ ...emp })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a09080' }}><Pencil size={14} /></button>
-                    <button onClick={() => deleteItem('employees', emp.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={14} /></button>
+                    <button onClick={() => { if (window.confirm(`確定刪除員工「${emp.name}」？\n（打卡、請假、薪資資料仍保留；登入帳號請另外刪除）`)) deleteItem('employees', emp.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8' }}><Trash2 size={14} /></button>
                   </div>
                 </div>
                 {(emp.phone || emp.email) && (
@@ -903,6 +909,23 @@ export default function HR() {
                     {emp.email && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: E.textSecond }}><Mail size={11} />{emp.email}</div>}
                   </div>
                 )}
+                {/* 登入帳號（2026-10-20 帳號管理併入員工卡）*/}
+                {(() => {
+                  const acc = accounts.find(a => a.name === emp.name)
+                  return (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${E.divider}`, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <KeyRound size={12} style={{ color: E.textMuted }} />
+                      {acc ? (<>
+                        <span style={{ fontSize: '12px', fontFamily: 'monospace', color: E.textSecond }}>{acc.username}</span>
+                        <span style={{ fontSize: '11px', padding: '1px 8px', borderRadius: '999px', backgroundColor: acc.role === 'admin' ? '#f5edd0' : '#e8f0e4', color: acc.role === 'admin' ? '#8a6010' : '#3a6d31', fontWeight: 600 }}>{acc.role === 'admin' ? '管理員' : '員工'}</span>
+                        <button onClick={() => { setEditAcc({ ...acc, password: '', confirmPw: '' }); setAccMsg('') }} style={{ ...E.btnGhost, padding: '2px 8px', fontSize: '11px', marginLeft: 'auto' }}>帳號／重設密碼</button>
+                      </>) : (<>
+                        <span style={{ fontSize: '12px', color: '#c08a30' }}>尚無登入帳號</span>
+                        <button onClick={() => { setNewAcc({ ...EMPTY_ACC, name: emp.name, email: emp.email || '' }); setAccMsg(''); setShowAddAcc(true) }} style={{ ...E.btnGhost, padding: '2px 8px', fontSize: '11px', marginLeft: 'auto' }}>建立帳號</button>
+                      </>)}
+                    </div>
+                  )
+                })()}
                 {/* 特休狀態 */}
                 <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${E.divider}` }}>
                   {emp.hireDate ? (() => {
@@ -926,11 +949,29 @@ export default function HR() {
               </div>
             ))}
           </div>
+          {isAdmin && (() => {
+            const others = accounts.filter(a => !data.employees.some(e => e.name === a.name))
+            if (!others.length) return null
+            return (
+              <div style={{ ...E.card }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: E.textPrimary, marginBottom: '8px' }}>其他系統帳號（沒有對應員工資料）</div>
+                {others.map(acc => (
+                  <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0', borderTop: `1px solid ${E.divider}` }}>
+                    <b style={{ fontSize: '13px', color: E.textPrimary, minWidth: '72px' }}>{acc.name}</b>
+                    <span style={{ fontSize: '12px', fontFamily: 'monospace', color: E.textSecond }}>{acc.username}</span>
+                    <span style={{ fontSize: '11px', padding: '1px 8px', borderRadius: '999px', backgroundColor: acc.role === 'admin' ? '#f5edd0' : '#e8f0e4', color: acc.role === 'admin' ? '#8a6010' : '#3a6d31', fontWeight: 600 }}>{acc.role === 'admin' ? '管理員' : '員工'}</span>
+                    <button onClick={() => { setEditAcc({ ...acc, password: '', confirmPw: '' }); setAccMsg('') }} style={{ ...E.btnGhost, padding: '2px 8px', fontSize: '11px', marginLeft: 'auto' }}>編輯</button>
+                    {acc.id !== 'admin_001' && <button onClick={() => { if (window.confirm(`確定刪除帳號「${acc.name}」？`)) deleteAccount(acc.id) }} style={{ ...E.btnGhost, padding: '2px 8px', fontSize: '11px', color: '#b42318' }}>刪除</button>}
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       )}
 
       {/* 打卡記錄 */}
-      {tab === 'clockin' && (() => {
+      {tab === 'clockin_old' && (() => {
         const TYPE_STYLE = {
           '上班':   { color: '#3a6d31', bg: '#edf2ea' },
           '下班':   { color: '#5a4a8a', bg: '#f0eef8' },
@@ -1330,7 +1371,11 @@ export default function HR() {
           </div>
           <button onClick={() => {
             if (!editEmployee.name.trim()) return
+            const oldName = data.employees.find(e => e.id === editEmployee.id)?.name
             updateItem('employees', editEmployee.id, { name: editEmployee.name, role: editEmployee.role, email: editEmployee.email, phone: editEmployee.phone, hireDate: editEmployee.hireDate || '' })
+            // 改名時同步登入帳號的姓名（員工登入靠 accounts.name === employees.name 對應）
+            const linked = oldName && accounts.find(a => a.name === oldName)
+            if (linked && oldName !== editEmployee.name.trim()) updateAccount(linked.id, { name: editEmployee.name.trim() })
             const who = currentUser?.name || currentUser?.username || '未知'
             logEdit({ user: who, action: '編輯', entityType: '員工', entityName: editEmployee.name, summary: `職稱：${editEmployee.role || '—'}${editEmployee.hireDate ? ` · 到職 ${editEmployee.hireDate}` : ''}` })
             setEditEmployee(null)

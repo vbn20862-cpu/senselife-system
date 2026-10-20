@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { useFirebaseConnection } from '../context/AppContext'
 import { APP_VERSION } from '../version'
+import { pendingReviewCount, myMissingPunches } from '../pages/AttendanceReview'
 
 const NAV_MAIN = [
   { to: '/',           icon: LayoutDashboard, label: '儀表板' },
@@ -78,7 +79,9 @@ export default function Layout({ children }) {
   const [fbMsg, setFbMsg] = useState('')
   const [fbSent, setFbSent] = useState(false)
   const { currentUser, isAdmin, logout } = useAuth()
-  const { addItem } = useApp()
+  const { addItem, data } = useApp()
+  const myEmpId = (data.employees || []).find(e => e && e.name === currentUser?.name)?.id
+  const reviewCount = isAdmin ? pendingReviewCount(data) : myMissingPunches(data, myEmpId).length
   const navigate = useNavigate()
   const { connected } = useFirebaseConnection()
   const [showReconnected, setShowReconnected] = useState(false)
@@ -148,8 +151,9 @@ export default function Layout({ children }) {
         <nav className="flex-1 px-3 py-4 overflow-y-auto" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
 
           {NAV_MAIN.map(({ to, icon, label }) => (
-            <div key={to} onClick={() => setOpen(false)}>
+            <div key={to} onClick={() => setOpen(false)} style={{ position: 'relative' }}>
               <NavItem to={to} icon={icon} label={label} end={to === '/'} />
+              {to === '/hr' && reviewCount > 0 && <span title={isAdmin ? '出勤待處理（延續加班待核准＋缺下班卡）' : '你有缺下班卡的日子，請聯絡管理員補登'} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: '#c0202a', color: '#fff', fontSize: '11px', fontWeight: 700, borderRadius: '999px', padding: '1px 7px', pointerEvents: 'none' }}>{reviewCount}</span>}
             </div>
           ))}
 
@@ -182,25 +186,7 @@ export default function Layout({ children }) {
             </div>
           ))}
 
-          {/* 打卡後台（管理員專屬）*/}
-          {isAdmin && (
-            <a href="/checkin-admin" target="_blank" rel="noopener noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '9px 12px', borderRadius: '8px',
-                fontSize: '13px', fontWeight: '400',
-                color: 'rgba(200,184,138,0.5)',
-                cursor: 'pointer', textDecoration: 'none',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              <ClipboardCheck size={15} />
-              打卡後台
-              <span style={{ fontSize: '10px', color: 'rgba(200,184,138,0.35)', marginLeft: 'auto' }}>↗</span>
-            </a>
-          )}
+          {/* 打卡後台已併入「人事管理 → 出勤」（2026-10-20）；/checkin-admin 路由保留備用 */}
         </nav>
 
         {/* 回報問題按鈕 */}
