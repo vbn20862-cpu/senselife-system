@@ -78,7 +78,8 @@ export default function AttendanceTab() {
             </select>
           )}
           <span style={{ fontSize: '12px', color: E.textMuted }}>{list.length} 筆</span>
-          {isAdmin && <button onClick={() => setAdding({ empId: who === 'all' ? '' : who, date: new Date().toLocaleDateString('sv-SE'), time: '', type: '上班', note: '' })} style={{ ...E.btnPrimary, padding: '6px 12px', fontSize: '12px', marginLeft: 'auto' }}>＋ 新增打卡</button>}
+          <a href="/checkin" target="_blank" rel="noreferrer" style={{ ...E.btnGhost, textDecoration: 'none', padding: '6px 12px', fontSize: '12px', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center' }}>📱 員工打卡頁</a>
+          {isAdmin && <button onClick={() => setAdding({ empId: who === 'all' ? '' : who, date: new Date().toLocaleDateString('sv-SE'), time: '', type: '上班', note: '' })} style={{ ...E.btnPrimary, padding: '6px 12px', fontSize: '12px' }}>＋ 新增打卡</button>}
         </div>
 
         {adding && (

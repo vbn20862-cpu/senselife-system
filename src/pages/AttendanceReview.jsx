@@ -99,9 +99,6 @@ export default function AttendanceReview({ embedded = false }) {
         {embedded
           ? <div style={{ fontSize: '15px', fontWeight: 700, color: E.textPrimary }}>待處理與審核</div>
           : <h1 style={{ fontSize: '20px', fontWeight: 700, color: E.textPrimary, margin: 0 }}>出勤審核</h1>}
-        <p style={{ fontSize: '12px', color: E.textMuted, margin: '6px 0 0', lineHeight: 1.6 }}>
-          {EXT_OT_FROM.slice(5).replace('-', '/')} 起。延續加班＝只打上下班、從上班起算第 10 小時之後的時間（第 9～10 小時為休息），核准後才計入加班；駁回不計。活動日不適用。
-        </p>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
