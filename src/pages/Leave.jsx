@@ -30,7 +30,7 @@ function daysBetween(start, end) {
   return n
 }
 
-export default function Leave() {
+export default function Leave({ embedded = false }) {
   const { data, addItem, updateItem, deleteItem } = useApp()
   const { currentUser, isAdmin } = useAuth()
   const mob = useIsMobile()
@@ -175,10 +175,10 @@ export default function Leave() {
   })()
 
   return (
-    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className={embedded ? '' : 'page-enter'} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>
-          請假管理
+        <h1 style={{ fontSize: embedded ? '15px' : '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>
+          {embedded ? '請假紀錄' : '請假管理'}
           {isAdmin && pendingCount > 0 && (
             <span style={{ marginLeft: '10px', fontSize: '12px', padding: '2px 10px', borderRadius: '999px', backgroundColor: '#fef3cd', color: '#8a6d1a', fontWeight: '700' }}>{pendingCount} 待審核</span>
           )}

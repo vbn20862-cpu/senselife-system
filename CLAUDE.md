@@ -79,6 +79,9 @@
   把「已核准請假」與「排班表平日休假（週一～五、非國定假日）」寫成公司日曆的全天事件（標題「姓名 假別」「姓名 休假」，一律紅色 colorId 11），
   用 extendedProperties.private.slSource/slKey 認領，改了、刪了會跟著更新。需 Netlify 環境變數 GOOGLE_SA_JSON_B64（服務帳號金鑰 base64，
   日曆要分享「變更活動」給服務帳號）、GOOGLE_CALENDAR_ID；選填 CALENDAR_SYNC_TOKEN＝VITE_CALENDAR_SYNC_TOKEN。服務帳號 senselife-calendar@mystic-berm-493306-m9（2026-10-20 建，金鑰只在 Netlify）。請假頁管理員有「同步 Google 日曆」按鈕
+- 「代墊申請」2026-10-20 改名「費用報支」（資料 key 仍是 reimbursements，交通費與員工自墊都走這裡，送出自動入帳目；1–5 月 26 筆未入帳的舊代墊阿慶決定不補）
+- **交通費報支**（2026-10-20）：自用車里程＝Google Routes API 開車距離（netlify/functions/route-distance.mjs，用同一服務帳號 OAuth，GCP 專案 mystic-berm-493306-m9 需啟用 Routes API＋帳單）公里無條件捨去 × 3 元；
+  員工送出「待審核」（不入帳），管理員核准才入帳目（科目 旅費、類別 交通）轉待還款，駁回要寫理由。其他交通（客運火車計程車過路停車）一般報支實報實銷。財務管理紅點＝待審核報支
 - 交辦（dispatches）＝執行主系統，扁平一列一事；帳務缺欄進紅字不計預算；發票號硬擋
 
 ## 日常維運（機器人的工作）

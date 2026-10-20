@@ -61,7 +61,7 @@ export function exportFinance(data) {
 
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, sheet(expenses.length  ? expenses  : [{ '提示': '尚無資料' }]), '帳目')
-  XLSX.utils.book_append_sheet(wb, sheet(reimburse.length ? reimburse : [{ '提示': '尚無資料' }]), '代墊申請')
+  XLSX.utils.book_append_sheet(wb, sheet(reimburse.length ? reimburse : [{ '提示': '尚無資料' }]), '費用報支')
   XLSX.utils.book_append_sheet(wb, sheet(purchase.length  ? purchase  : [{ '提示': '尚無資料' }]), '採購申請')
   XLSX.utils.book_append_sheet(wb, sheet(payable.length   ? payable   : [{ '提示': '尚無資料' }]), '應付款項')
 

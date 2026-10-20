@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { Plus, Trash2, Search, CreditCard, ChevronLeft, Pencil, Download, Receipt, Filter } from 'lucide-react'
 import Modal from '../components/Modal'
+import MileageClaim from '../components/finance/MileageClaim'
 import PayStatements, { PayDraftsOverview } from '../components/PayStatements'
 import { E, STATUS, useIsMobile } from '../styles/earth'
 import { exportFinance } from '../utils/exportExcel'
@@ -35,15 +36,18 @@ function DonutChart({ slices, size = 120 }) {
   )
 }
 
-export default function Finance() {
+// tools=true：擴充功能裡的「財務工具」，只放少用的頁籤（採購、應付、統編發票、匯款帳戶）；2026-10-20
+// embedTab：嵌入其他頁時只顯示單一頁籤、不顯示標題與頁籤列（例：客戶與廠商頁的匯款帳戶）
+export default function Finance({ tools = false, embedTab = null }) {
   const { data, addItem, updateItem, deleteItem, logEdit, generateSerial, batchUpdate } = useApp()
   const { isAdmin, currentUser } = useAuth()
   const mob = useIsMobile()
   // URL 參數可深連結到特定分頁與案件（例：/finance?tab=budget&project=RME_sl）
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams()
-  const [tab, setTab] = useState(urlParams.get('tab') || 'reimburse')
+  const [tab, setTab] = useState(embedTab || urlParams.get('tab') || (tools ? 'purchase' : 'expenses'))
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [claimType, setClaimType] = useState('general') // 費用報支：general 一般費用（實報實銷）／mileage 自用車里程
   const [showAddBank, setShowAddBank] = useState(false)
   const [showAddPayable, setShowAddPayable] = useState(false)
   const [selectedBudget, setSelectedBudget] = useState(urlParams.get('project') || null)
@@ -145,8 +149,32 @@ export default function Finance() {
     return { payables, pendingPayables, paidPayables, overduePayables, totalPending }
   }, [data.payables, today])
 
-  const ALL_TABS = [['reimburse','代墊申請'],['purchase','採購申請'],['payable','應付款項'],['invoice','統編發票'],['expenses','帳目查詢'],['budget','預算總覽'],['bank','匯款帳戶'],['payroll','薪資管理']]
-  const TABS = isAdmin ? ALL_TABS : [['reimburse','代墊申請'],['purchase','採購申請'],['expenses','帳目查詢'],['budget','預算總覽'],['payroll','薪資管理']]
+  // 常用（財務管理）與少用（財務工具）分開
+  const MAIN_TABS = [['expenses','帳目查詢'],['reimburse','費用報支'],['payroll','薪資管理'],['budget','預算總覽']]
+  const TOOL_TABS = isAdmin ? [['purchase','採購申請'],['payable','應付款項'],['invoice','統編發票']] : [['purchase','採購申請']]
+  const TABS = tools ? TOOL_TABS : MAIN_TABS
+
+  // 交通費（自用車里程）核准：建立連結帳目並轉「待還款」，與一般報支送出時的入帳格式相同
+  function approveClaim(r) {
+    const who = currentUser?.name || currentUser?.username || '管理員'
+    const now = new Date().toLocaleString('sv-SE').slice(0, 16)
+    batchUpdate(d => {
+      if ((d.expenses || []).some(e => e.linkedReimbursementId === r.id)) return d // 已入帳就不重複
+      const maxNum = (d.expenses || []).reduce((mx, e) => { const m = e.id?.match?.(/(\d+)$/); return m ? Math.max(mx, parseInt(m[1])) : mx }, 0)
+      const expEntry = {
+        id: `slm26-${String(maxNum + 1).padStart(3, '0')}`, date: r.date, direction: '支出', project: r.project,
+        category: r.category || '交通', account: r.account || '旅費', amount: Number(r.amount),
+        vendor: r.vendor || '自用車里程', method: r.method || '轉帳', receiptNo: '', noReceipt: true,
+        note: `${r.description}（${r.person} 報支）`, serialNo: r.serialNo || '', linkedReimbursementId: r.id,
+      }
+      return {
+        ...d,
+        reimbursements: (d.reimbursements || []).map(x => x && x.id === r.id ? { ...x, status: '待還款', reviewedBy: who, reviewedAt: now } : x),
+        expenses: [...(d.expenses || []), expEntry],
+        editLogs: [{ id: Date.now(), timestamp: now, user: who, action: '核准', entityType: '費用報支', entityName: r.person, summary: `${r.description} NT${Number(r.amount).toLocaleString()} → 已入帳` }, ...(d.editLogs || [])].slice(0, 500),
+      }
+    })
+  }
 
   function stChip(s) {
     const c = STATUS[s] || { bg: '#eee', color: '#666' }
@@ -236,9 +264,10 @@ export default function Finance() {
   }
 
   return (
-    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className={embedTab ? '' : 'page-enter'} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {!embedTab && <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>財務管理</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>{tools ? '財務工具' : '財務管理'}</h1>
         {isAdmin && (
           <button onClick={() => exportFinance(data)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '10px', border: `1px solid ${E.inputBorder}`, backgroundColor: E.cardBg, color: '#5a3a1a', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
@@ -253,18 +282,19 @@ export default function Finance() {
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab === key), flexShrink: 0 }}>{label}</button>
         ))}
       </div>
+      </>}
 
       {/* 代墊申請 */}
       {tab === 'reimburse' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={() => { setNewR(r => ({ ...r, person: !isAdmin ? (currentUser?.name || '') : r.person })); setFormError(''); setSubmitting(false); setShowAdd(true) }}
-              style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={15} />新增代墊</button>
+            <button onClick={() => { setNewR(r => ({ ...r, person: !isAdmin ? (currentUser?.name || '') : r.person })); setFormError(''); setSubmitting(false); setClaimType('general'); setShowAdd(true) }}
+              style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={15} />新增報支</button>
           </div>
 
           {/* 管理員 Dashboard */}
           {isAdmin && (() => {
-            const allPending = data.reimbursements.filter(r => r.status !== '已還款')
+            const allPending = data.reimbursements.filter(r => r.status !== '已還款' && r.status !== '待審核' && r.status !== '已駁回')
             const totalPendingAmt = allPending.reduce((s, r) => s + (Number(r.amount) || 0), 0)
             // 按員工分組（待還款）
             const byPerson = {}
@@ -315,18 +345,24 @@ export default function Finance() {
                   <div key={r.id} style={{ ...E.card, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: E.textPrimary }}>{r.description || '代墊款'}</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: E.textPrimary }}>{r.description || '費用報支'}</span>
                         <span style={stChip(r.status)}>{r.status}</span>
                         {r.serialNo && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: '#e8f0e4', color: '#3a6d31', fontWeight: '600', letterSpacing: '0.5px' }}>{r.serialNo}</span>}
                       </div>
                       <div style={{ fontSize: '12px', color: E.textMuted, marginTop: '4px' }}>{r.date}{isAdmin ? ` · ${r.person}` : ''} · {r.project} · {r.method}</div>
                       {r.receiptNo && <div style={{ fontSize: '12px', color: E.textMuted }}>憑證：{r.receiptNo}</div>}
+                      {r.mileage && <div style={{ fontSize: '12px', color: E.textMuted }}>里程 {r.mileage.km} 公里 × {r.mileage.rate} 元{r.mileage.mapUrl && <> · <a href={r.mileage.mapUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1a56a0' }}>看路線</a></>}</div>}
+                      {r.status === '已駁回' && r.rejectReason && <div style={{ fontSize: '12px', color: '#b42318' }}>駁回理由：{r.rejectReason}</div>}
                       {r.updatedBy && <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '4px', fontStyle: 'italic' }}>最後編輯：{r.updatedBy} · {r.updatedAt}</div>}
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: '15px', fontWeight: '700', color: E.textPrimary }}>NT${Number(r.amount).toLocaleString()}</div>
                       <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'flex-end' }}>
-                        {isAdmin && (
+                        {isAdmin && r.status === '待審核' && (<>
+                          <button onClick={() => approveClaim(r)} style={{ fontSize: '11px', backgroundColor: E.green, color: '#f2f7f0', border: 'none', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>核准</button>
+                          <button onClick={() => { const why = window.prompt('駁回理由（會顯示給申請人）'); if (why && why.trim()) updateItem('reimbursements', r.id, { status: '已駁回', rejectReason: why.trim(), reviewedBy: currentUser?.name || '管理員', reviewedAt: new Date().toLocaleString('sv-SE').slice(0, 16) }) }} style={{ fontSize: '11px', background: 'none', color: '#b42318', border: '1px solid #e9b8a0', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>駁回</button>
+                        </>)}
+                        {isAdmin && r.status !== '待審核' && r.status !== '已駁回' && (
                           <button onClick={() => updateItem('reimbursements', r.id, { status: '已還款' })}
                             style={{ fontSize: '11px', backgroundColor: E.green, color: '#f2f7f0', border: 'none', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>已還款</button>
                         )}
@@ -373,7 +409,7 @@ export default function Finance() {
                 <div key={r.id} style={{ ...E.card, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '8px', opacity: 0.72 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: E.textPrimary }}>{r.description || '代墊款'}</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: E.textPrimary }}>{r.description || '費用報支'}</span>
                       <span style={stChip('已還款')}>已還款</span>
                       {r.serialNo && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', backgroundColor: '#e8f0e4', color: '#3a6d31', fontWeight: '600', letterSpacing: '0.5px' }}>{r.serialNo}</span>}
                     </div>
@@ -678,7 +714,7 @@ export default function Finance() {
           {!isAdmin && (
             <div style={{ fontSize: '12px', color: E.textSecond, backgroundColor: '#eef2f8', border: '1px solid #cfd9e8', borderRadius: '10px', padding: '10px 14px', lineHeight: 1.6 }}>
 你在這裡是<strong>幫公司作帳</strong>：可以新增、補齊任何一筆帳的欄位（人事/薪資類不顯示）。<br />
-              這些是<strong>公司的錢，不算在你身上、也不會還給你</strong>；自己先墊錢要請款請走「<strong>代墊申請</strong>」分頁。
+              這些是<strong>公司的錢，不算在你身上、也不會還給你</strong>；自己先墊的錢、交通費請走「<strong>費用報支</strong>」分頁。
             </div>
           )}
           {/* 重複帳檢查（管理員）：同發票號（忽略 -、空白、大小寫）＋同金額；另列編號撞號 */}
@@ -1273,7 +1309,21 @@ export default function Finance() {
 
       {/* 新增代墊 Modal */}
       {showAdd && tab === 'reimburse' && (
-        <Modal title="新增代墊申請" onClose={() => { setShowAdd(false); setFormError(''); setSubmitting(false) }}>
+        <Modal title="新增費用報支" onClose={() => { setShowAdd(false); setFormError(''); setSubmitting(false) }}>
+          <div style={{ display: 'flex', gap: '4px', background: E.cardBg, borderRadius: '10px', padding: '3px', border: `1px solid ${E.cardBorder}`, marginBottom: '12px' }}>
+            {[['general', '一般費用（附收據）'], ['mileage', '交通費（自用車里程）']].map(([k, l]) => (
+              <button key={k} onClick={() => setClaimType(k)} style={{ ...E.tab(claimType === k), flex: 1, fontSize: '13px' }}>{l}</button>
+            ))}
+          </div>
+          {claimType === 'mileage' ? (
+            <MileageClaim data={data} isAdmin={isAdmin} currentUser={currentUser} onCancel={() => setShowAdd(false)}
+              onSubmit={rec => {
+                const who = currentUser?.name || currentUser?.username || '未知'
+                addItem('reimbursements', { id: Date.now(), serialNo: generateSerial(), submittedAt: new Date().toLocaleString('sv-SE').slice(0, 16), ...rec })
+                logEdit({ user: who, action: '新增', entityType: '費用報支', entityName: rec.person, summary: `交通費（自用車）${rec.mileage.km} 公里 NT${rec.amount} 待審核` })
+                setShowAdd(false)
+              }} />
+          ) : (<>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[['日期 *','date','date',''],['付款人 *','person','text','員工姓名'],['付款給誰 *','vendor','text','例：建豪印刷、家樂福'],['說明 *','description','text','說明用途'],['憑證編號','receiptNo','text','統編/收據號'],['金額 *','amount','number','0']].map(([label,key,type,ph]) => (
               <div key={key}>
@@ -1376,6 +1426,7 @@ export default function Finance() {
             style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '12px 0', opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
             {submitting ? '送出中…' : '送出申請'}
           </button>
+          </>)}
         </Modal>
       )}
 
@@ -1500,7 +1551,7 @@ export default function Finance() {
 
       {/* 編輯代墊 Modal */}
       {editR && (
-        <Modal title="編輯代墊申請" onClose={() => setEditR(null)}>
+        <Modal title="編輯費用報支" onClose={() => setEditR(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[['日期','date','date',''],['付款人','person','text',''],['付款給誰','vendor','text','例：建豪印刷'],['說明','description','text',''],['憑證編號','receiptNo','text',''],['金額','amount','number','']].map(([label,key,type,ph]) => (
               <div key={key}>
@@ -1545,7 +1596,7 @@ export default function Finance() {
               )
               return { ...d, reimbursements: newReimb, expenses: newExp }
             })
-            logEdit({ user: who, action: '編輯', entityType: '代墊申請', entityName: editR.description || '代墊款', summary: `金額 NT$${Number(editR.amount).toLocaleString()} → 帳目同步更新` })
+            logEdit({ user: who, action: '編輯', entityType: '費用報支', entityName: editR.description || '費用報支', summary: `金額 NT$${Number(editR.amount).toLocaleString()} → 帳目同步更新` })
             setEditR(null)
           }} style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>儲存</button>
         </Modal>
@@ -2203,7 +2254,7 @@ export default function Finance() {
             </div>
             {!isAdmin && (
               <div style={{ fontSize: '12px', color: '#2f5a80', backgroundColor: '#eef2f8', borderRadius: '8px', padding: '8px 12px', lineHeight: 1.6 }}>
-                ℹ️ 這筆記為<strong>公司支出</strong>（你只是代填、不算你的錢）。<br />若是你自己先墊的，請改用「代墊申請」才會還款給你。
+                ℹ️ 這筆記為<strong>公司支出</strong>（你只是代填、不算你的錢）。<br />若是你自己先墊的，請改用「費用報支」才會還款給你。
               </div>
             )}
             {/* 查重：發票號撞號（帳目＋代墊）紅警；同日期＋同金額 黃警 */}

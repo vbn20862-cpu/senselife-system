@@ -138,6 +138,7 @@ export const STATUS = {
   '進行中': { bg: '#e0e8f0', color: '#305080' },
   '待開始': { bg: '#ece8e4', color: '#6a5a4a' },
   '待審核': { bg: '#f0ece0', color: '#8a7028' },
+  '已駁回': { bg: '#fce8e0', color: '#b42318' },
   '已還款': { bg: '#e4f0e8', color: '#2e6040' },
   '待還款': { bg: '#f5ece0', color: '#8a5828' },
   '已核准': { bg: '#e4f0e8', color: '#2e6040' },

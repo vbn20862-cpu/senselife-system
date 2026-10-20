@@ -282,7 +282,7 @@ export default function HistoryPage() {
       {/* 代墊申請 */}
       <div style={{ ...E.card, padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 16px', borderBottom: `1px solid ${E.divider}`, fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>
-          代墊申請（{reimbs.length} 筆）
+          費用報支（{reimbs.length} 筆）
         </div>
         {reimbs.length === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: E.textMuted, fontSize: '13px' }}>無代墊紀錄</div>
@@ -292,7 +292,7 @@ export default function HistoryPage() {
               <div key={r.id} style={{ padding: '12px 16px', borderBottom: i < reimbs.length - 1 ? `1px solid ${E.divider}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: i % 2 === 0 ? 'transparent' : '#faf7f2' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>{r.description || '代墊款'}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: E.textPrimary }}>{r.description || '費用報支'}</span>
                     <span style={stChip(r.status)}>{r.status}</span>
                   </div>
                   <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '2px' }}>{r.date} · {r.person} · {r.method}</div>

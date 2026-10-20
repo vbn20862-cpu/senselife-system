@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History, MessageSquarePlus, Bug, Lightbulb, HelpCircle, Send, WifiOff, Wifi, CalendarClock, CalendarOff } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Kanban, DollarSign, Users, Package, Menu, X, Megaphone, FolderOpen, Upload, ChevronDown, LogOut, ClipboardCheck, Shield, History, MessageSquarePlus, Bug, Lightbulb, HelpCircle, Send, WifiOff, Wifi, CalendarClock, CalendarOff, Building2 } from 'lucide-react'
 import logo from '../assets/logo.jpeg'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
@@ -14,17 +14,19 @@ const NAV_MAIN = [
   { to: '/projects',   icon: FolderKanban,    label: '案件管理' },
   { to: '/finance',    icon: DollarSign,      label: '財務管理' },
   { to: '/hr',         icon: Users,           label: '人事管理' },
-  { to: '/leave',      icon: CalendarOff,     label: '請假管理' },
-  { to: '/assets',     icon: Package,         label: '公司財產' },
+  { to: '/crm',        icon: Building2,       label: '客戶與廠商' },
 ]
 
 const NAV_EXPAND = [
+  { to: '/finance-tools', icon: DollarSign,     label: '財務工具' },
+  { to: '/assets',        icon: Package,        label: '公司財產' },
+  { to: '/logs',          icon: History,        label: '操作紀錄', adminOnly: true },
   { to: '/design',        icon: Kanban,         label: '執行追蹤(舊)' },
-  { to: '/guide',         icon: HelpCircle,     label: '使用說明' },
   { to: '/history',       icon: History,        label: '歷年紀錄' },
 ]
 
 const NAV_SYSTEM = [
+  { to: '/guide',  icon: HelpCircle, label: '使用說明' },
   { to: '/import', icon: Upload, label: '匯入資料' },
 ]
 
@@ -81,7 +83,10 @@ export default function Layout({ children }) {
   const { currentUser, isAdmin, logout } = useAuth()
   const { addItem, data } = useApp()
   const myEmpId = (data.employees || []).find(e => e && e.name === currentUser?.name)?.id
-  const reviewCount = isAdmin ? pendingReviewCount(data) : myMissingPunches(data, myEmpId).length
+  const financeCount = isAdmin ? (data.reimbursements || []).filter(r => r && r.status === '待審核').length : 0
+  const reviewCount = isAdmin
+    ? pendingReviewCount(data) + (data.leaveRequests || []).filter(x => x && x.status === '待審核').length
+    : myMissingPunches(data, myEmpId).length
   const navigate = useNavigate()
   const { connected } = useFirebaseConnection()
   const [showReconnected, setShowReconnected] = useState(false)
@@ -153,7 +158,8 @@ export default function Layout({ children }) {
           {NAV_MAIN.map(({ to, icon, label }) => (
             <div key={to} onClick={() => setOpen(false)} style={{ position: 'relative' }}>
               <NavItem to={to} icon={icon} label={label} end={to === '/'} />
-              {to === '/hr' && reviewCount > 0 && <span title={isAdmin ? '出勤待處理（延續加班待核准＋缺下班卡）' : '你有缺下班卡的日子，請聯絡管理員補登'} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: '#c0202a', color: '#fff', fontSize: '11px', fontWeight: 700, borderRadius: '999px', padding: '1px 7px', pointerEvents: 'none' }}>{reviewCount}</span>}
+              {to === '/finance' && financeCount > 0 && <span title="費用報支待審核" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: '#c0202a', color: '#fff', fontSize: '11px', fontWeight: 700, borderRadius: '999px', padding: '1px 7px', pointerEvents: 'none' }}>{financeCount}</span>}
+              {to === '/hr' && reviewCount > 0 && <span title={isAdmin ? '人事待處理（延續加班待核准＋缺下班卡＋待審請假）' : '你有缺下班卡的日子，請聯絡管理員補登'} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: '#c0202a', color: '#fff', fontSize: '11px', fontWeight: 700, borderRadius: '999px', padding: '1px 7px', pointerEvents: 'none' }}>{reviewCount}</span>}
             </div>
           ))}
 
@@ -168,7 +174,7 @@ export default function Layout({ children }) {
             <ChevronDown size={12} style={{ color: 'rgba(200,184,138,0.35)', transition: 'transform 0.2s', transform: expandOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
           </button>
 
-          {expandOpen && NAV_EXPAND.map(({ to, icon, label }) => (
+          {expandOpen && NAV_EXPAND.filter(n => !n.adminOnly || isAdmin).map(({ to, icon, label }) => (
             <div key={to} onClick={() => setOpen(false)}>
               <NavItem to={to} icon={icon} label={label} size={15} fontSize="13px" fontWeight500={false} />
             </div>

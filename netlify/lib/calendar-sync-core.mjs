@@ -40,13 +40,13 @@ export function desiredEvents(data, months) {
 }
 
 // ── Google 服務帳號 → access token ──
-async function accessToken() {
+export async function accessToken(scope = 'https://www.googleapis.com/auth/calendar') {
   const b64 = process.env.GOOGLE_SA_JSON_B64
   if (!b64) throw new Error('缺 GOOGLE_SA_JSON_B64')
   const sa = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))
   const now = Math.floor(Date.now() / 1000)
   const enc = o => Buffer.from(JSON.stringify(o)).toString('base64url')
-  const unsigned = `${enc({ alg: 'RS256', typ: 'JWT' })}.${enc({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/calendar', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })}`
+  const unsigned = `${enc({ alg: 'RS256', typ: 'JWT' })}.${enc({ iss: sa.client_email, scope, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })}`
   const sig = crypto.sign('RSA-SHA256', Buffer.from(unsigned), sa.private_key).toString('base64url')
   const res = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${sig}` }) })
   if (!res.ok) throw new Error('token ' + res.status + ' ' + await res.text())

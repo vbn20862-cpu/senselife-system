@@ -13,6 +13,7 @@ import { triggerCalendarSync } from '../utils/calendarSync'
 import { annualLeaveStatus } from '../utils/payrollEngine'
 import AttendanceTab from '../components/hr/AttendanceTab'
 import WorkHoursTab from '../components/hr/WorkHoursTab'
+import Leave from './Leave'
 
 // 出勤統計列（展開細節）
 function AttendanceRow({ s, divider, green, coffee, textPrimary, textSecond, textMuted, sandLight, card, mob }) {
@@ -171,11 +172,12 @@ function daysInMonth(y, m) { return new Date(y, m, 0).getDate() }
 
 const EMPTY_ACC = { username: '', name: '', email: '', role: 'employee', password: '', confirmPw: '' }
 
-export default function HR() {
+// logsOnly=true：擴充功能裡獨立的「操作紀錄」頁（2026-10-20 從人事管理移出）
+export default function HR({ logsOnly = false }) {
   const { data, update, addItem, updateItem, deleteItem, logEdit } = useApp()
   const { currentUser, isAdmin, accounts, addAccount, updateAccount, deleteAccount } = useAuth()
   const mob = useIsMobile()
-  const [tab, setTab] = useState('schedule')
+  const [tab, setTab] = useState(() => logsOnly ? 'logs' : (new URLSearchParams(window.location.search).get('tab') || 'schedule'))
   // 手機班表：打開時自動捲到今天那一欄
   const schedScrollRef = useRef(null)
   const [mobSchedMode, setMobSchedMode] = useState('cal') // cal=月曆看 edit=排班編
@@ -326,8 +328,8 @@ export default function HR() {
     ['schedule',  '班表'],
     ['clockin',   '出勤'],
     ['attendance', '工時'],
+    ['leave',     '請假'],
     ...(isAdmin ? [['employees', '員工']] : []),
-    ...(isAdmin ? [['logs', '操作紀錄']] : []),
   ]
 
   // 帳號管理：新增
@@ -448,8 +450,8 @@ export default function HR() {
   return (
     <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>人事管理</h1>
-        {isAdmin && (
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: E.textPrimary, margin: 0, letterSpacing: '-0.01em' }}>{logsOnly ? '操作紀錄' : '人事管理'}</h1>
+        {isAdmin && !logsOnly && (
           <button onClick={() => exportHR(data)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '10px', border: `1px solid ${E.inputBorder}`, backgroundColor: E.cardBg, color: '#5a3a1a', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
             <Download size={14} /> 匯出 Excel
@@ -457,11 +459,11 @@ export default function HR() {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '4px', backgroundColor: E.cardBg, borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      {!logsOnly && <div style={{ display: 'flex', gap: '4px', backgroundColor: E.cardBg, borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
         {TABS.map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{ ...E.tab(tab === key), flexShrink: 0 }}>{label}</button>
         ))}
-      </div>
+      </div>}
 
       {/* 排班表 */}
       {tab === 'schedule' && (
@@ -709,6 +711,7 @@ export default function HR() {
 
       {/* 出缺勤 — 根據打卡紀錄統計 */}
       {tab === 'attendance' && <WorkHoursTab />}
+      {tab === 'leave' && <Leave embedded />}
       {tab === 'clockin' && <AttendanceTab />}
       {tab === 'attendance_old' && (() => {
         const [attYear, setAttYear] = [scheduleMonth.year, (y) => setScheduleMonth(p => ({...p, year: y}))]
@@ -1121,6 +1124,7 @@ export default function HR() {
         const logs = [...(data.editLogs || [])].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
         const TYPE_COLORS = {
           '代墊申請': { bg: '#f0ede0', color: '#7a5a10' },
+          '費用報支': { bg: '#f0ede0', color: '#7a5a10' },
           '採購申請': { bg: '#e8f0f8', color: '#305080' },
           '匯款帳戶': { bg: '#e8f0e4', color: '#3a6d31' },
           '公司財產': { bg: '#f0e8f5', color: '#6a3a80' },

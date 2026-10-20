@@ -1,242 +1,166 @@
-import { useState } from 'react'
+// 客戶與廠商（CRM）：客戶（業主）、廠商、聯絡人、匯款帳戶（2026-10-20 取代主選單的「公司財產」，財產移到擴充功能）
+// 客戶＝案件的 client ＋ 聯絡人類型「業主」；廠商＝聯絡人類型「廠商」＋帳目裡出現過的付款對象（排除員工）
+import { useMemo, useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { Plus, Trash2, Phone, Mail, Building2, Pencil } from 'lucide-react'
-import Modal from '../components/Modal'
+import { useAuth } from '../context/AuthContext'
 import { E } from '../styles/earth'
+import Modal from '../components/Modal'
+import Finance from './Finance'
 
-const TYPE_OPTIONS = ['廠商', '業主', '政府單位', '媒體', '其他']
-const EMPTY_CONTACT = { name: '', type: '廠商', phone: '', email: '', project: '', note: '' }
+const CONTACT_TYPES = ['業主', '政府單位', '廠商', '媒體', '其他'] // 業主、政府單位歸「客戶」；廠商歸「廠商」
+const EMPTY = { name: '', type: '業主', org: '', phone: '', email: '', project: '', note: '' }
+const money = n => `NT$${Math.round(n || 0).toLocaleString()}`
+const norm = s => String(s || '').replace(/[\s·˙・.]/g, '').replace(/[（(].*?[)）]/g, '')
 
 export default function CRM() {
   const { data, addItem, updateItem, deleteItem } = useApp()
-  const [search, setSearch]         = useState('')
-  const [filterType, setFilterType] = useState('全部')
-  const [showAdd, setShowAdd]       = useState(false)
-  const [editContact, setEditContact] = useState(null)
-  const [newContact, setNewContact] = useState(EMPTY_CONTACT)
+  const { isAdmin } = useAuth()
+  const [tab, setTab] = useState('clients')
+  const [q, setQ] = useState('')
+  const [edit, setEdit] = useState(null)
+  const [open, setOpen] = useState(null)
 
-  const filtered = data.contacts.filter(c => {
-    const matchType = filterType === '全部' || c.type === filterType
-    const matchSearch = !search ||
-      c.name.includes(search) || c.type.includes(search) ||
-      c.note?.includes(search) || c.phone?.includes(search) ||
-      c.email?.includes(search)
-    return matchType && matchSearch
-  })
+  const projects = (data.projects || []).filter(Boolean)
+  const contacts = (data.contacts || []).filter(Boolean)
+  const expenses = (data.expenses || []).filter(Boolean)
+  const banks = (data.bankAccounts || []).filter(Boolean)
+  const staffNames = useMemo(() => new Set([...(data.employees || []).filter(Boolean).map(e => norm(e.name)), ...banks.filter(b => b.type === 'employee').map(b => norm(b.name))]), [data.employees, banks])
 
-  function handleAdd() {
-    if (!newContact.name.trim()) return
-    addItem('contacts', { id: Date.now(), ...newContact })
-    setNewContact(EMPTY_CONTACT)
-    setShowAdd(false)
+  const clients = useMemo(() => {
+    const m = new Map()
+    const get = name => { const k = norm(name); if (!m.has(k)) m.set(k, { name, projects: [], contacts: [] }); return m.get(k) }
+    for (const p of projects) if (p.client && p.client !== '內部') get(p.client).projects.push(p)
+    for (const c of contacts) if (c.type === '業主' || c.type === '政府單位') get(c.org || c.name).contacts.push(c)
+    return [...m.values()].map(c => ({ ...c, total: c.projects.reduce((s, p) => s + Number(p.contractAmount || 0), 0) })).sort((a, b) => b.total - a.total)
+  }, [projects, contacts])
+
+  const vendors = useMemo(() => {
+    const m = new Map()
+    const get = name => { const k = norm(name); if (!m.has(k)) m.set(k, { name, contacts: [], spend: 0, count: 0, last: '', projects: new Set() }); return m.get(k) }
+    for (const e of expenses) {
+      if (!e.vendor || e.direction === '收入' || staffNames.has(norm(e.vendor))) continue
+      const v = get(e.vendor); v.spend += Number(e.amount || 0); v.count++; if ((e.date || '') > v.last) v.last = e.date; if (e.project) v.projects.add(e.project)
+    }
+    for (const c of contacts) if (c.type === '廠商') get(c.org || c.name).contacts.push(c)
+    for (const v of m.values()) v.bank = banks.find(b => b.type === 'vendor' && (norm(b.name).includes(norm(v.name)) || norm(v.name).includes(norm(b.name))))
+    return [...m.values()].sort((a, b) => b.spend - a.spend)
+  }, [expenses, contacts, banks, staffNames])
+
+  const match = s => !q || String(s).toLowerCase().includes(q.toLowerCase())
+  function save() {
+    if (!edit.name.trim()) return alert('請填姓名或單位名稱')
+    const rec = { ...edit, name: edit.name.trim() }
+    if (edit.id) updateItem('contacts', edit.id, rec)
+    else addItem('contacts', { ...rec, id: Date.now() })
+    setEdit(null)
   }
 
-  function handleSave() {
-    if (!editContact.name.trim()) return
-    updateItem('contacts', editContact.id, {
-      name: editContact.name, type: editContact.type,
-      phone: editContact.phone, email: editContact.email,
-      project: editContact.project, note: editContact.note,
-    })
-    setEditContact(null)
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* 標題 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: '700', color: E.textPrimary, margin: 0 }}>客戶關係</h1>
-        <button onClick={() => { setNewContact(EMPTY_CONTACT); setShowAdd(true) }}
-          style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={15} />新增聯絡人
-        </button>
-      </div>
-
-      {/* 搜尋 + 篩選 */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="搜尋名稱、電話、備註..."
-          style={{ ...E.input, flex: 1, minWidth: '180px' }} />
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {['全部', ...TYPE_OPTIONS].map(t => (
-            <button key={t} onClick={() => setFilterType(t)} style={{
-              padding: '7px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '500',
-              cursor: 'pointer', border: 'none',
-              backgroundColor: filterType === t ? E.green : '#fdfaf5',
-              color: filterType === t ? '#f2f7f0' : E.textSecond,
-              boxShadow: filterType === t ? 'none' : '0 1px 3px rgba(60,30,0,0.1)',
-            }}>
-              {t}
-              {t !== '全部' && (
-                <span style={{ opacity: 0.65, marginLeft: '4px' }}>
-                  ({data.contacts.filter(c => c.type === t).length})
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 統計列 */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        {[
-          { label: '全部聯絡人', count: data.contacts.length, color: E.coffee },
-          { label: '廠商', count: data.contacts.filter(c => c.type === '廠商').length, color: '#3a6d31' },
-          { label: '業主', count: data.contacts.filter(c => c.type === '業主').length, color: '#305080' },
-        ].map(({ label, count, color }) => (
-          <div key={label} style={{ ...E.card, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 120px' }}>
-            <span style={{ fontSize: '22px', fontWeight: '800', color }}>{count}</span>
-            <span style={{ fontSize: '12px', color: E.textSecond }}>{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* 聯絡人卡片列表 */}
-      {filtered.length === 0 ? (
-        <div style={{ ...E.card, textAlign: 'center', color: E.textMuted, fontSize: '13px', padding: '40px' }}>
-          {search || filterType !== '全部' ? '找不到符合的聯絡人' : '尚無聯絡人，點右上角按鈕新增'}
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-          {filtered.map(c => {
-            const projectName = c.project ? (data.projects.find(p => p.id === c.project)?.name || c.project) : null
-            return (
-              <div key={c.id} style={E.card}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
-                      backgroundColor: c.type === '業主' ? '#e0e8f0' : c.type === '廠商' ? '#e8f0e4' : E.sandLight,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Building2 size={18} style={{ color: c.type === '業主' ? '#305080' : c.type === '廠商' ? '#3a6d31' : E.coffee }} />
-                    </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: E.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {c.name}
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
-                        <span style={{
-                          fontSize: '11px', padding: '2px 8px', borderRadius: '999px', fontWeight: '600',
-                          backgroundColor: c.type === '業主' ? '#e0e8f0' : c.type === '廠商' ? '#e8f0e4' : '#f0ece0',
-                          color: c.type === '業主' ? '#305080' : c.type === '廠商' ? '#3a6d31' : '#8a7028',
-                        }}>{c.type}</span>
-                        {projectName && (
-                          <span style={{ fontSize: '11px', color: E.textMuted, padding: '2px 0' }}>
-                            {projectName}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                    <button onClick={() => setEditContact({ ...c })}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a09080', padding: '4px' }}>
-                      <Pencil size={14} />
-                    </button>
-                    <button onClick={() => { if (window.confirm(`確定刪除「${c.name}」？`)) deleteItem('contacts', c.id) }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d0b8a8', padding: '4px' }}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {(c.phone || c.email || c.note) && (
-                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${E.divider}`, display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {c.phone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: E.textSecond }}>
-                        <Phone size={11} style={{ color: E.textMuted, flexShrink: 0 }} />
-                        <a href={`tel:${c.phone}`} style={{ color: E.textSecond, textDecoration: 'none' }}>{c.phone}</a>
-                      </div>
-                    )}
-                    {c.email && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: E.textSecond }}>
-                        <Mail size={11} style={{ color: E.textMuted, flexShrink: 0 }} />
-                        <a href={`mailto:${c.email}`} style={{ color: E.textSecond, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</a>
-                      </div>
-                    )}
-                    {c.note && (
-                      <div style={{ fontSize: '11px', color: E.textMuted, marginTop: '2px', fontStyle: 'italic' }}>{c.note}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Modal：新增聯絡人 */}
-      {showAdd && (
-        <Modal title="新增聯絡人" onClose={() => setShowAdd(false)}>
-          <ContactForm
-            value={newContact}
-            onChange={setNewContact}
-            projects={data.projects}
-            typeOptions={TYPE_OPTIONS}
-          />
-          <button onClick={handleAdd}
-            style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>
-            新增
-          </button>
-        </Modal>
-      )}
-
-      {/* Modal：編輯聯絡人 */}
-      {editContact && (
-        <Modal title="編輯聯絡人" onClose={() => setEditContact(null)}>
-          <ContactForm
-            value={editContact}
-            onChange={setEditContact}
-            projects={data.projects}
-            typeOptions={TYPE_OPTIONS}
-          />
-          <button onClick={handleSave}
-            style={{ ...E.btnPrimary, marginTop: '16px', width: '100%', padding: '11px 0' }}>
-            儲存
-          </button>
-        </Modal>
-      )}
+  const TABS = [['clients', `客戶（${clients.length}）`], ['vendors', `廠商（${vendors.length}）`], ['contacts', `聯絡人（${contacts.length}）`], ...(isAdmin ? [['bank', '匯款帳戶']] : [])]
+  const row = { ...E.card, padding: '12px 16px' }
+  const chip = (t, bg = E.sandLight, c = E.textSecond) => <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: bg, color: c, fontWeight: 600, whiteSpace: 'nowrap' }}>{t}</span>
+  const contactLine = c => (
+    <div key={c.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '12px', color: E.textSecond, flexWrap: 'wrap', padding: '4px 0' }}>
+      <b style={{ color: E.textPrimary }}>{c.name}</b>{c.phone && <span>☎ {c.phone}</span>}{c.email && <span>✉ {c.email}</span>}{c.note && <span>｜{c.note}</span>}
+      <button onClick={() => setEdit({ ...EMPTY, ...c })} style={{ ...E.btnGhost, padding: '1px 8px', fontSize: '11px', display: 'inline-flex' }}>編輯</button>
     </div>
   )
-}
 
-/* 共用表單元件 */
-function ContactForm({ value, onChange, projects, typeOptions }) {
-  const set = (key, val) => onChange(p => ({ ...p, [key]: val }))
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div>
-        <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>名稱 *</label>
-        <input value={value.name} onChange={e => set('name', e.target.value)} placeholder="公司或聯絡人姓名" style={E.input} />
+    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: E.textPrimary, margin: 0 }}>客戶與廠商</h1>
+        <button onClick={() => setEdit({ ...EMPTY, type: tab === 'vendors' ? '廠商' : '業主' })} style={{ ...E.btnPrimary, padding: '8px 14px', fontSize: '13px' }}>＋ 新增聯絡人</button>
       </div>
-      <div>
-        <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>類型</label>
-        <select value={value.type} onChange={e => set('type', e.target.value)} style={{ ...E.input, cursor: 'pointer' }}>
-          {typeOptions.map(t => <option key={t}>{t}</option>)}
-        </select>
+      <div style={{ display: 'flex', gap: '4px', background: E.cardBg, borderRadius: '12px', padding: '4px', border: `1px solid ${E.cardBorder}`, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+        {TABS.map(([k, l]) => <button key={k} onClick={() => setTab(k)} style={{ ...E.tab(tab === k), flexShrink: 0 }}>{l}</button>)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-        <div>
-          <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>電話</label>
-          <input value={value.phone} onChange={e => set('phone', e.target.value)} placeholder="02-1234-5678" style={E.input} />
+      {tab !== 'bank' && <input value={q} onChange={e => setQ(e.target.value)} placeholder="搜尋名稱、電話、案件…" style={{ ...E.input, maxWidth: '320px' }} />}
+
+      {tab === 'clients' && clients.filter(c => match(c.name + c.projects.map(p => p.name + p.id).join() + c.contacts.map(x => x.name + x.phone).join())).map(c => (
+        <div key={c.name} style={row}>
+          <div onClick={() => setOpen(o => o === c.name ? null : c.name)} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', cursor: 'pointer' }}>
+            <b style={{ fontSize: '15px', color: E.textPrimary }}>{c.name}</b>
+            {chip(`${c.projects.length} 個案件`)}{c.contacts.length > 0 && chip(`${c.contacts.length} 位聯絡人`)}
+            {isAdmin && c.total > 0 && <span style={{ marginLeft: 'auto', fontSize: '13px', fontWeight: 700, color: E.textPrimary }}>合約 {money(c.total)}</span>}
+            <span style={{ color: E.textMuted, marginLeft: isAdmin && c.total > 0 ? 0 : 'auto' }}>{open === c.name ? '▲' : '▼'}</span>
+          </div>
+          {open === c.name && (
+            <div style={{ marginTop: '10px', borderTop: `1px solid ${E.divider}`, paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {c.projects.map(p => (
+                <div key={p.id} style={{ display: 'flex', gap: '10px', fontSize: '13px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {chip(p.code || p.id, '#eef2f8', '#1a56a0')}<span style={{ color: E.textPrimary }}>{p.name}</span>
+                  {p.deadline && <span style={{ color: E.textMuted, fontSize: '12px' }}>期限 {p.deadline}</span>}
+                  {isAdmin && p.contractAmount ? <span style={{ marginLeft: 'auto', fontSize: '12px', color: E.textSecond }}>{money(p.contractAmount)}</span> : null}
+                </div>
+              ))}
+              {c.contacts.map(contactLine)}
+              <button onClick={() => setEdit({ ...EMPTY, type: '業主', org: c.name })} style={{ ...E.btnGhost, alignSelf: 'flex-start', padding: '3px 10px', fontSize: '12px' }}>＋ 加聯絡人</button>
+            </div>
+          )}
         </div>
-        <div>
-          <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>Email</label>
-          <input type="email" value={value.email} onChange={e => set('email', e.target.value)} placeholder="name@example.com" style={E.input} />
+      ))}
+
+      {tab === 'vendors' && (
+        <div style={{ ...E.card, padding: 0, overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '640px', fontSize: '13px' }}>
+            <thead><tr style={{ background: E.sandLight }}>
+              {['廠商', '案件', '最近交易', ...(isAdmin ? ['累計支出', '匯款帳戶'] : []), '聯絡人'].map(h => <th key={h} style={{ padding: '9px 12px', textAlign: 'left', color: E.textSecond, fontWeight: 600 }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {vendors.filter(v => match(v.name + [...v.projects].join() + v.contacts.map(x => x.name + x.phone).join())).map(v => (
+                <tr key={v.name} style={{ borderTop: `1px solid ${E.divider}` }}>
+                  <td style={{ padding: '8px 12px', fontWeight: 600, color: E.textPrimary }}>{v.name}</td>
+                  <td style={{ padding: '8px 12px', color: E.textSecond, fontSize: '12px' }}>{[...v.projects].join('、') || '—'}</td>
+                  <td style={{ padding: '8px 12px', color: E.textSecond, whiteSpace: 'nowrap' }}>{v.last || '—'}{v.count ? `（${v.count} 筆）` : ''}</td>
+                  {isAdmin && <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{v.spend ? money(v.spend) : '—'}</td>}
+                  {isAdmin && <td style={{ padding: '8px 12px', fontSize: '12px', color: v.bank ? '#3a6d31' : E.textMuted }}>{v.bank ? `${v.bank.bank} ${v.bank.account}` : '—'}</td>}
+                  <td style={{ padding: '8px 12px', fontSize: '12px' }}>
+                    {v.contacts.map(c => <div key={c.id}>{c.name}{c.phone ? ` ☎ ${c.phone}` : ''}</div>)}
+                    <button onClick={() => setEdit({ ...EMPTY, type: '廠商', org: v.name })} style={{ ...E.btnGhost, padding: '1px 8px', fontSize: '11px', display: 'inline-flex' }}>＋</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
-      <div>
-        <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>關聯案件</label>
-        <select value={value.project} onChange={e => set('project', e.target.value)} style={{ ...E.input, cursor: 'pointer' }}>
-          <option value="">不綁定案件</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </div>
-      <div>
-        <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>備註</label>
-        <input value={value.note} onChange={e => set('note', e.target.value)} placeholder="補充說明、職稱、備忘..." style={E.input} />
-      </div>
+      )}
+
+      {tab === 'contacts' && (contacts.filter(c => match(c.name + c.org + c.phone + c.email + c.note + c.project)).map(c => (
+        <div key={c.id} style={{ ...row, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {chip(c.type || '其他', c.type === '業主' ? '#eef2f8' : c.type === '廠商' ? '#f5edd0' : E.sandLight, c.type === '業主' ? '#1a56a0' : c.type === '廠商' ? '#8a6010' : E.textSecond)}
+          <b style={{ color: E.textPrimary }}>{c.name}</b>{c.org && c.org !== c.name && <span style={{ fontSize: '12px', color: E.textSecond }}>{c.org}</span>}
+          {c.phone && <span style={{ fontSize: '12px', color: E.textSecond }}>☎ {c.phone}</span>}{c.email && <span style={{ fontSize: '12px', color: E.textSecond }}>✉ {c.email}</span>}
+          {c.project && chip(c.project, '#eef2f8', '#1a56a0')}{c.note && <span style={{ fontSize: '12px', color: E.textMuted }}>{c.note}</span>}
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+            <button onClick={() => setEdit({ ...EMPTY, ...c })} style={{ ...E.btnGhost, padding: '3px 10px', fontSize: '12px' }}>編輯</button>
+            {isAdmin && <button onClick={() => { if (window.confirm(`刪除聯絡人「${c.name}」？`)) deleteItem('contacts', c.id) }} style={{ ...E.btnGhost, padding: '3px 10px', fontSize: '12px', color: '#b42318' }}>刪除</button>}
+          </span>
+        </div>
+      )))}
+      {tab === 'contacts' && !contacts.length && <div style={{ ...row, color: E.textMuted, fontSize: '13px' }}>還沒有聯絡人，按右上「新增聯絡人」。</div>}
+
+      {tab === 'bank' && isAdmin && <Finance embedTab="bank" />}
+
+      {edit && (
+        <Modal title={edit.id ? '編輯聯絡人' : '新增聯絡人'} onClose={() => setEdit(null)} size="sm">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[['name', '姓名或單位 *'], ['org', '所屬單位（公所、公司）'], ['phone', '電話'], ['email', 'Email'], ['note', '備註（職稱、窗口事項）']].map(([k, l]) => (
+              <label key={k} style={{ fontSize: '12px', color: E.textSecond }}>{l}
+                <input value={edit[k] || ''} onChange={e => setEdit(x => ({ ...x, [k]: e.target.value }))} style={{ ...E.input, marginTop: '4px' }} />
+              </label>
+            ))}
+            <label style={{ fontSize: '12px', color: E.textSecond }}>類型
+              <select value={edit.type} onChange={e => setEdit(x => ({ ...x, type: e.target.value }))} style={{ ...E.input, marginTop: '4px' }}>{CONTACT_TYPES.map(t => <option key={t}>{t}</option>)}</select>
+            </label>
+            <label style={{ fontSize: '12px', color: E.textSecond }}>相關案件
+              <select value={edit.project || ''} onChange={e => setEdit(x => ({ ...x, project: e.target.value }))} style={{ ...E.input, marginTop: '4px' }}>
+                <option value="">不指定</option>{projects.map(p => <option key={p.id} value={p.code || p.id}>{(p.code || p.id) + '　' + p.name}</option>)}
+              </select>
+            </label>
+            <button onClick={save} style={{ ...E.btnPrimary, padding: '10px 0', marginTop: '6px' }}>儲存</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

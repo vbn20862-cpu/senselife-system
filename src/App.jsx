@@ -11,6 +11,7 @@ import Finance from './pages/Finance'
 import HR from './pages/HR'
 import Leave from './pages/Leave'
 import AttendanceReview from './pages/AttendanceReview'
+import CRM from './pages/CRM'
 import Dispatch from './pages/Dispatch'
 import Guide from './pages/Guide'
 import Assets from './pages/Assets'
@@ -96,12 +97,15 @@ export default function App() {
                         <Route path="/projects"     element={<Projects />} />
                         <Route path="/design"       element={<Design />} />
                         <Route path="/dispatch"     element={<Dispatch />} />
-                        <Route path="/finance"      element={<Finance />} />
-                        <Route path="/hr"           element={<HR />} />
-                        <Route path="/leave"        element={<Leave />} />
+                        <Route path="/finance"      element={<Finance key="main" />} />
+                        <Route path="/finance-tools" element={<Finance key="tools" tools />} />
+                        <Route path="/hr"           element={<HR key="hr" />} />
+                        <Route path="/logs"         element={<RequireAdmin><HR key="logs" logsOnly /></RequireAdmin>} />
+                        <Route path="/leave"        element={<Navigate to="/hr?tab=leave" replace />} />
                         <Route path="/attendance-review" element={<RequireAdmin><AttendanceReview /></RequireAdmin>} />
                         <Route path="/guide"        element={<Guide />} />
                         <Route path="/assets"       element={<Assets />} />
+                        <Route path="/crm"          element={<CRM />} />
                         <Route path="/history"       element={<History />} />
                         <Route path="/announcements" element={<Announcements />} />
                         <Route path="/documents"    element={<Documents />} />
