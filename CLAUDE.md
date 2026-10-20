@@ -103,6 +103,16 @@ HR.jsx 內舊的 attendance_old、clockin_old、accounts 區塊已不顯示，�
 管理員 `admin`／員工帳號見 `/accounts`（明文，待改雜湊）。員工登入靠
 `accounts.name === employees.name` 對應，改名要兩邊同步。
 
+## 2026-10-20 交接（線上 V26.09.04）
+
+- 選單：儀表板、交辦、案件、財務管理（帳目／費用報支／薪資／預算）、人事管理（班表／出勤／工時／請假／員工）、客戶與廠商（客戶／廠商／聯絡人／匯款帳戶）、
+  擴充功能（財務工具＝採購／應付／統編發票、公司財產、操作紀錄、執行追蹤舊、歷年紀錄）、系統工具（使用說明、匯入資料）
+- Netlify 環境變數：GOOGLE_SA_JSON_B64（服務帳號 senselife-calendar，日曆同步）、GOOGLE_CALENDAR_ID、GOOGLE_MAPS_API_KEY（地圖金鑰，限 Routes API）
+- 待處理：缺下班卡 姿晴 10/7、10/12、寶琳 10/8；兩人 9 月明細未確認；現金 姿晴 8,867、寶琳 8,669；11/5 前 10 月草稿加姿晴 7–8 月第 2 期 22h
+- 寶琳到職日系統寫 2026-03-02，契約 115/2/24，待阿慶確認；HR.jsx 舊 attendance_old／clockin_old／accounts 區塊待刪
+- 「下載」資料夾的服務帳號金鑰 JSON 待刪；舊服務帳號 calendar-sync@ 可刪
+- 測試用掉流水號 SL-2610-0040（報支流水號跳一號）
+
 ## 待辦（跨 session 交接）
 
 - 🔴 Firebase 安全規則鎖定＋密碼雜湊（最大洞）
