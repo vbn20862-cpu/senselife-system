@@ -106,7 +106,7 @@ node ops/repair-garbled.mjs    # 有亂碼時 dry-run → 確認 → --fix
   轉換程序：先把 salarySettings 改 payType hourly、baseSalary＝hourlyRate＝200、津貼 0、payTypeFrom＝生效日、prevSetting＝月薪快照（引擎 effectiveSetting 會讓之前月份照舊）
 - **時數帳模式**（2026-10-19，目前只有寶琳）：salarySettings.hoursLedger={from:'2026-09-01',openingHours:13,openingNote}
   → 自 from 起缺時不扣薪，記入時數帳逐月累計（computeCompLedger 回傳 monthly[].ledger{open,opening,add,offsetByComp,close}）；
-  補休先抵當月缺時、剩餘再抵餘額；餘額以勞務補足、離職月結清。薪資頁與明細自動顯示；9 月明細為手動版（52.52h），10 月起草稿自帶
+  補休先抵當月缺時、剩餘再抵餘額；餘額以勞務補足、離職月結清。請假照缺時規則記入（病假／生理假半天 4h、事假與超額病假 8h、特休公假喪假 0；2026-10-20 阿慶確認）。薪資頁與明細自動顯示；9 月明細為手動版（52.52h），10 月起草稿自帶
 - 生理假假別：半薪，每月 1 天、全年 3 天內不併入病假（V26.08.07）
 - 喪假需選親屬關係（8／6／3 天，Leave.jsx BEREAVEMENT_DAYS），公假全薪不計額度；兩者引擎皆 cat paid
 - 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）
