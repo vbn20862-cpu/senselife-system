@@ -946,11 +946,14 @@ export default function Projects() {
 
   function handleAdd() {
     if (!newProject.name.trim()) return
-    const codeVal    = newProject.code.trim() || `PRJ_${Date.now()}`
+    // 案件代碼必填：英文 2–4 字＋_sl（2026-10-20；之前留空會自動產生 PRJ_時間戳）
+    const codeVal    = newProject.code.trim()
+    if (!/^[A-Za-z]{2,4}_sl$/.test(codeVal)) { alert('案件代碼必填，格式：英文 2–4 字＋_sl，例：HDE_sl'); return }
+    if ((data.projects || []).some(p => p && (p.id === codeVal || p.code === codeVal))) { alert(`案件代碼 ${codeVal} 已存在`); return }
     const now        = new Date().toLocaleString('sv-SE').slice(0, 16)
     const autoColor  = TYPE_COLORS[newProject.type] || newProject.color
     addItem('projects', {
-      id: codeVal, code: codeVal, ...newProject,
+      ...newProject, id: codeVal, code: codeVal,
       budget: Number(newProject.budget) || 0,
       color: autoColor,
       milestones: createDefaultMilestones(),
@@ -1148,8 +1151,8 @@ export default function Projects() {
               <input value={newProject.name} onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))} style={E.input} placeholder="例：魯凱小米文化特展" />
             </div>
             <div>
-              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>案件代碼 <span style={{ color: E.textMuted, fontWeight: '400' }}>（留空自動產生）</span></label>
-              <input value={newProject.code} onChange={e => setNewProject(p => ({ ...p, code: e.target.value }))} style={E.input} placeholder="例：PW_sl" />
+              <label style={{ fontSize: '12px', color: E.textSecond, display: 'block', marginBottom: '4px' }}>案件代碼 * <span style={{ color: E.textMuted, fontWeight: '400' }}>（英文 2–4 字＋_sl）</span></label>
+              <input value={newProject.code} onChange={e => setNewProject(p => ({ ...p, code: e.target.value }))} style={E.input} placeholder="例：HDE_sl" />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: '10px' }}>
               <div>
