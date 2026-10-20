@@ -10,7 +10,7 @@ export function triggerCalendarSync(months = []) {
     const list = [...pending].sort().slice(0, 3); pending = new Set()
     if (!list.length) return
     const tok = import.meta.env.VITE_CALENDAR_SYNC_TOKEN || ''
-    fetch(`/.netlify/functions/calendar-sync${tok ? `?token=${encodeURIComponent(tok)}` : ''}`, {
+    fetch(`/.netlify/functions/calendar-sync-now${tok ? `?token=${encodeURIComponent(tok)}` : ''}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ months: list }),
     }).catch(() => {})
   }, 1500)
@@ -19,7 +19,7 @@ export function triggerCalendarSync(months = []) {
 // 手動同步（管理員按鈕用）：回傳結果物件或丟錯
 export async function runCalendarSync(months) {
   const tok = import.meta.env.VITE_CALENDAR_SYNC_TOKEN || ''
-  const res = await fetch(`/.netlify/functions/calendar-sync${tok ? `?token=${encodeURIComponent(tok)}` : ''}`, {
+  const res = await fetch(`/.netlify/functions/calendar-sync-now${tok ? `?token=${encodeURIComponent(tok)}` : ''}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ months }),
   })
   const j = await res.json().catch(() => ({}))
