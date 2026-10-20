@@ -9,6 +9,7 @@ import { downloadCsv } from '../utils/exportCsv'
 import { MONTHS, GOVT_WORK_DAYS, roundHours, resolveEmpName, computeEmpMonthClockHours, computeAllTimeEarned, computeDayMinutes, computeOTSpans, normalDayMinutes, activityExtraOTMinutes } from '../utils/salaryCalc'
 import { mapLink } from '../utils/geo'
 import { holidaysInMonth, holidayOn, getHolidays, DEFAULT_HOLIDAYS } from '../utils/holidays'
+import { triggerCalendarSync } from '../utils/calendarSync'
 import { annualLeaveStatus } from '../utils/payrollEngine'
 
 // 出勤統計列（展開細節）
@@ -227,6 +228,7 @@ export default function HR() {
     } else {
       addItem('schedules', { id: Date.now(), empId, year, month, day, shift })
     }
+    triggerCalendarSync([`${year}-${String(month).padStart(2, '0')}`]) // 平日休假同步到 Google 日曆
   }
   function monthHours(empId) {
     return data.schedules.filter(s => s.empId === empId && s.year === year && s.month === month)
@@ -245,11 +247,13 @@ export default function HR() {
       else arr.push({ id: ts++, empId, year, month, day, shift: '出勤' })
     }
     update('schedules', arr)
+    triggerCalendarSync([`${year}-${String(month).padStart(2, '0')}`])
   }
   function clearMonthSchedule(empId) {
     const emp = data.employees.find(e => e.id === empId)
     if (!window.confirm(`確定清空 ${emp?.name || ''} ${month} 月整月排班？`)) return
     update('schedules', data.schedules.filter(s => !(s.empId === empId && s.year === year && s.month === month)))
+    triggerCalendarSync([`${year}-${String(month).padStart(2, '0')}`])
   }
 
   // ── 國定假日管理 ──

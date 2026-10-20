@@ -5,6 +5,7 @@ import { E, useIsMobile } from '../styles/earth'
 import Modal from '../components/Modal'
 import { Plus, Check, X, Trash2, Clock } from 'lucide-react'
 import { LEAVE_TYPES, annualLeaveStatus, computeCompLedger, sickLeaveCap, annualLeaveHoursOf } from '../utils/payrollEngine'
+import { triggerCalendarSync, runCalendarSync } from '../utils/calendarSync'
 
 // 喪假天數（勞工請假規則第 3 條），依親屬關係，工資照給
 const BEREAVEMENT_DAYS = {
@@ -112,6 +113,7 @@ export default function Leave() {
       reviewedBy: isAdmin ? (currentUser?.name || '管理員') : '',
       reviewedAt: isAdmin ? localTimestamp() : '',
     })
+    if (isAdmin) triggerCalendarSync([form.startDate, end])
     // TODO: 之後接「小彥機器人」→ 發送到老闆群組
     setShowForm(false)
   }
@@ -122,6 +124,17 @@ export default function Leave() {
       reviewedBy: currentUser?.name || '管理員',
       reviewedAt: localTimestamp(),
     })
+    triggerCalendarSync([l.startDate || l.date, l.endDate || l.startDate]) // 核准／駁回都同步到 Google 日曆
+  }
+  const [syncMsg, setSyncMsg] = useState('')
+  async function manualSync() {
+    setSyncMsg('同步中…')
+    try {
+      const now = new Date(); const y = now.getFullYear(), m = now.getMonth() + 1
+      const r = await runCalendarSync([`${y}-${String(m).padStart(2, '0')}`, `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`])
+      setSyncMsg(`已同步：新增 ${r.created}、更新 ${r.updated}、刪除 ${r.deleted}`)
+    } catch (e) { setSyncMsg('同步失敗：' + e.message) }
+    setTimeout(() => setSyncMsg(''), 6000)
   }
 
 
@@ -170,9 +183,15 @@ export default function Leave() {
             <span style={{ marginLeft: '10px', fontSize: '12px', padding: '2px 10px', borderRadius: '999px', backgroundColor: '#fef3cd', color: '#8a6d1a', fontWeight: '700' }}>{pendingCount} 待審核</span>
           )}
         </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {isAdmin && (
+          <button onClick={manualSync} title="把已核准請假與排班表平日休假同步到公司 Google 日曆" style={{ ...E.btnGhost, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>📅 同步 Google 日曆</button>
+        )}
+        {syncMsg && <span style={{ fontSize: '12px', color: syncMsg.startsWith('同步失敗') ? '#b42318' : '#3a6d31' }}>{syncMsg}</span>}
         <button onClick={openForm} style={{ ...E.btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={15} /> {isAdmin ? '補登請假' : '申請請假'}
         </button>
+        </div>
       </div>
 
       {/* 員工：我的特休 + 補休餘額 */}
