@@ -23,7 +23,7 @@ export function desiredEvents(data, months) {
       if (!s || e < from || s >= to) continue
       const name = nameOf(l.empId); if (!name) continue
       const half = l.halfDay || (s === e && Number(l.days) === 0.5)
-      out.set(`leave:${l.id}`, { key: `leave:${l.id}`, start: s, end: addDays(e, 1), summary: `${name} ${l.type}${half ? '（半天）' : ''}`, description: `請假 ${l.type}${l.relation ? `（${l.relation}）` : ''} ${s}${e !== s ? `～${e}` : ''}` })
+      out.set(`leave:${l.id}`, { key: `leave:${l.id}`, start: s, end: addDays(e, 1), summary: `${name} ${l.type}${half ? '（半天）' : ''}`, colorId: '11', description: `請假 ${l.type}${l.relation ? `（${l.relation}）` : ''} ${s}${e !== s ? `～${e}` : ''}` })
     }
     // 排班表平日休假（週一～週五、非國定假日）
     const [yr, mo] = ym.split('-').map(Number)
@@ -79,10 +79,10 @@ export async function syncMonths(months, { dry = false } = {}) {
   } while (pageToken)
   const log = { created: 0, updated: 0, deleted: 0, unchanged: 0 }
   for (const [key, w] of want) {
-    const body = { summary: w.summary, description: w.description, start: { date: w.start }, end: { date: w.end }, transparency: 'transparent', extendedProperties: { private: { slSource: 'senselife', slKey: key } } }
+    const body = { summary: w.summary, description: w.description, ...(w.colorId ? { colorId: w.colorId } : {}), start: { date: w.start }, end: { date: w.end }, transparency: 'transparent', extendedProperties: { private: { slSource: 'senselife', slKey: key } } }
     const ev = have.get(key)
     if (!ev) { await gcal(token, `/calendars/${cal}/events`, { method: 'POST', body: JSON.stringify(body) }); log.created++ }
-    else if (ev.summary !== w.summary || ev.start?.date !== w.start || ev.end?.date !== w.end) { await gcal(token, `/calendars/${cal}/events/${ev.id}`, { method: 'PATCH', body: JSON.stringify(body) }); log.updated++ }
+    else if (ev.summary !== w.summary || ev.start?.date !== w.start || ev.end?.date !== w.end || (ev.colorId || '') !== (w.colorId || '')) { await gcal(token, `/calendars/${cal}/events/${ev.id}`, { method: 'PATCH', body: JSON.stringify(body) }); log.updated++ }
     else log.unchanged++
   }
   for (const [key, ev] of have) { if (!want.has(key)) { await gcal(token, `/calendars/${cal}/events/${ev.id}`, { method: 'DELETE' }); log.deleted++ } }

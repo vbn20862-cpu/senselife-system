@@ -72,7 +72,7 @@
   與北葉辦公室；離邊界 ≤ 手機誤差且 ≤50 公尺也算）。地圖工具在 company-system/_map/（git 忽略）。活動日、外勤由管理員在打卡後台登記。
   **加班開始／加班結束不受定位限制**（有定位照記）；加班結束必填「加班內容」（≥4 字，存在 clockin.note「加班內容：…」）（2026-10-19）
 - **Google 日曆同步**（2026-10-20，老闆只看日曆）：`netlify/functions/calendar-sync.mjs` 每天 06:00 排程（排程函式正式站不接受網址呼叫）＋`calendar-sync-now.mjs` 供前端在核准請假／補登／改班表時 POST 觸發，共用 `netlify/lib/calendar-sync-core.mjs`，
-  把「已核准請假」與「排班表平日休假（週一～五、非國定假日）」寫成公司日曆的全天事件（標題「姓名 假別」「姓名 休假」），
+  把「已核准請假」與「排班表平日休假（週一～五、非國定假日）」寫成公司日曆的全天事件（標題「姓名 假別」紅色 colorId 11、「姓名 休假」預設色），
   用 extendedProperties.private.slSource/slKey 認領，改了、刪了會跟著更新。需 Netlify 環境變數 GOOGLE_SA_JSON_B64（服務帳號金鑰 base64，
   日曆要分享「變更活動」給服務帳號）、GOOGLE_CALENDAR_ID；選填 CALENDAR_SYNC_TOKEN＝VITE_CALENDAR_SYNC_TOKEN。服務帳號 senselife-calendar@mystic-berm-493306-m9（2026-10-20 建，金鑰只在 Netlify）。請假頁管理員有「同步 Google 日曆」按鈕
 - 交辦（dispatches）＝執行主系統，扁平一列一事；帳務缺欄進紅字不計預算；發票號硬擋
