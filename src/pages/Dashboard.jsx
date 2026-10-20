@@ -663,7 +663,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ⑤ 團隊進度總覽 */}
+      {/* ⑤ 團隊進度總覽：只看案件工項（2026-10-20 拿掉人員任務統計）*/}
       <div className="card-animate d6 card-accent-coffee" style={{ ...E.card, padding: '16px 18px' }}>
         <SectionTitle icon={BarChart3} color="#8f5b38">團隊進度總覽</SectionTitle>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, ${mob ? 'minmax(140px, 1fr)' : 'minmax(280px, 1fr)'})`, gap: '20px' }}>
@@ -687,34 +687,6 @@ export default function Dashboard() {
                     <div style={{ height: '8px', borderRadius: '4px', backgroundColor: '#ede5d8', overflow: 'hidden' }}>
                       <div className="progress-bar" style={{ height: '100%', borderRadius: '4px', backgroundColor: p.color || '#3a6d31', width: `${p.pct}%` }} />
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 人員任務統計 */}
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: '#7a6050', marginBottom: '10px' }}>人員任務統計</div>
-            {teamProgress.personStats.length === 0 ? (
-              <div style={{ fontSize: '13px', color: '#b09070' }}>無任務資料</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {teamProgress.personStats.map(p => (
-                  <div key={p.name} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '7px 10px', borderRadius: '8px', backgroundColor: '#faf7f2',
-                  }}>
-                    <div style={{
-                      width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#edf2ea',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '12px', fontWeight: '700', color: '#3a6d31', flexShrink: 0,
-                    }}>
-                      {p.name.slice(0, 1)}
-                    </div>
-                    <span style={{ flex: 1, fontSize: '13px', fontWeight: '500', color: '#3d2510' }}>{p.name}</span>
-                    <span style={{ fontSize: '12px', color: '#7a6050' }}>{p.done} 完成</span>
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#3a6d31' }}>{p.total} 項</span>
                   </div>
                 ))}
               </div>
