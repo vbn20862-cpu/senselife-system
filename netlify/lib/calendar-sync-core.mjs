@@ -33,7 +33,7 @@ export function desiredEvents(data, months) {
       const dow = new Date(ds + 'T00:00:00Z').getUTCDay()
       if (dow === 0 || dow === 6 || holidays.has(ds)) continue
       const name = nameOf(sc.empId); if (!name) continue
-      out.set(`sched:${sc.empId}:${ds}`, { key: `sched:${sc.empId}:${ds}`, start: ds, end: addDays(ds, 1), summary: `${name} 休假`, description: '排班表平日休假（調休）' })
+      out.set(`sched:${sc.empId}:${ds}`, { key: `sched:${sc.empId}:${ds}`, start: ds, end: addDays(ds, 1), summary: `${name} 休假`, colorId: '11', description: '排班表平日休假（調休）' })
     }
   }
   return out
