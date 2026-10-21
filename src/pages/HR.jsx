@@ -281,6 +281,18 @@ export default function HR({ logsOnly = false }) {
     update('holidays', [...DEFAULT_HOLIDAYS])
   }
 
+  // ── 已核准請假：班表格子疊標記（排班值不動，薪資／缺時計算不受影響）──
+  const leaveByEmpDay = {}
+  const ymKey = `${year}-${String(month).padStart(2, '0')}`
+  ;(data.leaveRequests || []).filter(l => l && l.status === '已核准').forEach(l => {
+    const start = l.startDate || l.date, end = l.halfDay ? start : (l.endDate || start)
+    if (!start || end < `${ymKey}-01` || start > `${ymKey}-31`) return
+    for (let d = 1; d <= days; d++) {
+      const ds = `${ymKey}-${String(d).padStart(2, '0')}`
+      if (ds >= start && ds <= end) (leaveByEmpDay[l.empId] ||= {})[d] = `${l.type}${l.halfDay ? '（半天）' : ''}`
+    }
+  })
+
   // ── 停班 / 豪雨假管理 ──
   const allSusp = data.suspensions || {}
   const suspByDay = {}
@@ -548,6 +560,7 @@ export default function HR({ logsOnly = false }) {
                         <span style={{ width: '52px', fontSize: '13px', fontWeight: '600', color: isHol || dow === 0 ? '#c04030' : dow === 6 ? '#4a70a0' : E.textPrimary }}>{d}（{WEEKDAYS[dow]}）</span>
                         <span style={{ flex: 1, fontSize: '10px', color: isHol ? '#c0202a' : '#3c6eb4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {isHol ? `🎌${holidayByDay[d]}` : isSusp ? `🌧️${suspLabel(suspByDay[d])}` : ''}
+                          {leaveByEmpDay[editEmp.id]?.[d] && <span style={{ color: '#6a3a80', fontWeight: 700 }}>{isHol || isSusp ? ' ' : ''}🌿{leaveByEmpDay[editEmp.id][d]}</span>}
                         </span>
                         <button
                           onClick={() => !isScheduleLocked && setSchedule(editEmp.id, d, nextShift(shift))}
@@ -635,6 +648,27 @@ export default function HR({ logsOnly = false }) {
                       if (noteVal) while (d + span <= days && noteOf(d + span) === noteVal) span++   // 連續同備註 → 合併
                       const runDays = Array.from({ length: span }, (_, i) => d + i)
                       const width = Math.max(colW * span + (span - 1) * 2, noteVal ? noteVal.length * 10 + 8 : 0)
+                      // 手機：全域 CSS 會把 input 字級強制 16px（防 iOS 縮放），改用小字 span，點一下用對話框編輯
+                      const saveNote = v => {
+                        if (v == null || v === noteVal) return
+                        const next = { ...(data.scheduleNotes || {}) }
+                        runDays.forEach(x => { next[keyOf(x)] = v })
+                        update('scheduleNotes', next)
+                      }
+                      if (mob) {
+                        cells.push(
+                          <td key={d} colSpan={span} style={{ padding: '2px 1px', textAlign: 'center' }}>
+                            <span
+                              onClick={() => saveNote(window.prompt(span > 1 ? `${month}/${d}–${month}/${d + span - 1} 活動備註（整段一起改）` : `${month}/${d} 活動備註`, noteVal))}
+                              title={noteVal}
+                              style={{ display: 'block', width: `${width}px`, height: '20px', lineHeight: '20px', borderRadius: '4px', fontSize: '9px', backgroundColor: noteVal ? '#fff3cd' : 'transparent', color: noteVal ? E.textPrimary : '#d0c0b0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 2px', boxSizing: 'border-box' }}>
+                              {noteVal || '·'}
+                            </span>
+                          </td>
+                        )
+                        d += span
+                        continue
+                      }
                       cells.push(
                         <td key={d} colSpan={span} style={{ padding: '2px 1px', textAlign: 'center' }}>
                           <input
@@ -670,15 +704,19 @@ export default function HR({ logsOnly = false }) {
                       const dow = getDayOfWeek(year, month, d)
                       const isWeekend = dow === 0 || dow === 6
                       const cellLocked = isScheduleLocked || !canEditSchedule(emp)
+                      const lv = leaveByEmpDay[emp.id]?.[d]
                       return (
                         <td key={d} style={{ padding: mob ? '3px 1px' : '3px 2px', textAlign: 'center', backgroundColor: isWeekend ? 'rgba(0,0,0,0.025)' : 'transparent' }}>
+                          <span style={{ position: 'relative', display: 'inline-block' }}>
                           <button
                             onClick={() => !cellLocked && setSchedule(emp.id, d, nextShift(shift))}
                             disabled={cellLocked}
-                            title={isScheduleLocked ? '當月5日後僅管理員可編輯' : !canEditSchedule(emp) ? '僅能編輯自己的排班' : ''}
-                            style={{ width: mob ? '29px' : '34px', height: mob ? '24px' : '26px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', border: 'none', transition: 'all 0.1s', backgroundColor: s ? s.bg : 'transparent', color: s ? s.color : '#d0c0b0', cursor: cellLocked ? 'not-allowed' : 'pointer', opacity: cellLocked ? 0.8 : 1 }}>
+                            title={[lv ? `已核准請假：${lv}` : '', isScheduleLocked ? '當月5日後僅管理員可編輯' : !canEditSchedule(emp) ? '僅能編輯自己的排班' : ''].filter(Boolean).join('；')}
+                            style={{ width: mob ? '29px' : '34px', height: mob ? '24px' : '26px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', border: lv ? '1.5px solid #8a5aa8' : 'none', boxSizing: 'border-box', transition: 'all 0.1s', backgroundColor: s ? s.bg : (lv ? '#f0ebf5' : 'transparent'), color: s ? s.color : '#d0c0b0', cursor: cellLocked ? 'not-allowed' : 'pointer', opacity: cellLocked ? 0.8 : 1 }}>
                             {s ? s.short : '·'}
                           </button>
+                          {lv && <span style={{ position: 'absolute', top: '-3px', right: '-3px', width: '9px', height: '9px', borderRadius: '50%', backgroundColor: '#6a3a80', border: '1.5px solid #fff', pointerEvents: 'none' }} />}
+                          </span>
                         </td>
                       )
                     })}
@@ -705,6 +743,9 @@ export default function HR({ logsOnly = false }) {
           {isScheduleLocked
             ? <p style={{ fontSize: '12px', color: '#c04030', margin: 0 }}>🔒 當月5日後排班表已鎖定，如需調整請聯絡管理員</p>
             : <p style={{ fontSize: '12px', color: E.textMuted, margin: 0 }}>點擊格子循環切換：出勤 → 休假 → 上午班 → 下午班 → 清空</p>
+          }
+          {Object.keys(leaveByEmpDay).length > 0 &&
+            <p style={{ fontSize: '12px', color: '#6a3a80', margin: 0 }}>🟣 紫框＋右上角紫點＝該日有已核准請假（滑過格子看假別）；排班值不變，薪資與缺時照請假規則計算</p>
           }
         </div>
       )}

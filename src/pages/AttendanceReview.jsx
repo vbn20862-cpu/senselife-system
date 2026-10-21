@@ -1,5 +1,5 @@
 // 出勤審核（管理員）：延續加班核准／駁回、加班卡內容、跨日下班、缺下班卡補登、補登更正紀錄
-// 延續加班規則見 utils/salaryCalc.js extendedOTInfo（第 10 小時起進加班池，核准才計入）
+// 延續加班規則見 utils/salaryCalc.js extendedOTInfo（工作滿 8 小時＋休息 30 分後進加班池，即打卡起算 9 小時 30 分；核准才計入）
 import { useMemo, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
@@ -16,7 +16,7 @@ export const REJECT_REASONS = [
 ]
 const W = '日一二三四五六'
 const md = d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}（${W[new Date(d + 'T00:00:00').getDay()]}）`
-const H = m => `${Math.round(m / 6) / 10}h`
+const H = m => `${Math.round(m / 60 * 100) / 100}h（${m} 分）` // 算到分鐘
 
 // 員工自己的缺下班卡日期（過去日子、有上班沒下班），選單紅點與打卡頁提醒用
 export function myMissingPunches(data, empId) {

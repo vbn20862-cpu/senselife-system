@@ -37,7 +37,8 @@ export const GOVT_WORK_DAYS = {
 // 注意：此為 UI 顯示用粗略單位（半小時粒度）。
 // 真實薪資／加班費計算請用 minutesToDecimalHours（分鐘級精度），
 // 並由 utils/payrollEngine.js 的勞基法引擎執行。
-export const roundHours = (minutes) => Math.floor((minutes / 60) * 2) / 2
+// 2026-10-21 阿慶定：上班時數一律算到分鐘（小數 2 位），不再捨去到 0.5 小時
+export const roundHours = (minutes) => Math.round((minutes / 60) * 100) / 100
 
 // 分鐘 → 小數小時（不捨去，保留分鐘精度）
 export const minutesToDecimalHours = (minutes) => Math.round((minutes / 60) * 100) / 100
@@ -91,10 +92,11 @@ export function normalDayMinutes(dayRecs, date, data, isToday = false) {
 }
 // 活動日登打時間超過 8h 的部分（分鐘）→ 自動算加班；非活動日為 0
 // ── 延續加班（2026-10-20 阿慶定）──
-// 只打上下班、從第一張上班卡起算：前 9 小時＝8 小時工作＋1 小時午休，第 9～10 小時＝休息，第 10 小時之後進「加班池」；
+// 只打上下班、從第一張上班卡起算：前 9 小時＝8 小時工作＋1 小時午休，工作滿 8 小時後休息 30 分（打卡起算 9:00～9:30），
+// 打卡起算第 9 小時 30 分之後進「加班池」（2026-10-21 阿慶改：原為第 10 小時起）；
 // 不用另打加班卡，但要填原因，經管理員核准才計入（下班卡上的 otStatus：待核准／核准／駁回）。活動日不適用（照登打全算）。
 export const EXT_OT_FROM = '2026-10-01'
-export const EXT_OT_START_MIN = 600
+export const EXT_OT_START_MIN = 570
 const hm = t => { const [h, m] = String(t || '').split(':').map(Number); return Number.isFinite(h) ? h * 60 + (m || 0) : null }
 export function extendedOTInfo(dayRecs, date, data) {
   if (!date || date < EXT_OT_FROM || isActivityDay(date, data)) return null
@@ -112,7 +114,7 @@ export function extendedOTInfo(dayRecs, date, data) {
   return { spanMin, extMin, inRec: ins[0], outRec, status: outRec.otStatus || '待核准', reason: outRec.otReason || '', rejectReason: outRec.otRejectReason || '' }
 }
 
-// 正常工時以外、要算加班的分鐘數：活動日＝超過 8 小時的部分；一般日＝已核准的延續加班（第 10 小時起）
+// 正常工時以外、要算加班的分鐘數：活動日＝超過 8 小時的部分；一般日＝已核准的延續加班（打卡起算 9 小時 30 分後）
 export function activityExtraOTMinutes(dayRecs, date, data, isToday = false) {
   if (isActivityDay(date, data)) {
     const { dayMin } = computeDayMinutes(dayRecs, isToday, { noBreak: true })

@@ -9,7 +9,7 @@ import { normalDayMinutes, activityExtraOTMinutes, computeOTSpans, extendedOTInf
 
 const W = '日一二三四五六'
 const pad = n => String(n).padStart(2, '0')
-const h = m => Math.round(m / 6) / 10
+const h = m => Math.round(m / 60 * 100) / 100 // 算到分鐘
 const ymNow = () => new Date().toLocaleDateString('sv-SE').slice(0, 7)
 const SHIFT_H = { '出勤': 8, 'W': 8, '上午班': 4, '下午班': 4 }
 

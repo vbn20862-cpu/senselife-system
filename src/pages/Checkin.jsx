@@ -153,12 +153,12 @@ export default function Checkin() {
       type,
       ...(crossNote ? { note: crossNote } : {}),
     }
-    // 延續加班：下班時從上班起算超過 10 小時 → 第 10 小時之後進加班池（待核准），必填原因
+    // 延續加班：下班時從上班起算超過 9 小時 30 分（8 小時工作＋1 小時午休＋30 分休息）→ 之後的時間進加班池（待核准），必填原因
     if (type === '下班') {
       const dayRecs = data.clockins.filter(c => c.empId === emp.id && c.date === punchDate)
       const info = extendedOTInfo([...dayRecs, rec], punchDate, data)
       if (info) {
-        if (!note) { setExtInfo({ hours: Math.round(info.extMin / 6) / 10 }); setOtNoteOpen('下班'); return }
+        if (!note) { setExtInfo({ hours: Math.round(info.extMin / 60 * 100) / 100 }); setOtNoteOpen('下班'); return }
         rec.otReason = note; rec.otStatus = '待核准'
       }
     }
@@ -295,7 +295,7 @@ export default function Checkin() {
             {/* 加班結束：必填加班內容 */}
             {otNoteOpen && (
               <div style={{ backgroundColor: '#e0f2fe', border: '1px solid #7fb8d8', borderRadius: '12px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0369a1' }}>{otNoteOpen === '下班' ? `🌙 今天從上班起算已超過 10 小時，第 10 小時之後約 ${extInfo?.hours ?? ''} 小時會進加班池，請說明延續加班原因（必填，主管核准後計入）` : '✅ 加班結束：請說明這次加班做了什麼（必填）'}</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0369a1' }}>{otNoteOpen === '下班' ? `🌙 今天工作已滿 8 小時並休息 30 分，之後約 ${extInfo?.hours ?? ''} 小時會進加班池，請說明延續加班原因（必填，主管核准後計入）` : '✅ 加班結束：請說明這次加班做了什麼（必填）'}</div>
                 <textarea value={otNote} onChange={e => setOtNote(e.target.value)} rows={3} placeholder="例：慢城活動器材整理、報告修改到 20:30"
                   style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #b8d4e4', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }} />
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
