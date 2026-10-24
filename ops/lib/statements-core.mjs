@@ -30,7 +30,7 @@ for (const e of data.employees) {
   const s = PE.effectiveSetting(s0, YR, MO)
   const hire = e.hireDate && e.hireDate > `${target}-31` ; if (hire) continue
   const hourly = (s.payType || 'monthly') === 'hourly'
-  const recs = data.clockins.filter(c => c.date?.startsWith(target) && c.empName === e.name)
+  const recs = SC.applyEventRule(data.clockins.filter(c => c.date?.startsWith(target) && c.empName === e.name), data, e.id) // 事件日受影響的人打卡不計
   const ot = {}; for (const sp of SC.computeOTSpans(recs)) if (!sp.missingEnd && !sp.missingStart && sp.startDate) ot[sp.startDate] = (ot[sp.startDate] || 0) + sp.minutes
   const sched = Object.fromEntries(data.schedules.filter(x => x.empId === e.id && x.year === YR && x.month === MO).map(x => [`${target}-${pad(x.day)}`, x.shift]))
   const leaves = d => data.leaveRequests.filter(l => l.empId === e.id && l.status === '已核准' && d >= (l.startDate || l.date) && d <= (l.endDate || l.startDate))

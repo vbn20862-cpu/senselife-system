@@ -360,6 +360,32 @@ export default function Dashboard() {
         <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'rgba(242,247,240,0.55)' }}>深活共構管理系統</p>
       </div>
 
+      {/* 臨時事件公告：今天起 7 天內的停班／放假，員工也看得到 */}
+      {(() => {
+        const todayS = new Date().toLocaleDateString('sv-SE')
+        const until = new Date(); until.setDate(until.getDate() + 7)
+        const untilS = until.toLocaleDateString('sv-SE')
+        const myEmpId = (data.employees || []).find(e => e && e.name === currentUser?.name)?.id
+        const list = Object.entries(data.suspensions || {}).filter(([d]) => d >= todayS && d <= untilS).sort((a, b) => a[0].localeCompare(b[0]))
+        if (!list.length) return null
+        const KIND = { disaster: '天災停班', company: '公司放假', other: '臨時事件' }
+        return (
+          <div className="card-animate d2" style={{ backgroundColor: '#eaf0f8', border: '1px solid #b8cbe6', borderRadius: '14px', padding: '12px 16px' }}>
+            <div style={{ fontWeight: 700, fontSize: '13px', color: '#2a4f80', marginBottom: '6px' }}>⚡ 臨時事件</div>
+            {list.map(([d, s]) => {
+              const excluded = myEmpId != null && (s.excludeEmpIds || []).includes(myEmpId)
+              return (
+                <div key={d} style={{ fontSize: '13px', color: '#2a4f80', lineHeight: 1.7 }}>
+                  <b>{Number(d.slice(5, 7))}/{Number(d.slice(8))}{d === todayS ? '（今天）' : ''}</b>　{s.label || '事件'}・{KIND[s.kind] || '停班'}・{s.scope === 'partial' ? `${s.fromTime} 起不用上班` : '全天不用上班'}
+                  {excluded && <span style={{ color: '#b45309', fontWeight: 700 }}>　你被列為照常出勤</span>}
+                  {s.note && <span style={{ color: '#5a6f90' }}>　{s.note}</span>}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
+
       {/* ① 交辦追蹤（管理員置頂：紅字區 / 本週結算） */}
       {isAdmin && (
         <div className="card-animate d2" style={{ backgroundColor: '#ffffff', border: '1px solid #e8c8a0', borderRadius: '14px', padding: '14px 16px', boxShadow: '0 2px 12px rgba(60,30,0,0.10)' }}>

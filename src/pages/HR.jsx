@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import { E, useIsMobile } from '../styles/earth'
 import { exportHR } from '../utils/exportExcel'
 import { downloadCsv } from '../utils/exportCsv'
-import { MONTHS, GOVT_WORK_DAYS, roundHours, resolveEmpName, computeEmpMonthClockHours, computeAllTimeEarned, computeDayMinutes, computeOTSpans, normalDayMinutes, activityExtraOTMinutes } from '../utils/salaryCalc'
+import { MONTHS, GOVT_WORK_DAYS, roundHours, resolveEmpName, computeEmpMonthClockHours, computeAllTimeEarned, computeDayMinutes, computeOTSpans, normalDayMinutes, activityExtraOTMinutes, applyEventRule } from '../utils/salaryCalc'
 import { mapLink } from '../utils/geo'
 import { holidaysInMonth, holidayOn, getHolidays, DEFAULT_HOLIDAYS } from '../utils/holidays'
 import { triggerCalendarSync } from '../utils/calendarSync'
@@ -191,7 +191,9 @@ export default function HR({ logsOnly = false }) {
   const [showHolidayModal, setShowHolidayModal] = useState(false)
   const [newHoliday, setNewHoliday] = useState({ date: '', name: '' })
   const [showSuspModal, setShowSuspModal] = useState(false)
-  const [newSusp, setNewSusp] = useState({ date: '', label: '豪雨假', scope: 'full', fromTime: '14:00' })
+  const EVENT_KINDS = [['disaster', '天災停班'], ['company', '公司放假'], ['other', '其他']]
+  const EMPTY_EVENT = { date: '', endDate: '', label: '颱風假', kind: 'disaster', scope: 'full', fromTime: '14:00', exclude: [], note: '' }
+  const [newSusp, setNewSusp] = useState(EMPTY_EVENT)
 
   // 帳號管理 state
   const [showAddAcc, setShowAddAcc]   = useState(false)
@@ -306,31 +308,44 @@ export default function HR({ logsOnly = false }) {
   function suspLabel(s) {
     return s.scope === 'partial' ? `${s.label || '停班'} ${s.fromTime || ''}後` : (s.label || '停班')
   }
+  // ── 臨時事件（停班／放假）──
+  // 事件是臨時發生的，跟國定假日不同：班表已排好、事件發生就是所有人（排除名單除外）都不用上班（2026-10-24 阿慶定）
+  // 資料仍存 suspensions，以日期為鍵；跨天事件每天一筆、共用 groupId。欄位：label, kind, scope, fromTime, excludeEmpIds, note, groupId
   function addSusp() {
     if (!newSusp.date) return
+    const endDate = newSusp.endDate && newSusp.endDate > newSusp.date ? newSusp.endDate : newSusp.date
+    const label = newSusp.label.trim() || '臨時事件'
+    const excludeEmpIds = newSusp.exclude.map(Number)
+    const groupId = Date.now()
+    const dates = []
+    for (const d = new Date(newSusp.date + 'T00:00:00'); d.toLocaleDateString('sv-SE') <= endDate; d.setDate(d.getDate() + 1)) dates.push(d.toLocaleDateString('sv-SE'))
+    if (dates.length > 31) { alert('事件最多 31 天'); return }
     const next = { ...(data.suspensions || {}) }
-    next[newSusp.date] = newSusp.scope === 'partial'
-      ? { label: newSusp.label.trim() || '豪雨假', scope: 'partial', fromTime: newSusp.fromTime }
-      : { label: newSusp.label.trim() || '豪雨假', scope: 'full' }
+    for (const ds of dates) next[ds] = { label, kind: newSusp.kind, scope: newSusp.scope === 'partial' ? 'partial' : 'full', ...(newSusp.scope === 'partial' ? { fromTime: newSusp.fromTime } : {}), excludeEmpIds, note: newSusp.note.trim(), groupId }
     update('suspensions', next)
-    // 停班是臨時事件，事件發生就是所有人都不用上班（2026-10-24 阿慶定）：
-    // 全天停班 → 當天的單日請假（待審核／已核准）自動取消，不扣薪、不耗額度；跨多天的請假由薪資引擎跳過停班日
+    // 全天事件 → 當天的單日請假（待審核／已核准、未被排除的人）自動取消，不扣薪、不耗額度；跨多天的請假由薪資引擎跳過事件日
+    const hit = [], spanning = []
     if (newSusp.scope !== 'partial') {
-      const label = next[newSusp.date].label
-      const hit = (data.leaveRequests || []).filter(l => l && (l.status === '待審核' || l.status === '已核准') && (l.startDate || l.date) === newSusp.date && (l.endDate || l.startDate || l.date) === newSusp.date)
-      for (const l of hit) updateItem('leaveRequests', l.id, { status: '已取消', reason: `${l.reason || ''}（${newSusp.date.slice(5).replace('-', '/')} ${label}停班，系統自動取消）`.trim(), cancelledAt: new Date().toLocaleString('sv-SE').slice(0, 16), cancelledBy: '系統（停班）' })
-      const spanning = (data.leaveRequests || []).filter(l => l && (l.status === '待審核' || l.status === '已核准') && (l.startDate || l.date) < newSusp.date && (l.endDate || '') > newSusp.date)
-      if (hit.length || spanning.length) alert(`${label}（${newSusp.date}）已登錄。\n自動取消當天請假 ${hit.length} 筆：${hit.map(l => `${l.empName} ${l.type}`).join('、') || '無'}${spanning.length ? `\n另有 ${spanning.length} 筆跨多天的請假涵蓋這天（${spanning.map(l => l.empName).join('、')}），薪資引擎會自動跳過這天，不用改。` : ''}`)
+      for (const l of (data.leaveRequests || [])) {
+        if (!l || !(l.status === '待審核' || l.status === '已核准') || excludeEmpIds.includes(l.empId)) continue
+        const s = l.startDate || l.date, e = l.endDate || s
+        if (s === e && dates.includes(s)) hit.push(l)
+        else if (s <= endDate && e >= newSusp.date) spanning.push(l)
+      }
+      for (const l of hit) updateItem('leaveRequests', l.id, { status: '已取消', reason: `${l.reason || ''}（${(l.startDate || l.date).slice(5).replace('-', '/')} ${label}，系統自動取消）`.trim(), cancelledAt: new Date().toLocaleString('sv-SE').slice(0, 16), cancelledBy: '系統（臨時事件）' })
     }
-    triggerCalendarSync([newSusp.date.slice(0, 7)]) // 停班同步到 Google 日曆
-    setNewSusp({ date: '', label: '豪雨假', scope: 'full', fromTime: '14:00' })
+    logEdit({ user: currentUser?.name || '管理員', action: '新增', entityType: '臨時事件', entityName: label, summary: `${newSusp.date}${endDate !== newSusp.date ? `～${endDate}` : ''} ${newSusp.scope === 'partial' ? `${newSusp.fromTime} 起` : '全天'}${excludeEmpIds.length ? `，排除 ${excludeEmpIds.map(id => data.employees.find(e => e.id === id)?.name).filter(Boolean).join('、')}` : ''}` })
+    alert(`${label}（${newSusp.date}${endDate !== newSusp.date ? `～${endDate}` : ''}）已登錄。\n自動取消請假 ${hit.length} 筆：${hit.map(l => `${l.empName} ${l.type} ${(l.startDate || l.date).slice(5)}`).join('、') || '無'}${spanning.length ? `\n另有 ${spanning.length} 筆跨多天的請假涵蓋事件日（${[...new Set(spanning.map(l => l.empName))].join('、')}），薪資引擎會自動跳過，不用改。` : ''}`)
+    triggerCalendarSync([...new Set(dates.map(d => d.slice(0, 7)))]) // 事件同步到 Google 日曆
+    setNewSusp(EMPTY_EVENT)
   }
   function removeSusp(date) {
     const next = { ...(data.suspensions || {}) }
     delete next[date]
     update('suspensions', next)
+    logEdit({ user: currentUser?.name || '管理員', action: '刪除', entityType: '臨時事件', entityName: (data.suspensions || {})[date]?.label || '事件', summary: date })
     triggerCalendarSync([date.slice(0, 7)])
-    // 注意：被停班自動取消的請假不會自動恢復，要請員工重新申請
+    // 注意：被事件自動取消的請假不會自動恢復，要請員工重新申請
   }
 
   // 排班鎖定：非管理員 + 當月 + 已過5日
@@ -414,7 +429,7 @@ export default function HR({ logsOnly = false }) {
     ]
     const rows = allClockinNames.map(name => {
       const emp = data.employees.find(e => e.name === name || e.name.includes(name) || name.includes(e.name))
-      const myClockins = monthClockins.filter(c => c.empName === name)
+      const myClockins = applyEventRule(monthClockins.filter(c => c.empName === name), data, emp?.id) // 事件日受影響的人打卡不計
       const workDays = new Set(myClockins.filter(c => c.type === '上班').map(c => c.date))
       let totalHours = 0, totalOTHours = 0
       const compLeaveForMonth = emp ? (data.compLeaveRecords || []).filter(r => r.empId === emp.id && r.date?.startsWith(monthStr)) : []
@@ -508,7 +523,7 @@ export default function HR({ logsOnly = false }) {
             )}
             {isAdmin && (
               <button onClick={() => setShowSuspModal(true)} style={{ ...E.btnGhost, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                🌧️ 停班/豪雨假
+                ⚡ 臨時事件
               </button>
             )}
             <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexWrap: 'wrap' }}>
@@ -630,15 +645,15 @@ export default function HR({ logsOnly = false }) {
                     <td />
                   </tr>
                 )}
-                {/* 停班/豪雨假列 */}
+                {/* 臨時事件列（停班／放假） */}
                 {monthSuspList.length > 0 && (
                   <tr style={{ borderBottom: `1px solid ${E.divider}`, backgroundColor: '#eaf0f8' }}>
-                    <td style={{ padding: '3px 14px', fontWeight: '700', color: '#3c6eb4', position: 'sticky', left: 0, backgroundColor: '#eaf0f8', borderRight: `1px solid ${E.divider}`, fontSize: '10px', whiteSpace: 'nowrap' }}>🌧️ 停班</td>
+                    <td style={{ padding: '3px 14px', fontWeight: '700', color: '#3c6eb4', position: 'sticky', left: 0, backgroundColor: '#eaf0f8', borderRight: `1px solid ${E.divider}`, fontSize: '10px', whiteSpace: 'nowrap' }}>⚡ 事件</td>
                     {Array.from({ length: days }, (_, i) => i+1).map(d => (
-                      <td key={d} style={{ padding: '2px 1px', textAlign: 'center', backgroundColor: suspByDay[d] ? 'rgba(60,110,180,0.10)' : 'transparent' }}>
+                      <td key={d} style={{ padding: '2px 1px', textAlign: 'center', verticalAlign: 'top', backgroundColor: suspByDay[d] ? 'rgba(60,110,180,0.10)' : 'transparent', maxWidth: mob ? 29 : 34 }}>
                         {suspByDay[d] && (
-                          <span title={suspLabel(suspByDay[d])} style={{ fontSize: '8px', color: '#3c6eb4', fontWeight: '700', lineHeight: 1.1, display: 'inline-block', maxWidth: '34px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {suspByDay[d].scope === 'partial' ? `${suspByDay[d].fromTime}後` : '全天'}
+                          <span title={`${suspLabel(suspByDay[d])}${(suspByDay[d].excludeEmpIds || []).length ? `（照常出勤：${suspByDay[d].excludeEmpIds.map(id => data.employees.find(e => e.id === id)?.name).filter(Boolean).join('、')}）` : ''}`} style={{ fontSize: '8px', color: '#3c6eb4', fontWeight: '700', lineHeight: 1.15, display: 'block', whiteSpace: 'normal', wordBreak: 'break-all', padding: '0 1px' }}>
+                            {suspByDay[d].label || '事件'}{suspByDay[d].scope === 'partial' ? `${suspByDay[d].fromTime}起` : ''}
                           </span>
                         )}
                       </td>
@@ -1353,48 +1368,84 @@ export default function HR({ logsOnly = false }) {
 
       {/* Modal：停班 / 豪雨假管理 */}
       {showSuspModal && (
-        <Modal title="🌧️ 停班 / 豪雨假管理" onClose={() => setShowSuspModal(false)} size="md">
+        <Modal title="⚡ 臨時事件（停班／放假）" onClose={() => setShowSuspModal(false)} size="md">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ fontSize: '12px', color: E.textMuted, lineHeight: 1.6, backgroundColor: '#eaf0f8', padding: '8px 12px', borderRadius: '8px' }}>
-              縣市政府宣布停班時登記。依天災要點：停班日<strong style={{ color: '#3c6eb4' }}>沒出勤＝無薪</strong>（缺的時數照缺時扣薪），但<strong>不算曠職</strong>、不影響全勤；有出勤的工時照<strong>正常薪（1×）</strong>計，<u>不</u>自動 ×2。需另給加給/補假請手動處理。
+              班表排的是「預定」要上班；事件是臨時發生的（颱風停班、公司放假、停電）。登錄後系統自動：<strong style={{ color: '#3c6eb4' }}>那天不列入排班應到</strong>（沒來不缺時、不無薪、不記時數帳）、<strong>取消當天的單日請假</strong>（不扣薪、不耗額度）、同步 Google 日曆。有來的照正常工時算，不另外加給。排除名單裡的人照常上班、照常計算。
             </div>
             {/* 新增 */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '120px' }}>
-                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>日期</label>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '8px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>開始日 *</label>
                 <input type="date" value={newSusp.date} onChange={e => setNewSusp(p => ({ ...p, date: e.target.value }))} style={E.input} />
               </div>
-              <div style={{ flex: 1, minWidth: '100px' }}>
-                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>名稱</label>
-                <input type="text" value={newSusp.label} onChange={e => setNewSusp(p => ({ ...p, label: e.target.value }))} placeholder="豪雨假" style={E.input} />
+              <div>
+                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>結束日（跨天才填）</label>
+                <input type="date" value={newSusp.endDate} min={newSusp.date} onChange={e => setNewSusp(p => ({ ...p, endDate: e.target.value }))} style={E.input} />
               </div>
-              <div style={{ minWidth: '110px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>類型</label>
+                <select value={newSusp.kind} onChange={e => setNewSusp(p => ({ ...p, kind: e.target.value, label: e.target.value === 'company' && p.label === '颱風假' ? '公司放假' : p.label }))} style={E.input}>
+                  {EVENT_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>名稱</label>
+                <input type="text" value={newSusp.label} onChange={e => setNewSusp(p => ({ ...p, label: e.target.value }))} placeholder="颱風假" style={E.input} />
+              </div>
+              <div>
                 <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>範圍</label>
                 <select value={newSusp.scope} onChange={e => setNewSusp(p => ({ ...p, scope: e.target.value }))} style={E.input}>
                   <option value="full">全天</option>
-                  <option value="partial">某時段後</option>
+                  <option value="partial">某時間起</option>
                 </select>
               </div>
               {newSusp.scope === 'partial' && (
-                <div style={{ minWidth: '90px' }}>
-                  <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>停班起</label>
+                <div>
+                  <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>幾點起不用上班</label>
                   <input type="time" value={newSusp.fromTime} onChange={e => setNewSusp(p => ({ ...p, fromTime: e.target.value }))} style={E.input} />
                 </div>
               )}
-              <button onClick={addSusp} disabled={!newSusp.date}
-                style={{ ...E.btnPrimary, padding: '9px 16px', opacity: !newSusp.date ? 0.5 : 1 }}>加入</button>
-            </div>
-            {/* 清單（本月） */}
-            <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', border: `1px solid ${E.divider}`, borderRadius: '8px', padding: '8px' }}>
-              {monthSuspList.map(([date, s]) => (
-                <div key={date} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', borderRadius: '6px', backgroundColor: '#eaf0f8' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#3c6eb4', minWidth: '88px' }}>{date}</span>
-                  <span style={{ fontSize: '13px', color: E.textPrimary, flex: 1 }}>{suspLabel(s)}<span style={{ color: E.textMuted, fontSize: '11px', marginLeft: '6px' }}>{s.scope === 'partial' ? '（部分停班）' : '（全天停班）'}</span></span>
-                  <button onClick={() => removeSusp(date)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c09070', padding: '2px', display: 'flex' }}><Trash2 size={14} /></button>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>照常出勤的人（排除，不受事件影響）</label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {(data.employees || []).filter(Boolean).map(emp => {
+                    const on = newSusp.exclude.includes(String(emp.id))
+                    return (
+                      <button key={emp.id} onClick={() => setNewSusp(p => ({ ...p, exclude: on ? p.exclude.filter(x => x !== String(emp.id)) : [...p.exclude, String(emp.id)] }))}
+                        style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '999px', border: `1px solid ${on ? '#3c6eb4' : E.divider}`, backgroundColor: on ? '#eaf0f8' : 'transparent', color: on ? '#3c6eb4' : E.textSecond, cursor: 'pointer', fontWeight: on ? 700 : 400 }}>
+                        {on ? '✓ ' : ''}{emp.name}
+                      </button>
+                    )
+                  })}
                 </div>
-              ))}
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '11px', color: E.textMuted, display: 'block', marginBottom: '3px' }}>說明（選填，會寫進日曆）</label>
+                <input type="text" value={newSusp.note} onChange={e => setNewSusp(p => ({ ...p, note: e.target.value }))} placeholder="例：屏東縣政府宣布停班停課" style={E.input} />
+              </div>
+            </div>
+            <button onClick={addSusp} disabled={!newSusp.date}
+              style={{ ...E.btnPrimary, padding: '10px 16px', opacity: !newSusp.date ? 0.5 : 1 }}>登錄事件</button>
+            {/* 清單（本月） */}
+            <div style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', border: `1px solid ${E.divider}`, borderRadius: '8px', padding: '8px' }}>
+              {monthSuspList.map(([date, s]) => {
+                const KIND = { disaster: '天災停班', company: '公司放假', other: '其他' }
+                const excl = (s.excludeEmpIds || []).map(id => data.employees.find(e => e.id === id)?.name).filter(Boolean)
+                return (
+                  <div key={date} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', borderRadius: '6px', backgroundColor: '#eaf0f8' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#3c6eb4', minWidth: '88px' }}>{date}</span>
+                    <span style={{ fontSize: '13px', color: E.textPrimary, flex: 1, lineHeight: 1.4 }}>
+                      {suspLabel(s)}<span style={{ color: E.textMuted, fontSize: '11px', marginLeft: '6px' }}>{KIND[s.kind] || '停班'}・{s.scope === 'partial' ? `${s.fromTime} 起` : '全天'}</span>
+                      {excl.length > 0 && <span style={{ display: 'block', fontSize: '11px', color: E.textMuted }}>照常出勤：{excl.join('、')}</span>}
+                      {s.note && <span style={{ display: 'block', fontSize: '11px', color: E.textMuted }}>{s.note}</span>}
+                    </span>
+                    <button onClick={() => { if (window.confirm(`刪除 ${date} ${s.label}？\n（已被自動取消的請假不會恢復）`)) removeSusp(date) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c09070', padding: '2px', display: 'flex' }}><Trash2 size={14} /></button>
+                  </div>
+                )
+              })}
               {monthSuspList.length === 0 && (
-                <div style={{ textAlign: 'center', color: E.textMuted, fontSize: '12px', padding: '16px' }}>本月尚無停班日</div>
+                <div style={{ textAlign: 'center', color: E.textMuted, fontSize: '12px', padding: '16px' }}>本月沒有臨時事件</div>
               )}
             </div>
           </div>

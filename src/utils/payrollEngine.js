@@ -5,7 +5,7 @@
 // 設計原則：寧可多給、不可少給；寧可少扣、不可溢扣。
 // 加班費：小數無條件進位。遲到早退：金額無條件捨去。
 
-import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin, normalDayMinutes, activityExtraOTMinutes, isActivityDay } from './salaryCalc'
+import { GOVT_WORK_DAYS, breakMinutesFor, computeOTSpans, computeDayMinutes, capNormalMin, normalDayMinutes, activityExtraOTMinutes, isActivityDay, applyEventRule } from './salaryCalc'
 import { getHolidays } from './holidays'
 
 // ── 2025–2026 國定假日（勞基法第 37 條認定）──
@@ -135,7 +135,7 @@ export const SHIFT_HOURS = { '出勤': 8, 'W': 8, '上午班': 4, '下午班': 4
 export function scheduledHoursOn(emp, dateStr, data) {
   const [y, m, d] = dateStr.split('-').map(Number)
   const sc = (data.schedules || []).find(x => x && x.empId === emp.id && x.year === y && x.month === m && x.day === d)
-  if (isFullSuspDay(dateStr, data)) return 0 // 全天停班：這天沒有應出勤時數（特休、時薪制請假折算都跳過）
+  if (isFullSuspDay(dateStr, data, emp.id)) return 0 // 全天停班：這天沒有應出勤時數（特休、時薪制請假折算都跳過）
   return SHIFT_HOURS[sc?.shift] || 0
 }
 
@@ -580,7 +580,7 @@ const quarterOf = (month) => Math.ceil(month / 3)
 export function computeMonthNormalHours(emp, yr, mo, data, holidaySet) {
   const monthStr = `${yr}-${pad2(mo)}`
   const todayStr = new Date().toLocaleDateString('sv-SE')
-  const recs = (data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp))
+  const recs = applyEventRule((data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp)), data, emp.id) // 事件日不計打卡
   const dates = [...new Set(recs.map(c => c.date))]
   let min = 0
   for (const date of dates) {
@@ -596,7 +596,7 @@ export function computeMonthNormalHours(emp, yr, mo, data, holidaySet) {
 //   lots：依費率分桶 { '1.34': h, '1.67': h, '2': h } — 供「先扣低費率」消耗用
 export function computeMonthCompAccrual(emp, yr, mo, data, holidaySet) {
   const monthStr = `${yr}-${pad2(mo)}`
-  const recs = (data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp))
+  const recs = applyEventRule((data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp)), data, emp.id) // 事件日不計打卡
   // 加班用跨日 span 配對，歸戶到開始日
   const otMinByDate = {}
   for (const sp of computeOTSpans(recs)) {
@@ -632,7 +632,7 @@ export function computeMonthCompAccrual(emp, yr, mo, data, holidaySet) {
 // 時薪制加班時數（加班開始/結束配對，跨日歸開始日）— 費率 1.0：時數 × 時薪直接併入薪資
 export function computeHourlyOTHours(emp, yr, mo, data) {
   const monthStr = `${yr}-${pad2(mo)}`
-  const recs = (data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp))
+  const recs = applyEventRule((data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp)), data, emp.id) // 事件日不計打卡
   let min = 0
   for (const sp of computeOTSpans(recs)) {
     if (sp.missingEnd || sp.missingStart || !sp.startDate) continue
@@ -647,7 +647,7 @@ export function computeHourlyOTHours(emp, yr, mo, data) {
 //   回傳「加給的等值時數」（打卡時數已把加班以 ×1.0 計入，這裡只補差額）
 export function computeHourlyOTPremiumHours(emp, yr, mo, data) {
   const monthStr = `${yr}-${pad2(mo)}`
-  const recs = (data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp))
+  const recs = applyEventRule((data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp)), data, emp.id) // 事件日不計打卡
   const otMinByDate = {}
   for (const sp of computeOTSpans(recs)) {
     if (sp.missingEnd || sp.missingStart || !sp.startDate) continue
@@ -666,7 +666,7 @@ export function computeHourlyOTPremiumHours(emp, yr, mo, data) {
 export function computeHourlyHolidayPremium(emp, yr, mo, data, rate) {
   const holidaySet = new Set(getHolidays(data).map(h => h.date))
   const monthStr = `${yr}-${pad2(mo)}`
-  const recs = (data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp))
+  const recs = applyEventRule((data.clockins || []).filter(c => c.date?.startsWith(monthStr) && nameMatch(c, emp)), data, emp.id) // 事件日不計打卡
   // 加班用跨日 span 配對（歸開始日），與月時數一致
   const otMinByDate = {}
   for (const sp of computeOTSpans(recs)) {
@@ -718,7 +718,7 @@ export function sickLeaveFactorMap(emp, yr, data) {
     const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
     while (d <= last) {
       const ds = d.toLocaleDateString('sv-SE')
-      if (ds.startsWith(String(yr)) && !isFullSuspDay(ds, data)) days.push({ ds, w }) // 停班日不耗病假額度
+      if (ds.startsWith(String(yr)) && !isFullSuspDay(ds, data, emp.id)) days.push({ ds, w }) // 停班日不耗病假額度
       d.setDate(d.getDate() + 1)
     }
   }
@@ -788,7 +788,7 @@ export function leaveEffectiveHoursInMonth(emp, yr, mo, data) {
       const ds = d.toLocaleDateString('sv-SE')
       // 時薪制（部分工時）：請假折算按當日排班時數（沒排班的日子請假不給薪）；月薪制固定 8h／半天 4h
       const dayHours = isHourlyFor(emp, data, yr, mo) ? scheduledHoursOn(emp, ds, data) * (half ? 0.5 : 1) : (half ? 4 : 8)
-      if (ds.startsWith(monthStr) && !isFullSuspDay(ds, data)) hours += dayHours * leaveFactorOn(l, emp, ds, data, sickMaps) // 停班日不折算
+      if (ds.startsWith(monthStr) && !isFullSuspDay(ds, data, emp.id)) hours += dayHours * leaveFactorOn(l, emp, ds, data, sickMaps) // 停班日不折算
       d.setDate(d.getDate() + 1)
     }
   }
@@ -832,9 +832,13 @@ function dateHasLeave(emp, dateStr, data) {
 //   （舊規則：沒出勤算「停班未出勤」無薪缺時；6/26、8/24、8/25 當時已按舊規則結算，不回溯）
 export const SUSP_NEW_RULE_FROM = '2026-10-01' // 新停班規則生效日；之前月份照舊規則（已結算）
 // 全天停班日（新規則）：所有人都不用上班，這天的請假不折算、不耗額度、不扣半薪
-export function isFullSuspDay(ds, data) {
+// 事件可排除特定人（excludeEmpIds：那天照常出勤的人，例如外勤）
+export function suspAppliesTo(s, empId) {
+  return !!s && !(empId != null && (s.excludeEmpIds || []).includes(empId))
+}
+export function isFullSuspDay(ds, data, empId) {
   const s = (data?.suspensions || {})[ds]
-  return !!s && s.scope === 'full' && ds >= SUSP_NEW_RULE_FROM
+  return !!s && s.scope === 'full' && ds >= SUSP_NEW_RULE_FROM && suspAppliesTo(s, empId)
 }
 export function getSuspensions(data) {
   return data?.suspensions || {}
@@ -870,7 +874,7 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
   const absentDates = [], missingPunchDates = [], deficitDates = [], suspShortDates = []
   // 當日加班先補當日缺時（加班 span 歸開始日）；超過 8h 的部分才轉補休（見 computeMonthCompAccrual）
   const otMinByDate = {}
-  for (const sp of computeOTSpans((data.clockins || []).filter(c => c.date?.startsWith(`${yr}-${pad2(mo)}`) && nameMatch(c, emp)))) {
+  for (const sp of computeOTSpans(applyEventRule((data.clockins || []).filter(c => c.date?.startsWith(`${yr}-${pad2(mo)}`) && nameMatch(c, emp)), data, emp.id))) {
     if (sp.missingEnd || sp.missingStart || !sp.startDate) continue
     otMinByDate[sp.startDate] = (otMinByDate[sp.startDate] || 0) + sp.minutes
   }
@@ -880,17 +884,19 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     const dateStr = `${yr}-${pad2(mo)}-${pad2(sc.day)}`
     if (isDoubledHoliday(dateStr, holidaySet) || dateStr >= todayStr) continue // 今天與未來不算（尚未結束）
     const susp = suspensions[dateStr]
-    const newSusp = susp && dateStr >= SUSP_NEW_RULE_FROM
-    if (newSusp && susp.scope === 'full') continue // 全天停班：不列入應到（新規則）
-    const dayRecs = (data.clockins || []).filter(c => c.date === dateStr && nameMatch(c, emp))
-    const hasIn = dayRecs.some(c => c.type === '上班')
-    const hasOut = dayRecs.some(c => c.type === '下班')
+    const suspHit = susp && suspAppliesTo(susp, emp.id) ? susp : null // 被排除的人（照常出勤）視同沒有事件
+    const newSusp = suspHit && dateStr >= SUSP_NEW_RULE_FROM
+    if (newSusp && suspHit.scope === 'full') continue // 全天停班：不列入應到（新規則）
+    const rawDayRecs = (data.clockins || []).filter(c => c.date === dateStr && nameMatch(c, emp))
+    const dayRecs = applyEventRule(rawDayRecs, data, emp.id) // 計時數用（事件後的時間不計）
+    const hasIn = rawDayRecs.some(c => c.type === '上班')
+    const hasOut = rawDayRecs.some(c => c.type === '下班')
     const leaveH = leaveEffectiveHoursOnDate(emp, dateStr, data)
     const onLeave = leaveH > 0 || dateHasLeave(emp, dateStr, data)
     // 有上班沒下班 = 忘打卡，待補登：不計缺時、不算曠職（等補登）
     if (hasIn && !hasOut && !onLeave) { missingPunchDays++; missingPunchDates.push(dateStr); continue }
     // 部分停班：應到只算停班前的時段
-    const dueH = newSusp && susp.scope === 'partial' ? Math.max(0, sh - suspendedHours(susp, sc.shift, sh, dayRecs)) : sh
+    const dueH = newSusp && suspHit.scope === 'partial' ? Math.max(0, sh - suspendedHours(suspHit, sc.shift, sh, dayRecs)) : sh
     scheduledH += dueH
     const workedMin = normalDayMinutes(dayRecs, dateStr, data) + activityExtraOTMinutes(dayRecs, dateStr, data) + (otMinByDate[dateStr] || 0)
     const fulfilledMin = workedMin + leaveH * 60
@@ -899,13 +905,13 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     // 有出勤就不算缺時（民法受領遲延）；整天沒出勤照扣（2026-10-16 阿慶定）
     if (dMin > 0 && isActivityDay(dateStr, data) && (hasIn || hasOut)) dMin = 0
     // 舊規則（2026-10-01 前）：部分停班日未做滿全班，停班時段整塊無薪；全天停班沒出勤＝無薪缺時（6/25、6/26、8/24、8/25 已按此結算）
-    if (dMin > 0 && susp && !newSusp && susp.scope === 'partial') {
-      dMin = Math.min(sh * 60, Math.max(dMin, suspendedHours(susp, sc.shift, sh, dayRecs) * 60))
+    if (dMin > 0 && suspHit && !newSusp && suspHit.scope === 'partial') {
+      dMin = Math.min(sh * 60, Math.max(dMin, suspendedHours(suspHit, sc.shift, sh, dayRecs) * 60))
     }
     if (dMin > 0) {
       deficitMin += dMin
       deficitDates.push({ date: dateStr, hours: round2(dMin / 60) })
-      if (susp && !newSusp) { suspShortDays++; suspShortDates.push(dateStr) } // 舊規則：停班未出勤，無薪但不算曠職
+      if (suspHit && !newSusp) { suspShortDays++; suspShortDates.push(dateStr) } // 舊規則：停班未出勤，無薪但不算曠職
       else if (!hasIn && !hasOut && !onLeave) { absentDays++; absentDates.push(dateStr) } // 整天曠職
       else lateLeaveDays++ // 遲到/早退缺時
     }

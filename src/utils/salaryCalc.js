@@ -95,6 +95,31 @@ export function normalDayMinutes(dayRecs, date, data, isToday = false) {
 // 只打上下班、從第一張上班卡起算：前 9 小時＝8 小時工作＋1 小時午休，工作滿 8 小時後休息 30 分（打卡起算 9:00～9:30），
 // 打卡起算第 9 小時 30 分之後進「加班池」（2026-10-21 阿慶改：原為第 10 小時起）；
 // 不用另打加班卡，但要填原因，經管理員核准才計入（下班卡上的 otStatus：待核准／核准／駁回）。活動日不適用（照登打全算）。
+// ── 臨時事件（停班／放假）對「實到」的影響（2026-10-24 阿慶定）──
+// 事件發生＝公司那天不要人。受事件影響的人（不在排除名單）就算有打卡也不算時數：
+//   全天事件 → 當天所有打卡不計；部分事件（fromTime 起）→ fromTime 之後的時間不計（下班卡裁到 fromTime）
+// 排除名單（excludeEmpIds，照常出勤的人）→ 對他沒有事件，照打卡算
+export const EVENT_RULE_FROM = '2026-10-01'
+export function eventFor(date, data, empId) {
+  const s = (data?.suspensions || {})[date]
+  if (!s || !date || date < EVENT_RULE_FROM) return null
+  if (empId != null && (s.excludeEmpIds || []).includes(empId)) return null
+  return s
+}
+export function applyEventRule(recs, data, empId) {
+  if (!recs?.length || !data?.suspensions) return recs || []
+  return recs.flatMap(c => {
+    const ev = eventFor(c.date, data, empId)
+    if (!ev) return [c]
+    if (ev.scope === 'full' || !ev.fromTime) return []
+    const ft = ev.fromTime
+    if (c.type === '上班' || c.type === '加班開始') return c.time < ft ? [c] : []
+    // 下班／加班結束：事件開始後的裁到 fromTime（凌晨跨日下班視為事件後）
+    const after = c.time > ft || c.time < '06:00'
+    return after ? [{ ...c, time: ft, note: [c.note, `${ev.label || '事件'} ${ft} 起不計時數（原 ${c.time}）`].filter(Boolean).join('；'), otStatus: undefined, otReason: undefined }] : [c]
+  })
+}
+
 export const EXT_OT_FROM = '2026-10-01'
 export const EXT_OT_START_MIN = 570
 const hm = t => { const [h, m] = String(t || '').split(':').map(Number); return Number.isFinite(h) ? h * 60 + (m || 0) : null }
@@ -234,10 +259,10 @@ export function computeEmpMonthClockHours(emp, yr, mo, data, opts = {}) {
   const rh = opts.exact ? minutesToDecimalHours : roundHours
   const monthStr = `${yr}-${String(mo).padStart(2,'0')}`
   const todayStr = new Date().toLocaleDateString('sv-SE')
-  const myClockins = data.clockins.filter(c =>
+  const myClockins = applyEventRule(data.clockins.filter(c =>
     c.empName && c.date?.startsWith(monthStr) &&
     (c.empName === emp.name || emp.name.includes(c.empName) || c.empName.includes(emp.name))
-  )
+  ), data, emp.id) // 受事件影響的人那天打卡不計
   // 加班用跨日 span 配對（歸開始日），避免跨午夜加班漏算
   const otMinByDate = {}
   for (const sp of computeOTSpans(myClockins)) {

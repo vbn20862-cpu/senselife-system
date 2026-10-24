@@ -38,7 +38,7 @@ function nearestSite(lat, lng) {
 import { useApp } from '../context/AppContext'
 import { useIsMobile } from '../styles/earth'
 import { getCurrentCoords, reverseGeocode } from '../utils/geo'
-import { localTimestamp, extendedOTInfo } from '../utils/salaryCalc'
+import { localTimestamp, extendedOTInfo, applyEventRule, eventFor } from '../utils/salaryCalc'
 import { myMissingPunches } from './AttendanceReview'
 import logo from '../assets/logo.jpeg'
 
@@ -156,7 +156,7 @@ export default function Checkin() {
     // 延續加班：下班時從上班起算超過 9 小時 30 分（8 小時工作＋1 小時午休＋30 分休息）→ 之後的時間進加班池（待核准），必填原因
     if (type === '下班') {
       const dayRecs = data.clockins.filter(c => c.empId === emp.id && c.date === punchDate)
-      const info = extendedOTInfo([...dayRecs, rec], punchDate, data)
+      const info = extendedOTInfo(applyEventRule([...dayRecs, rec], data, emp.id), punchDate, data) // 事件日受影響的人不進加班池
       if (info) {
         if (!note) { setExtInfo({ hours: Math.round(info.extMin / 60 * 100) / 100 }); setOtNoteOpen('下班'); return }
         rec.otReason = note; rec.otStatus = '待核准'
@@ -261,6 +261,20 @@ export default function Checkin() {
             </div>
           </div>
         )}
+
+        {/* 臨時事件提示（停班／放假） */}
+        {selectedEmp && (() => {
+          const raw = (data.suspensions || {})[today]
+          if (!raw) return null
+          const ev = eventFor(today, data, Number(selectedEmp))
+          return (
+            <div style={{ background: '#eaf0f8', border: '1px solid #b8cbe6', borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', color: '#2a4f80', lineHeight: 1.6 }}>
+              {ev
+                ? <>⚡ 今天 <b>{ev.label || '臨時事件'}</b>（{ev.scope === 'partial' ? `${ev.fromTime} 起` : '全天'}不用上班）。{ev.scope === 'partial' ? `${ev.fromTime} 之後的打卡不計時數` : '今天的打卡不計時數'}，有事要到公司請先告知管理員。</>
+                : <>⚡ 今天 <b>{raw.label || '臨時事件'}</b>，你被列為照常出勤，打卡照常計算。</>}
+            </div>
+          )
+        })()}
 
         {/* 缺下班卡提醒 */}
         {selectedEmp && (() => {

@@ -39,7 +39,9 @@ export function desiredEvents(data, months) {
     for (const [ds, s] of Object.entries(data.suspensions || {})) {
       if (!s || ds < from || ds >= to) continue
       const partial = s.scope === 'partial'
-      out.set(`susp:${ds}`, { key: `susp:${ds}`, start: ds, end: addDays(ds, 1), summary: `${s.label || '停班'}${partial ? `（${s.fromTime} 起停班）` : '（全天停班）'}`, colorId: '11', description: partial ? `部分停班，${s.fromTime} 起不用上班` : '全天停班，全公司不用上班' })
+      const KIND = { disaster: '天災停班', company: '公司放假', other: '臨時事件' }
+      const excl = (s.excludeEmpIds || []).map(nameOf).filter(Boolean)
+      out.set(`susp:${ds}`, { key: `susp:${ds}`, start: ds, end: addDays(ds, 1), summary: `${s.label || '停班'}${partial ? `（${s.fromTime} 起）` : '（全天）'}`, colorId: '11', description: [`${KIND[s.kind] || '臨時事件'}：${partial ? `${s.fromTime} 起不用上班` : '全天不用上班'}`, excl.length ? `照常出勤：${excl.join('、')}` : '', s.note || ''].filter(Boolean).join('\n') })
     }
   }
   return out

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { E } from '../styles/earth'
-import { extendedOTInfo, EXT_OT_FROM, localTimestamp } from '../utils/salaryCalc'
+import { extendedOTInfo, EXT_OT_FROM, localTimestamp, applyEventRule } from '../utils/salaryCalc'
 
 export const REJECT_REASONS = [
   '下班後處理私人事務，非提供勞務',
@@ -38,7 +38,7 @@ function collect(data) {
   const ext = [], missing = [], otCards = [], cross = [], edits = []
   for (const [k, dayRecs] of Object.entries(byDay)) {
     const [, date] = k.split('|')
-    const info = extendedOTInfo(dayRecs, date, data)
+    const info = extendedOTInfo(applyEventRule(dayRecs, data, dayRecs[0].empId), date, data) // 事件日受影響的人不算延續加班
     if (info) ext.push({ date, name: dayRecs[0].empName, dayRecs, info })
     const hasIn = dayRecs.some(c => c.type === '上班'), hasOut = dayRecs.some(c => c.type === '下班')
     if (hasIn && !hasOut && date < today) missing.push({ date, name: dayRecs[0].empName, empId: dayRecs[0].empId, inRec: dayRecs.find(c => c.type === '上班') })

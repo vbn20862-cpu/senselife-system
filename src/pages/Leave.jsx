@@ -89,11 +89,12 @@ export default function Leave({ embedded = false }) {
         const ds = d.toLocaleDateString('sv-SE')
         const sc = (data.schedules || []).find(x => x && x.empId === empId && x.year === d.getFullYear() && x.month === d.getMonth() + 1 && x.day === d.getDate())
         if (sc && sc.shift) anyScheduled = true
-        if (sc && WORK[sc.shift] && susp[ds]?.scope !== 'full' && !holidayOn(data, ds)) workDays++ // 國定假日也不是出勤日
+        const offByEvent = susp[ds]?.scope === 'full' && !(susp[ds].excludeEmpIds || []).includes(empId) // 全天事件且這個人沒被排除
+        if (sc && WORK[sc.shift] && !offByEvent && !holidayOn(data, ds)) workDays++ // 國定假日也不是出勤日
         d.setDate(d.getDate() + 1)
       }
       if (!workDays) {
-        setFormErr(anyScheduled ? '這段期間班表沒有排出勤（休假、國定假日或停班日），不需要請假。' : '這段期間班表尚未排班，請先排好班表再請假。')
+        setFormErr(anyScheduled ? '這段期間班表沒有排出勤（休假、國定假日或停班／放假事件），不需要請假。' : '這段期間班表尚未排班，請先排好班表再請假。')
         return
       }
     }

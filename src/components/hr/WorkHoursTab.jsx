@@ -5,7 +5,7 @@ import { useApp } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
 import { E } from '../../styles/earth'
 import { computeCompLedger, leavesInMonth, effectiveSetting } from '../../utils/payrollEngine'
-import { normalDayMinutes, activityExtraOTMinutes, computeOTSpans, extendedOTInfo, isActivityDay } from '../../utils/salaryCalc'
+import { normalDayMinutes, activityExtraOTMinutes, computeOTSpans, extendedOTInfo, isActivityDay, applyEventRule, eventFor } from '../../utils/salaryCalc'
 
 const W = '日一二三四五六'
 const pad = n => String(n).padStart(2, '0')
@@ -16,27 +16,30 @@ const SHIFT_H = { '出勤': 8, 'W': 8, '上午班': 4, '下午班': 4 }
 function dayRows(emp, yr, mo, data, tm) {
   const ym = `${yr}-${pad(mo)}`
   const recs = (data.clockins || []).filter(c => c && c.empId === emp.id && c.date?.startsWith(ym))
+  const payRecs = applyEventRule(recs, data, emp.id) // 受事件影響的人：事件日打卡不計時數
   const otByDate = {}
-  for (const sp of computeOTSpans(recs)) if (!sp.missingEnd && !sp.missingStart && sp.startDate) otByDate[sp.startDate] = (otByDate[sp.startDate] || 0) + sp.minutes
+  for (const sp of computeOTSpans(payRecs)) if (!sp.missingEnd && !sp.missingStart && sp.startDate) otByDate[sp.startDate] = (otByDate[sp.startDate] || 0) + sp.minutes
   const sched = Object.fromEntries((data.schedules || []).filter(s => s && s.empId === emp.id && s.year === yr && s.month === mo).map(s => [`${ym}-${pad(s.day)}`, s.shift]))
   const defMap = Object.fromEntries((tm.deficitDates || []).map(x => [x.date, x.hours]))
   const leaves = (data.leaveRequests || []).filter(l => l && l.empId === emp.id && l.status === '已核准')
   const dates = [...new Set([...recs.map(c => c.date), ...Object.keys(sched).filter(d => SHIFT_H[sched[d]])])].sort()
   return dates.map(d => {
     const dr = recs.filter(c => c.date === d).sort((a, b) => a.time.localeCompare(b.time))
+    const dp = payRecs.filter(c => c.date === d)
+    const ev = eventFor(d, data, emp.id)
     const pick = t => dr.filter(c => c.type === t).map(c => c.time).join('/')
-    const ext = extendedOTInfo(dr, d, data)
+    const ext = extendedOTInfo(dp, d, data)
     const lv = leaves.filter(l => d >= (l.startDate || l.date) && d <= (l.endDate || l.startDate)).map(l => l.type + (l.halfDay ? '半天' : ''))
     const hasIn = dr.some(c => c.type === '上班'), hasOut = dr.some(c => c.type === '下班')
     const past = d < new Date().toLocaleDateString('sv-SE')
     const flags = [
-      past && !dr.length && !lv.length && SHIFT_H[sched[d]] && !((data.suspensions || {})[d]?.scope === 'full') ? '無打卡' : '', past && hasIn && !hasOut ? '缺下班卡' : '', !past && !dr.length ? '未到' : '',
-      isActivityDay(d, data) ? '活動日' : '', (data.suspensions || {})[d] ? `${(data.suspensions || {})[d].label || '停班'}${(data.suspensions || {})[d].scope === 'partial' ? `（${(data.suspensions || {})[d].fromTime} 起）` : ''}，不計應到` : '', ext ? `延續加班 ${h(ext.extMin)}h（${ext.status}）` : '',
+      past && !dr.length && !lv.length && SHIFT_H[sched[d]] && !((data.suspensions || {})[d]?.scope === 'full' && !((data.suspensions || {})[d].excludeEmpIds || []).includes(emp.id)) ? '無打卡' : '', past && hasIn && !hasOut ? '缺下班卡' : '', !past && !dr.length ? '未到' : '',
+      isActivityDay(d, data) ? '活動日' : '', (data.suspensions || {})[d] ? (ev ? `${ev.label || '事件'}${ev.scope === 'partial' ? `：${ev.fromTime} 起不計應到、打卡不計時數` : '：不計應到，打卡不計時數'}` : `${(data.suspensions || {})[d].label || '事件'}（本人照常出勤，照打卡算）`) : '', ext ? `延續加班 ${h(ext.extMin)}h（${ext.status}）` : '',
       dr.some(c => /補登|更正|跨日/.test(c.note || '')) ? '有補登／更正' : '',
     ].filter(Boolean)
     return {
       d, w: W[new Date(d + 'T00:00:00').getDay()], shift: sched[d] || '—', in: pick('上班'), out: pick('下班'),
-      normal: h(normalDayMinutes(dr, d, data)), ot: h((otByDate[d] || 0) + activityExtraOTMinutes(dr, d, data)),
+      normal: h(normalDayMinutes(dp, d, data)), ot: h((otByDate[d] || 0) + activityExtraOTMinutes(dp, d, data)),
       leave: lv.join('、'), def: defMap[d] || 0, flags,
     }
   })
@@ -57,7 +60,7 @@ export default function WorkHoursTab() {
     const lv = leavesInMonth(emp, yr, mo, data).filter(l => l.status === '已核准')
     const leaveDays = lv.reduce((s, l) => s + (l.halfDay ? 0.5 : l.daysInMonth), 0)
     const recs = (data.clockins || []).filter(c => c && c.empId === emp.id && c.date?.startsWith(month))
-    const byDay = {}; for (const c of recs) (byDay[c.date] ||= []).push(c)
+    const byDay = {}; for (const c of applyEventRule(recs, data, emp.id)) (byDay[c.date] ||= []).push(c)
     let extPend = 0, extOk = 0
     for (const [d, dr] of Object.entries(byDay)) { const x = extendedOTInfo(dr, d, data); if (x) x.status === '核准' ? extOk += x.extMin : x.status === '待核准' ? extPend += x.extMin : 0 }
     return { emp, tm, hourly: setting?.payType === 'hourly', leaveDays, extPend: h(extPend), extOk: h(extOk) }
