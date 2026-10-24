@@ -14,11 +14,13 @@ const BEREAVEMENT_DAYS = {
   '曾祖父母、兄弟姊妹、配偶之祖父母': 3,
 }
 import { localTimestamp } from '../utils/salaryCalc'
+import { holidayOn } from '../utils/holidays'
 
 const STATUS_STYLE = {
   '待審核': { bg: '#fef3cd', color: '#8a6d1a' },
   '已核准': { bg: '#e4f0e8', color: '#2e6040' },
   '已駁回': { bg: '#f5e4e0', color: '#8a3020' },
+  '已取消': { bg: '#eeeae4', color: '#7a6a56' },
 }
 
 // 計算兩日期間天數（含頭尾）
@@ -73,6 +75,28 @@ export default function Leave({ embedded = false }) {
     }
 
     const emp = data.employees.find(e => e.id === empId)
+    // 重複請假擋下：同一人、日期有重疊、狀態待審核或已核准（2026-10-24 阿慶定）
+    const dup = (data.leaveRequests || []).find(l => l && l.empId === empId && (l.status === '待審核' || l.status === '已核准')
+      && form.startDate <= (l.endDate || l.startDate) && end >= l.startDate)
+    if (dup) { setFormErr(`${dup.startDate}${dup.endDate && dup.endDate !== dup.startDate ? `～${dup.endDate}` : ''} 已有一筆${dup.type}（${dup.status}），不能重複請假。要改請先取消原申請。`); return }
+    // 沒排出勤的日子不用請假：整段期間至少要有一天班表是出勤／上午班／下午班，且不是全天停班
+    {
+      const WORK = { '出勤': 1, 'W': 1, '上午班': 1, '下午班': 1 }
+      const susp = data.suspensions || {}
+      const d = new Date(form.startDate + 'T00:00:00'), last = new Date(end + 'T00:00:00')
+      let workDays = 0, anyScheduled = false
+      while (d <= last) {
+        const ds = d.toLocaleDateString('sv-SE')
+        const sc = (data.schedules || []).find(x => x && x.empId === empId && x.year === d.getFullYear() && x.month === d.getMonth() + 1 && x.day === d.getDate())
+        if (sc && sc.shift) anyScheduled = true
+        if (sc && WORK[sc.shift] && susp[ds]?.scope !== 'full' && !holidayOn(data, ds)) workDays++ // 國定假日也不是出勤日
+        d.setDate(d.getDate() + 1)
+      }
+      if (!workDays) {
+        setFormErr(anyScheduled ? '這段期間班表沒有排出勤（休假、國定假日或停班日），不需要請假。' : '這段期間班表尚未排班，請先排好班表再請假。')
+        return
+      }
+    }
     let days = form.halfDay ? 0.5 : daysBetween(form.startDate, end)
     // 喪假：勞工請假規則第 3 條，依親等 8／6／3 天，單次事件不得超過
     if (form.type === '喪假') {
@@ -165,7 +189,7 @@ export default function Leave({ embedded = false }) {
     if (!empId) return null
     const yr = Number(form.startDate.slice(0, 4))
     const cap = form.type === '病假' ? sickLeaveCap(yr) : 14
-    const used = (data.leaveRequests || []).filter(l => l && l.empId === empId && l.type === form.type && l.status !== '已駁回' && (l.startDate || l.date || '').startsWith(String(yr))).reduce((sum, l) => sum + Number(l.days || 0), 0)
+    const used = (data.leaveRequests || []).filter(l => l && l.empId === empId && l.type === form.type && l.status !== '已駁回' && l.status !== '已取消' && (l.startDate || l.date || '').startsWith(String(yr))).reduce((sum, l) => sum + Number(l.days || 0), 0)
     const end = form.halfDay ? form.startDate : (form.endDate || form.startDate)
     const days = form.halfDay ? 0.5 : (end >= form.startDate ? daysBetween(form.startDate, end) : 0)
     const over = used + days - cap

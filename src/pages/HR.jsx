@@ -313,12 +313,24 @@ export default function HR({ logsOnly = false }) {
       ? { label: newSusp.label.trim() || '豪雨假', scope: 'partial', fromTime: newSusp.fromTime }
       : { label: newSusp.label.trim() || '豪雨假', scope: 'full' }
     update('suspensions', next)
+    // 停班是臨時事件，事件發生就是所有人都不用上班（2026-10-24 阿慶定）：
+    // 全天停班 → 當天的單日請假（待審核／已核准）自動取消，不扣薪、不耗額度；跨多天的請假由薪資引擎跳過停班日
+    if (newSusp.scope !== 'partial') {
+      const label = next[newSusp.date].label
+      const hit = (data.leaveRequests || []).filter(l => l && (l.status === '待審核' || l.status === '已核准') && (l.startDate || l.date) === newSusp.date && (l.endDate || l.startDate || l.date) === newSusp.date)
+      for (const l of hit) updateItem('leaveRequests', l.id, { status: '已取消', reason: `${l.reason || ''}（${newSusp.date.slice(5).replace('-', '/')} ${label}停班，系統自動取消）`.trim(), cancelledAt: new Date().toLocaleString('sv-SE').slice(0, 16), cancelledBy: '系統（停班）' })
+      const spanning = (data.leaveRequests || []).filter(l => l && (l.status === '待審核' || l.status === '已核准') && (l.startDate || l.date) < newSusp.date && (l.endDate || '') > newSusp.date)
+      if (hit.length || spanning.length) alert(`${label}（${newSusp.date}）已登錄。\n自動取消當天請假 ${hit.length} 筆：${hit.map(l => `${l.empName} ${l.type}`).join('、') || '無'}${spanning.length ? `\n另有 ${spanning.length} 筆跨多天的請假涵蓋這天（${spanning.map(l => l.empName).join('、')}），薪資引擎會自動跳過這天，不用改。` : ''}`)
+    }
+    triggerCalendarSync([newSusp.date.slice(0, 7)]) // 停班同步到 Google 日曆
     setNewSusp({ date: '', label: '豪雨假', scope: 'full', fromTime: '14:00' })
   }
   function removeSusp(date) {
     const next = { ...(data.suspensions || {}) }
     delete next[date]
     update('suspensions', next)
+    triggerCalendarSync([date.slice(0, 7)])
+    // 注意：被停班自動取消的請假不會自動恢復，要請員工重新申請
   }
 
   // 排班鎖定：非管理員 + 當月 + 已過5日

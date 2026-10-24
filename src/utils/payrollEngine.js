@@ -135,6 +135,7 @@ export const SHIFT_HOURS = { '出勤': 8, 'W': 8, '上午班': 4, '下午班': 4
 export function scheduledHoursOn(emp, dateStr, data) {
   const [y, m, d] = dateStr.split('-').map(Number)
   const sc = (data.schedules || []).find(x => x && x.empId === emp.id && x.year === y && x.month === m && x.day === d)
+  if (isFullSuspDay(dateStr, data)) return 0 // 全天停班：這天沒有應出勤時數（特休、時薪制請假折算都跳過）
   return SHIFT_HOURS[sc?.shift] || 0
 }
 
@@ -717,7 +718,7 @@ export function sickLeaveFactorMap(emp, yr, data) {
     const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
     while (d <= last) {
       const ds = d.toLocaleDateString('sv-SE')
-      if (ds.startsWith(String(yr))) days.push({ ds, w })
+      if (ds.startsWith(String(yr)) && !isFullSuspDay(ds, data)) days.push({ ds, w }) // 停班日不耗病假額度
       d.setDate(d.getDate() + 1)
     }
   }
@@ -787,7 +788,7 @@ export function leaveEffectiveHoursInMonth(emp, yr, mo, data) {
       const ds = d.toLocaleDateString('sv-SE')
       // 時薪制（部分工時）：請假折算按當日排班時數（沒排班的日子請假不給薪）；月薪制固定 8h／半天 4h
       const dayHours = isHourlyFor(emp, data, yr, mo) ? scheduledHoursOn(emp, ds, data) * (half ? 0.5 : 1) : (half ? 4 : 8)
-      if (ds.startsWith(monthStr)) hours += dayHours * leaveFactorOn(l, emp, ds, data, sickMaps)
+      if (ds.startsWith(monthStr) && !isFullSuspDay(ds, data)) hours += dayHours * leaveFactorOn(l, emp, ds, data, sickMaps) // 停班日不折算
       d.setDate(d.getDate() + 1)
     }
   }
@@ -825,9 +826,16 @@ function dateHasLeave(emp, dateStr, data) {
 // ── 停班 / 豪雨假 ─────────────────────────────
 // data.suspensions = { '2026-06-26': { label:'豪雨假', scope:'full' },
 //                      '2026-06-25': { label:'豪雨假', scope:'partial', fromTime:'14:00' } }
-// 停班日規則（依天災要點：可不發工資、但不得視為曠工）：
-//   月薪制沒出勤 → 缺的時數「無薪」（計入缺時扣薪），但歸類為「停班未出勤」、不算曠職/遲到早退
-//   有出勤 → 工時照正常薪 1× 計，不自動加給
+// 停班日規則（2026-10-24 阿慶定：排班是「預定」要上班，停班是臨時事件，事件發生就是所有人都不用上班）：
+//   全天停班 → 這天完全不列入排班應到，沒出勤不缺時、不無薪、不記時數帳；有出勤照正常工時計，不自動加給
+//   部分停班 → 應到只算停班前的時段（班別時數 − 停班時數），停班時段不缺時
+//   （舊規則：沒出勤算「停班未出勤」無薪缺時；6/26、8/24、8/25 當時已按舊規則結算，不回溯）
+export const SUSP_NEW_RULE_FROM = '2026-10-01' // 新停班規則生效日；之前月份照舊規則（已結算）
+// 全天停班日（新規則）：所有人都不用上班，這天的請假不折算、不耗額度、不扣半薪
+export function isFullSuspDay(ds, data) {
+  const s = (data?.suspensions || {})[ds]
+  return !!s && s.scope === 'full' && ds >= SUSP_NEW_RULE_FROM
+}
 export function getSuspensions(data) {
   return data?.suspensions || {}
 }
@@ -872,6 +880,8 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     const dateStr = `${yr}-${pad2(mo)}-${pad2(sc.day)}`
     if (isDoubledHoliday(dateStr, holidaySet) || dateStr >= todayStr) continue // 今天與未來不算（尚未結束）
     const susp = suspensions[dateStr]
+    const newSusp = susp && dateStr >= SUSP_NEW_RULE_FROM
+    if (newSusp && susp.scope === 'full') continue // 全天停班：不列入應到（新規則）
     const dayRecs = (data.clockins || []).filter(c => c.date === dateStr && nameMatch(c, emp))
     const hasIn = dayRecs.some(c => c.type === '上班')
     const hasOut = dayRecs.some(c => c.type === '下班')
@@ -879,22 +889,23 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
     const onLeave = leaveH > 0 || dateHasLeave(emp, dateStr, data)
     // 有上班沒下班 = 忘打卡，待補登：不計缺時、不算曠職（等補登）
     if (hasIn && !hasOut && !onLeave) { missingPunchDays++; missingPunchDates.push(dateStr); continue }
-    scheduledH += sh
+    // 部分停班：應到只算停班前的時段
+    const dueH = newSusp && susp.scope === 'partial' ? Math.max(0, sh - suspendedHours(susp, sc.shift, sh, dayRecs)) : sh
+    scheduledH += dueH
     const workedMin = normalDayMinutes(dayRecs, dateStr, data) + activityExtraOTMinutes(dayRecs, dateStr, data) + (otMinByDate[dateStr] || 0)
     const fulfilledMin = workedMin + leaveH * 60
-    let dMin = Math.max(0, sh * 60 - fulfilledMin)
+    let dMin = Math.max(0, dueH * 60 - fulfilledMin)
     // 活動日（排班表活動備註有填）：集合／解散時間由公司統一登打，提早解散是公司的決定，
     // 有出勤就不算缺時（民法受領遲延）；整天沒出勤照扣（2026-10-16 阿慶定）
     if (dMin > 0 && isActivityDay(dateStr, data) && (hasIn || hasOut)) dMin = 0
-    // 部分停班日：只要當日未做滿全班，停班時段整塊無薪（多留的零頭不抵扣；
-    // 停班時段內有出勤要給的，一律走手動補休入帳，如 6/25 傍晚案例）
-    if (dMin > 0 && susp && susp.scope === 'partial') {
+    // 舊規則（2026-10-01 前）：部分停班日未做滿全班，停班時段整塊無薪；全天停班沒出勤＝無薪缺時（6/25、6/26、8/24、8/25 已按此結算）
+    if (dMin > 0 && susp && !newSusp && susp.scope === 'partial') {
       dMin = Math.min(sh * 60, Math.max(dMin, suspendedHours(susp, sc.shift, sh, dayRecs) * 60))
     }
     if (dMin > 0) {
       deficitMin += dMin
       deficitDates.push({ date: dateStr, hours: round2(dMin / 60) })
-      if (susp) { suspShortDays++; suspShortDates.push(dateStr) } // 停班未出勤：無薪但不算曠職（天災要點）
+      if (susp && !newSusp) { suspShortDays++; suspShortDates.push(dateStr) } // 舊規則：停班未出勤，無薪但不算曠職
       else if (!hasIn && !hasOut && !onLeave) { absentDays++; absentDates.push(dateStr) } // 整天曠職
       else lateLeaveDays++ // 遲到/早退缺時
     }

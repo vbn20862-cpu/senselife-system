@@ -35,6 +35,12 @@ export function desiredEvents(data, months) {
       const name = nameOf(sc.empId); if (!name) continue
       out.set(`sched:${sc.empId}:${ds}`, { key: `sched:${sc.empId}:${ds}`, start: ds, end: addDays(ds, 1), summary: `${name} 休假`, colorId: '11', description: '排班表平日休假（調休）' })
     }
+    // 停班／天災假（全公司）
+    for (const [ds, s] of Object.entries(data.suspensions || {})) {
+      if (!s || ds < from || ds >= to) continue
+      const partial = s.scope === 'partial'
+      out.set(`susp:${ds}`, { key: `susp:${ds}`, start: ds, end: addDays(ds, 1), summary: `${s.label || '停班'}${partial ? `（${s.fromTime} 起停班）` : '（全天停班）'}`, colorId: '11', description: partial ? `部分停班，${s.fromTime} 起不用上班` : '全天停班，全公司不用上班' })
+    }
   }
   return out
 }

@@ -30,8 +30,8 @@ function dayRows(emp, yr, mo, data, tm) {
     const hasIn = dr.some(c => c.type === '上班'), hasOut = dr.some(c => c.type === '下班')
     const past = d < new Date().toLocaleDateString('sv-SE')
     const flags = [
-      past && !dr.length && !lv.length && SHIFT_H[sched[d]] ? '無打卡' : '', past && hasIn && !hasOut ? '缺下班卡' : '', !past && !dr.length ? '未到' : '',
-      isActivityDay(d, data) ? '活動日' : '', ext ? `延續加班 ${h(ext.extMin)}h（${ext.status}）` : '',
+      past && !dr.length && !lv.length && SHIFT_H[sched[d]] && !((data.suspensions || {})[d]?.scope === 'full') ? '無打卡' : '', past && hasIn && !hasOut ? '缺下班卡' : '', !past && !dr.length ? '未到' : '',
+      isActivityDay(d, data) ? '活動日' : '', (data.suspensions || {})[d] ? `${(data.suspensions || {})[d].label || '停班'}${(data.suspensions || {})[d].scope === 'partial' ? `（${(data.suspensions || {})[d].fromTime} 起）` : ''}，不計應到` : '', ext ? `延續加班 ${h(ext.extMin)}h（${ext.status}）` : '',
       dr.some(c => /補登|更正|跨日/.test(c.note || '')) ? '有補登／更正' : '',
     ].filter(Boolean)
     return {
