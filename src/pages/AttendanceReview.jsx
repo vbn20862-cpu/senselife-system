@@ -30,6 +30,12 @@ export function pendingReviewCount(data) {
   return ext.filter(x => x.info.status === '待核准').length + missing.length
 }
 
+// 當天有已核准的全天請假（非半天）→ 只有上班卡不算缺卡（例：上班後出事請公傷病假）
+export function hasFullDayLeave(data, empId, date) {
+  return (data.leaveRequests || []).some(l => l && l.empId === empId && l.status === '已核准' && !l.halfDay && !(Number(l.days) === 0.5)
+    && (l.startDate || l.date) <= date && (l.endDate || l.startDate || l.date) >= date)
+}
+
 function collect(data) {
   const today = new Date().toLocaleDateString('sv-SE')
   const recs = (data.clockins || []).filter(c => c && c.date >= EXT_OT_FROM)
@@ -41,7 +47,7 @@ function collect(data) {
     const info = extendedOTInfo(applyEventRule(dayRecs, data, dayRecs[0].empId), date, data) // 事件日受影響的人不算延續加班
     if (info) ext.push({ date, name: dayRecs[0].empName, dayRecs, info })
     const hasIn = dayRecs.some(c => c.type === '上班'), hasOut = dayRecs.some(c => c.type === '下班')
-    if (hasIn && !hasOut && date < today) missing.push({ date, name: dayRecs[0].empName, empId: dayRecs[0].empId, inRec: dayRecs.find(c => c.type === '上班') })
+    if (hasIn && !hasOut && date < today && !hasFullDayLeave(data, dayRecs[0].empId, date)) missing.push({ date, name: dayRecs[0].empName, empId: dayRecs[0].empId, inRec: dayRecs.find(c => c.type === '上班') })
   }
   for (const c of recs) {
     if (c.type === '加班結束') otCards.push(c)

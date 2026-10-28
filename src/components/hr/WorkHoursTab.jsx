@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
 import { E } from '../../styles/earth'
+import { hasFullDayLeave } from '../../pages/AttendanceReview'
 import { computeCompLedger, leavesInMonth, effectiveSetting } from '../../utils/payrollEngine'
 import { normalDayMinutes, activityExtraOTMinutes, computeOTSpans, extendedOTInfo, isActivityDay, applyEventRule, eventFor } from '../../utils/salaryCalc'
 
@@ -33,7 +34,7 @@ function dayRows(emp, yr, mo, data, tm) {
     const hasIn = dr.some(c => c.type === '上班'), hasOut = dr.some(c => c.type === '下班')
     const past = d < new Date().toLocaleDateString('sv-SE')
     const flags = [
-      past && !dr.length && !lv.length && SHIFT_H[sched[d]] && !((data.suspensions || {})[d]?.scope === 'full' && !((data.suspensions || {})[d].excludeEmpIds || []).includes(emp.id)) ? '無打卡' : '', past && hasIn && !hasOut ? '缺下班卡' : '', !past && !dr.length ? '未到' : '',
+      past && !dr.length && !lv.length && SHIFT_H[sched[d]] && !((data.suspensions || {})[d]?.scope === 'full' && !((data.suspensions || {})[d].excludeEmpIds || []).includes(emp.id)) ? '無打卡' : '', past && hasIn && !hasOut && !hasFullDayLeave(data, emp.id, d) ? '缺下班卡' : '', !past && !dr.length ? '未到' : '',
       isActivityDay(d, data) ? '活動日' : '', (data.suspensions || {})[d] ? (ev ? `${ev.label || '事件'}${ev.scope === 'partial' ? `：${ev.fromTime} 起不計應到、打卡不計時數` : '：不計應到，打卡不計時數'}` : `${(data.suspensions || {})[d].label || '事件'}（本人照常出勤，照打卡算）`) : '', ext ? `延續加班 ${h(ext.extMin)}h（${ext.status}）` : '',
       dr.some(c => /補登|更正|跨日/.test(c.note || '')) ? '有補登／更正' : '',
     ].filter(Boolean)
