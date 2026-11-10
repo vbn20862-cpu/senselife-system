@@ -141,8 +141,11 @@ HR.jsx 內舊的 attendance_old、clockin_old、accounts 區塊已不顯示，�
 - 喪假需選親屬關係（8／6／3 天，Leave.jsx BEREAVEMENT_DAYS），公假全薪不計額度；兩者引擎皆 cat paid
 - 已上線 V26.08.02（2026-10-16）：補休抵缺時 9 月起「先加權再抵」（payrollEngine WEIGHTED_OFFSET_FROM）
 - 🔴 姿晴 7–8 月缺 72h 分三期（第 1 期 24h、第 2、3 期各 22h（68h 含喪假、生理假後），2026-10-16 雙方約定）：9 月明細已重發第 4 版（本次應領 23,805，含第 1 期扣 2,950；喪假 12h 補入缺 72h；9 月 13 筆上班時間更正為 10:00）；
-  **10 月、11 月草稿要各加第 2、3 期**：當期以勞務補足的時數 × 122.92 退還、未補足的扣回（無條件捨去）。
-  monthly-drafts 自動草稿不會自己加這段，11/5 後人工補進去再發布（用 ops/publish-statement.mjs）
+  規則：當期以勞務補足的時數 × 122.92 退還、未補足的扣回（無條件捨去）。
+  **第 2 期（10 月）已於 2026-11-10 補進 10 月草稿**（當月未補足→全額扣回），待在薪資頁審核發布；金額見草稿本身。
+  ⚠️ **10 月草稿不要再跑 `ops/monthly-statements.mjs 2026-10`**，會整份覆蓋、沖掉第 2 期那段；真要重跑，重跑後必須再補一次。
+  🔴 **第 3 期（11 月）22h 同樣要人工補**：12/5 自動草稿產生後加進 11 月草稿（第 2 期的作法見 git log 2026-11-10）。
+  自動版 monthly-drafts／手動版 monthly-statements 都不會自己加這段。
 - Netlify 已升級 Pro（2026-10-16），push main 自動部署恢復；雲端建置若被 secrets scanning 擋，看 netlify.toml 的
   SECRETS_SCAN_* 設定（Firebase web key、VITE_ 金鑰皆為前端公開值）；備援仍可 `npx netlify-cli deploy --prod --dir=dist`
 - 10/19–10/25 整週排出勤無休假日（員工自願，阿慶決定不調）；七休一責任在雇主，已告知
