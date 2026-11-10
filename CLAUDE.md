@@ -57,6 +57,14 @@
   `payrollEngine.annualLeaveHoursOnDate`；病假/事假年度天數仍按請假單 days 計
 - **不再產生月底薪資單**（2026-09 拔除）：員工頁與管理員頁的實領都是 `buildDraftSlips` 即時計算，勿另寫一套；
   舊的 `/appData/payrolls` 歷史資料保留在資料庫、僅 Excel 匯出會帶出
+- **薪資頁「實領」以薪資明細為準**（V26.09.11，2026-11-10 阿慶定）：`buildDraftSlips` 的 netPay 改為
+  已發布 `payStatements/<empId>/<月>/net` ＞ 草稿 `payDrafts/…`（僅管理員）＞ 引擎即時計算。
+  原因：明細可能含引擎算不出來的人工調整（例：姿晴分期補扣），兩邊各顯示一個數字會被當成系統算錯。
+  只訂閱 `net` 一個欄位（不拉 HTML，明細每份約 6KB）；非管理員只訂閱自己那筆。
+  回傳多了 `liveNet`／`netSource`('published'|'draft'|'live')，UI 用它標示來源與差額。
+  ⚠️ 判斷「有沒有明細」務必先擋 `null`：節點不存在時 onValue 回 null，`Number(null) === 0`，
+  用 `Number.isFinite` 直接判會把「沒有明細」變成「實領 0 元」（寫這版時踩過）。
+  薪資頁預設月份同時改為**上個月**（結算中的那個月），當月／未來月份在月份選擇器旁標示進行中、無資料。
 - **薪資明細流程**：每月 5 號 Netlify 排程函式 `netlify/functions/monthly-drafts.mjs`（與手動版
   `node ops/monthly-statements.mjs [YYYY-MM] --upload` 共用 `ops/lib/statements-core.mjs`）→ 草稿存 `/payDrafts/<empId>/<YYYY-MM>`（只有管理員看得到）→
   阿慶在薪資頁審核按「審核通過，發布」→ 存 `/payStatements/…`，員工點開確認；人工調整後用

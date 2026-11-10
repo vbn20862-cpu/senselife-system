@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { ref, onValue } from 'firebase/database'
+import { db } from '../firebase'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { Plus, Trash2, Search, CreditCard, ChevronLeft, Pencil, Download, Receipt, Filter } from 'lucide-react'
@@ -94,9 +96,49 @@ export default function Finance({ tools = false, embedTab = null }) {
 
   // 薪資管理 state
   const now = new Date()
-  const [payrollMonth, setPayrollMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`)
+  const ymOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  const thisMonthYM = ymOf(now)
+  // 薪資頁預設停在「上個月」＝實際在結算的薪資月份（明細也是每月 5 號產上個月的）。
+  // 當月還沒過完，實領只是做到今天為止的半成品，預設顯示會被當成結算金額誤讀（2026-11-10 阿慶指出）。
+  const [payrollMonth, setPayrollMonth] = useState(ymOf(new Date(now.getFullYear(), now.getMonth() - 1, 1)))
   const [salaryEditEmp, setSalaryEditEmp] = useState(null)
   const [payViewEmpId, setPayViewEmpId] = useState(null) // 管理員薪資頁：null=總覽
+  // ── 薪資明細優先（2026-11-10 阿慶定）──
+  // 薪資頁的「實領」以薪資明細為準，不是引擎的即時計算。明細可能含引擎算不出來的人工調整
+  // （例：陳姿晴 7–8 月缺時分三期補扣），兩邊各顯示一個數字會讓人以為系統算錯。
+  // 優先序：已發布 payStatements > 草稿 payDrafts（僅管理員）> 即時計算。
+  // 只訂閱 net 這一個數字，不拉 HTML（明細每份約 6KB，全站拉會拖慢薪資頁）。
+  const myEmpId = useMemo(
+    () => (data.employees || []).find(e => e.name === currentUser?.name)?.id,
+    [data.employees, currentUser?.name])
+  const stmtEmpIds = useMemo(
+    () => (isAdmin ? (data.employees || []).map(e => e.id) : (myEmpId != null ? [myEmpId] : [])),
+    [isAdmin, data.employees, myEmpId])
+  const [stmtNet, setStmtNet] = useState({})
+  useEffect(() => {
+    setStmtNet({})
+    const offs = []
+    for (const id of stmtEmpIds) {
+      offs.push(onValue(ref(db, `payStatements/${id}/${payrollMonth}/net`),
+        snap => setStmtNet(p => ({ ...p, [`${id}:pub`]: snap.val() }))))
+      // 草稿未經審核，員工不可見
+      if (isAdmin) offs.push(onValue(ref(db, `payDrafts/${id}/${payrollMonth}/net`),
+        snap => setStmtNet(p => ({ ...p, [`${id}:draft`]: snap.val() }))))
+    }
+    return () => offs.forEach(f => f())
+  }, [payrollMonth, isAdmin, stmtEmpIds.join(',')])
+  // 回傳該員工當月明細的實領，沒有明細則 null
+  function statementNetFor(empId) {
+    // 注意 null：節點不存在時 onValue 回 null，而 Number(null) === 0，
+    // 直接用 Number.isFinite 會把「這個月沒有明細」誤判成「實領 0 元」。
+    const pick = (key, source) => {
+      const v = stmtNet[key]
+      if (v == null || v === '') return null
+      const n = Number(v)
+      return Number.isFinite(n) ? { net: n, source } : null
+    }
+    return pick(`${empId}:pub`, 'published') || (isAdmin ? pick(`${empId}:draft`, 'draft') : null)
+  }
   // 統編發票
   const [showAddInv, setShowAddInv] = useState(false)
   const [editInv, setEditInv] = useState(null)
@@ -233,14 +275,18 @@ export default function Finance({ tools = false, embedTab = null }) {
       // 時薪制國定假日加給（×2，底薪已含 ×1 → 補 ×1）
       const holidayPremium = payType === 'hourly' ? computeHourlyHolidayPremium(emp, y, m, data, baseSalary).amount : 0
       const totalDeductionsB = totalDeductions + compDock
-      const netPay = grossPay + compCashout + annualCashout + holidayPremium - totalDeductionsB
+      const liveNet = grossPay + compCashout + annualCashout + holidayPremium - totalDeductionsB
+      // 明細優先（見上方 statementNetFor 的說明）：有明細就以明細的實領為準
+      const st = statementNetFor(emp.id)
+      const netPay = st ? st.net : liveNet
+      const netSource = st ? st.source : 'live'
       return {
         empId: emp.id, empName: emp.name, hoursWorked: hrs, hourlyOTHrs, hourlyLeaveHrs, payType,
         baseSalary: computedBase, mealAllowance,
         fullAttendanceBonus, activityAttendance, overtime: 0, advance: 0,
         compDock, compCashout, annualCashout, holidayPremium, ledger: tm.ledgerOn ? tm.ledger : null,
         grossPay, healthInsEmp, laborInsEmp, pensionSelf, dependentHealth, wireFee,
-        totalDeductions: totalDeductionsB, netPay,
+        totalDeductions: totalDeductionsB, netPay, liveNet, netSource,
         healthInsEmployer, laborInsEmployer, pensionEmployer,
         totalEmployerBurden, totalEmployerCost: grossPay + totalEmployerBurden,
         note: '',
@@ -1817,9 +1863,17 @@ export default function Finance({ tools = false, embedTab = null }) {
                 <div style={{ fontSize:'12px', opacity:0.85, marginTop:'14px' }}>本月實領</div>
                 <div style={{ fontSize:'34px', fontWeight:'800', lineHeight:1.15, letterSpacing:'0.01em' }}>{hasSetting ? `NT$${net.toLocaleString()}` : '待設定'}</div>
                 {hasSetting && (
-                  <div style={{ fontSize:'12px', opacity:0.9, marginTop:'6px' }}>
-                    應發 NT${gross.toLocaleString()}　－　扣項 NT${Number(slip.totalDeductions || 0).toLocaleString()}
-                  </div>
+                  /* 實領來自已發布的薪資明細時，明細上可能有人工調整，
+                     「應發 − 扣項」不會剛好等於實領，改指向明細避免看起來算錯 */
+                  slip.netSource === 'published' && Number(slip.liveNet) !== Number(net) ? (
+                    <div style={{ fontSize:'12px', opacity:0.9, marginTop:'6px' }}>
+                      依本月薪資明細（含明細上的調整項）・細項請看上方薪資明細
+                    </div>
+                  ) : (
+                    <div style={{ fontSize:'12px', opacity:0.9, marginTop:'6px' }}>
+                      應發 NT${gross.toLocaleString()}　－　扣項 NT${Number(slip.totalDeductions || 0).toLocaleString()}
+                    </div>
+                  )
                 )}
               </div>
 
@@ -1964,6 +2018,17 @@ export default function Finance({ tools = false, embedTab = null }) {
                 <input type="month" value={payrollMonth} onChange={e => setPayrollMonth(e.target.value)}
                   style={{ ...E.input, width:'150px', padding:'7px 10px', fontSize:'13px' }} />
                 <span style={{ fontSize:'13px', color:E.textMuted }}>{monthLabel(payrollMonth)}</span>
+                {/* 當月還沒過完，數字會隨出勤變動，不是結算值 */}
+                {payrollMonth === thisMonthYM && (
+                  <span style={{ fontSize:'11px', fontWeight:'600', color:'#a06a20', backgroundColor:'#fdf3e0', border:'1px solid #e8d3a8', borderRadius:'999px', padding:'3px 10px', whiteSpace:'nowrap' }}>
+                    進行中・算到 {new Date(now.getTime() - 86400000).toLocaleDateString('sv-SE').slice(5).replace('-', '/')} 為止
+                  </span>
+                )}
+                {payrollMonth > thisMonthYM && (
+                  <span style={{ fontSize:'11px', fontWeight:'600', color:'#8a6a9a', backgroundColor:'#f5f0f8', border:'1px solid #ddd0e8', borderRadius:'999px', padding:'3px 10px', whiteSpace:'nowrap' }}>
+                    未來月份・尚無資料
+                  </span>
+                )}
               </div>
             </div>
 
@@ -2023,7 +2088,7 @@ export default function Finance({ tools = false, embedTab = null }) {
             <div style={{ ...E.card }}>
               <div style={{ marginBottom:'16px' }}>
                 <h3 style={{ fontSize:'14px', fontWeight:'700', color:E.textPrimary, margin:'0 0 4px' }}>薪資設定</h3>
-                <p style={{ fontSize:'12px', color:E.textMuted, margin:0 }}>{py}年{MONTHS[pm-1]}月 · 設定薪制、底薪與保費；實領為即時計算（含缺時扣薪、折現），員工畫面同步</p>
+                <p style={{ fontSize:'12px', color:E.textMuted, margin:0 }}>{py}年{MONTHS[pm-1]}月 · 設定薪制、底薪與保費；實領以薪資明細為準，該月還沒有明細才用即時計算（含缺時扣薪、折現），員工畫面同步</p>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:'0' }}>
                 {data.employees.map((emp, i) => {
@@ -2065,6 +2130,14 @@ export default function Finance({ tools = false, embedTab = null }) {
                           {live.grossPay > 0 || totalDeductions > 0 ? (
                             <>
                               <div style={{ fontSize:'13px', fontWeight:'700', color: netPay < 0 ? '#c04030' : E.textPrimary }}>實領 NT${netPay.toLocaleString()}</div>
+                              {/* 明細優先：數字來自明細時標示出來，並在與引擎即時計算不同時附上差額原因 */}
+                              {live.netSource && live.netSource !== 'live' && (
+                                <div style={{ fontSize:'11px', color:'#3a6d31', fontWeight:'600' }}>
+                                  依{live.netSource === 'published' ? '已發布明細' : '明細草稿'}
+                                  {Number(live.liveNet) !== Number(netPay) &&
+                                    <span style={{ color:E.textMuted, fontWeight:'400' }}>（系統算 {Number(live.liveNet).toLocaleString()}，差額為明細上的人工調整）</span>}
+                                </div>
+                              )}
                               {totalDeductions > 0 && <div style={{ fontSize:'11px', color:E.textMuted }}>扣 {totalDeductions.toLocaleString()}</div>}
                             </>
                           ) : <div style={{ fontSize:'13px', color:E.textMuted }}>--</div>}
@@ -2077,7 +2150,9 @@ export default function Finance({ tools = false, embedTab = null }) {
                 })}
               </div>
               <div style={{ marginTop:'16px', paddingTop:'16px', borderTop:`1px solid ${E.divider}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:'12px', color:E.textSecond }}>本月實領合計（即時）</span>
+                <span style={{ fontSize:'12px', color:E.textSecond }}>
+                  本月實領合計{liveSlips.some(x => x.netSource && x.netSource !== 'live') ? '（有明細者依明細）' : '（即時）'}
+                </span>
                 <span style={{ fontSize:'15px', fontWeight:'700', color:E.textPrimary }}>
                   NT${liveSlips.reduce((sum, x) => sum + Number(x.netPay || 0), 0).toLocaleString()}
                 </span>
