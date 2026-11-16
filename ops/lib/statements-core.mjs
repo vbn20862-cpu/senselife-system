@@ -36,21 +36,29 @@ for (const e of data.employees) {
   const leaves = d => data.leaveRequests.filter(l => l.empId === e.id && l.status === '已核准' && d >= (l.startDate || l.date) && d <= (l.endDate || l.startDate))
   const L = PE.computeCompLedger(e, data, { year: YR, month: MO }); const tm = L.monthly.find(m => m.year === YR && m.month === MO) || {}
   const defMap = Object.fromEntries((tm.deficitDates || []).map(x => [x.date, x.hours]))
+  const sickMap = PE.sickLeaveFactorMap(e, YR, data)
   const dates = [...new Set([...recs.map(c => c.date), ...Object.keys(sched).filter(d => SH[sched[d]])])].sort()
   const rows = dates.map(d => {
     const dr = recs.filter(c => c.date === d).sort((a, b) => a.time.localeCompare(b.time))
     const pick = t => dr.filter(c => c.type === t).map(c => c.time + (c.note && /補登|更正|統一/.test(c.note) ? '*' : '')).join('/')
     const nm = SC.normalDayMinutes(dr, d, data), om = (ot[d] || 0) + SC.activityExtraOTMinutes(dr, d, data), lv = leaves(d)
-    const lvH = Math.min(SH[sched[d]] || 0, lv.reduce((a, l) => a + ((l.startDate === l.endDate && Number(l.days) === 0.5) ? 4 : 8), 0))
+    const half = l => (l.startDate === l.endDate && (l.halfDay || Number(l.days) === 0.5))
+    const lvH = Math.min(SH[sched[d]] || 0, lv.reduce((a, l) => a + (half(l) ? 4 : 8), 0))
+    const factor = l => l.type === '病假' ? (sickMap.get(d) ?? 0.5) : (PE.PAY_FACTOR[PE.leaveTypeCat(l.type)] ?? 1) // 與引擎 leaveFactorOn 同規則（病假依年度額度）
+    const lvPaid = r2(Math.min(lvH, lv.reduce((a, l) => a + (half(l) ? 4 : 8) * factor(l), 0))) // 當日請假折抵
+    const fullLeave = lv.some(l => !half(l))
     const hasIn = dr.some(c => c.type === '上班'), hasOut = dr.some(c => c.type === '下班')
-    const flag = !dr.length ? (lv.length ? '' : '無打卡') : (hasIn && !hasOut) ? '缺下班卡' : (!hasIn && hasOut) ? '缺上班卡' : ''
+    const flag = !dr.length ? (lv.length ? '' : '無打卡') : (hasIn && !hasOut) ? (fullLeave ? '' : '缺下班卡') : (!hasIn && hasOut) ? '缺上班卡' : ''
     return { d: `${MO}/${Number(d.slice(8))}`, w: '日一二三四五六'[new Date(d + 'T00:00').getDay()], s: sched[d] || '-', in: pick('上班'), out: pick('下班'),
-      h: r2(nm / 60), ot: r2(om / 60), cnt: SC.roundHours(nm) + SC.roundHours(om), lv: lv.map(l => l.type + ((l.startDate === l.endDate && Number(l.days) === 0.5) ? '半天' : '')).join(','), lvH, def: defMap[d] || 0,
+      h: r2(nm / 60), ot: r2(om / 60), cnt: SC.roundHours(nm) + SC.roundHours(om), lv: lv.map(l => l.type + (half(l) ? '半天' : '')).join(','), lvH, lvPaid, def: defMap[d] || 0,
       note: [flag, SC.isActivityDay(d, data) ? '活動日' : '', hol.get(d) || '', susp[d] ? (susp[d].label || '停班') : ''].filter(Boolean).join('、') }
   })
   const act = r2(rows.reduce((a, r) => a + r.cnt, 0)), lvH = rows.reduce((a, r) => a + r.lvH, 0), short = r2(expected - act - lvH)
-  const lvBy = t => rows.filter(r => r.lv.startsWith(t)).reduce((a, r) => a + r.lvH, 0)
-  const lvText = ['特休', '補休', '病假', '生理假', '事假', '婚假', '喪假', '公假'].map(t => [t, lvBy(t)]).filter(([, h]) => h).map(([t, h]) => `${t} ${h}h`).join('、')
+  const lvBy = t => rows.filter(r => r.lv.replace('半天', '') === t).reduce((a, r) => a + r.lvH, 0)
+  const lvTypes = [...new Set(rows.filter(r => r.lv).map(r => r.lv.replace('半天', '')))]
+  const lvText = lvTypes.map(t => `${t} ${lvBy(t)}h`).join('、')
+  const lvPaidSum = r2(rows.reduce((a, r) => a + (r.lvPaid || 0), 0))
+  const acc = hourly ? null : PE.computeMonthCompAccrual(e, YR, MO, data, new Set(HO.getHolidays(data).map(h => h.date)))
   const N = k => Number(s[k] || 0)
   const extras = [['伙食', N('mealAllowance')], ['全勤', N('fullAttendanceBonus')], ['活動出勤', N('activityAttendance')]].filter(([, v]) => v)
   const dedItems = [['健保', N('healthInsEmp')], ['勞保', N('laborInsEmp')], ['勞退自提', N('pensionSelf')], ['眷屬健保', N('dependentHealth')], ['匯費', N('wireFee')]].filter(([, v]) => v)
@@ -94,24 +102,29 @@ table{border-collapse:collapse;width:100%}th,td{border:1px solid #8a7a66;padding
 h2{font-size:13pt;margin:0 0 8px;break-before:page}.d{font-size:8.3pt}.d td,.d th{padding:3px 4px;text-align:center}.d td.n{text-align:right}.d td.l{text-align:left}.bad td{background:#fbedea;color:#b42318}.lv td{background:#f3f0fa}
 </style></head><body>
 <h1>${esc(e.name)}　${YR} 年 ${MO} 月工時統計</h1><div class="date">製表日期：${new Date().toLocaleDateString('sv-SE').replace(/-/g, ' / ')}</div>
-<table class="sum"><tr><th>項目</th><th>時數</th></tr>
+${hourly ? `<table class="sum"><tr><th>項目</th><th>時數</th></tr>
 <tr><td>應上班時數（行政機關辦公${suspH ? `，扣除停班 ${suspH} 小時` : ''}）</td><td>${expected} 小時</td></tr>
-<tr><td>實際上班時數${Object.values(ot).some(Boolean) ? `（含加班 ${r2(rows.reduce((a, r) => a + Math.floor(r.ot * 2) / 2, 0))} 小時）` : ''}</td><td>${act} 小時</td></tr>
-<tr><td>請假時數${lvText ? `（${lvText}）` : ''}</td><td>${lvH} 小時</td></tr>
-<tr class="tot"><td>缺少時數（應上 − 實際 − 請假）</td><td class="miss">${short} 小時</td></tr></table>
+<tr><td>實際上班時數</td><td>${act} 小時</td></tr>
+<tr><td>請假時數${lvText ? `（${lvText}）` : ''}</td><td>${lvH} 小時</td></tr></table>` : `<table class="sum"><tr><th>項目</th><th>時數</th><th>說明</th></tr>
+<tr><td>排班應到</td><td>${tm.scheduledH || 0} 小時</td><td>依班表；國定假日、停班與臨時事件不計${(tm.missingPunchDates || []).length ? '；缺下班卡待補登的日子暫不計' : ''}</td></tr>
+<tr><td>請假${lvText ? `（${lvText}）` : ''}</td><td>折抵 ${lvPaidSum} 小時</td><td>全薪假全額折抵、病假與生理假半薪折一半、事假不折抵</td></tr>
+<tr class="tot"><td>本月缺時</td><td class="miss">${tm.deficitHours || 0} 小時</td><td>逐日計算：排班 − 正常工時 − 請假折抵；當日加班先補當日</td></tr>
+<tr><td>加班轉補休</td><td>${acc ? r2(acc.hours) : 0} 小時</td><td>${acc && acc.hours ? `當日總工時超過 8 小時的部分，前 2 小時 ×1.34、之後 ×1.67，加權後 ${r2(acc.weighted)} 小時` : '本月沒有超過 8 小時的日子'}</td></tr>
+<tr><td>補休先抵缺時</td><td>－ ${tm.consumed || 0} 小時</td><td>${tm.consumedHours ? `用掉補休 ${tm.consumedHours} 小時（加權後抵 ${tm.consumed} 小時）` : '無'}</td></tr>
+<tr class="tot"><td>${tm.ledgerOn ? '記入時數帳' : '扣薪時數'}</td><td class="miss">${tm.ledgerOn ? (tm.ledger?.add || 0) : (tm.dockHours || 0)} 小時</td><td>${tm.ledgerOn ? '不扣薪，見下方時數帳' : '見下方薪資計算'}</td></tr></table>`}
 <h3>薪資計算（系統）</h3>
 <table class="sum"><tr><th>項目</th><th>金額</th></tr>
 ${pay.map(([k, v, c]) => `<tr><td>${esc(k)}</td><td${c ? ` class="${c}"` : ''}>${v}</td></tr>`).join('')}
 <tr class="tot"><td>實領</td><td>${money(net)}</td></tr></table>
 ${ledgerHtml}
 <div class="note"><b>說明</b>
-<div>・實際上班時數：系統打卡紀錄（時間後標 * 者為補登或更正）。一般日依勞基法第 35 條扣休息、正常工時每日上限 8 小時；活動日照登打時間全算。計入時數＝正常工時與加班各取至 0.5 小時後相加。</div>
+<div>・實際上班時數：系統打卡紀錄（時間後標 * 者為補登或更正）。一般日依勞基法第 35 條扣休息、正常工時每日上限 8 小時；活動日照登打時間全算。時數按分鐘計，取至小數 2 位。</div>
 ${hourly ? '<div>・時薪制（部分工時）：（實際打卡時數按分鐘計［含加班 ×1.0］＋有薪假依當日排班時數折算＋當日超過 8 小時部分之加給：前 2 小時 ×0.34、之後 ×0.67）× 時薪；國定假日有排班出勤者加倍。</div>' : `<div>・系統缺時（扣薪基準）＝排班應到時數 − 實際工時（當日加班先補當日缺時）− 請假折抵；特休全額、病假一半、事假不折抵。本月系統缺時 ${tm.deficitHours || 0} 小時，先用補休抵，不足才扣薪。</div>`}
 ${(tm.missingPunchDates || []).length ? `<div>・待補登（缺下班卡，尚未計入）：${tm.missingPunchDates.map(d => `${MO}/${Number(d.slice(8))}`).join('、')}。</div>` : ''}
 </div>
 <h2>逐日明細｜${YR} 年 ${MO} 月</h2><table class="d"><tr><th>日期</th><th>星期</th><th>排班</th><th>上班</th><th>下班</th><th>當日工時</th><th>加班</th><th>計入時數</th><th>請假</th><th>系統缺時</th><th>備註</th></tr>
-${rows.map(r => `<tr${r.note.includes('無打卡') ? ' class="bad"' : r.lv ? ' class="lv"' : ''}><td>${r.d}</td><td>${r.w}</td><td>${r.s}</td><td>${esc(r.in) || '—'}</td><td>${esc(r.out) || '—'}</td><td class="n">${r.h || 0}</td><td class="n">${r.ot || ''}</td><td class="n">${r.cnt}</td><td>${r.lv ? r.lv + ' ' + r.lvH + 'h' : ''}</td><td class="n">${r.def || ''}</td><td class="l">${esc(r.note)}</td></tr>`).join('')}
-<tr class="tot"><td>小計</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="n">${act}</td><td>${lvH}h</td><td class="n">${tm.deficitHours || 0}</td><td class="l">應上 ${expected}h｜缺 ${short}h</td></tr></table>
+${rows.map(r => `<tr${r.note.includes('無打卡') ? ' class="bad"' : r.lv ? ' class="lv"' : ''}><td>${r.d}</td><td>${r.w}</td><td>${r.s}</td><td>${esc(r.in) || '—'}</td><td>${esc(r.out) || '—'}</td><td class="n">${r.h || 0}</td><td class="n">${r.ot || ''}</td><td class="n">${r.cnt}</td><td>${r.lv ? r.lv + ' ' + r.lvH + 'h' + (r.lvPaid !== r.lvH ? `（折 ${r.lvPaid}h）` : '') : ''}</td><td class="n">${r.def || ''}</td><td class="l">${esc(r.note)}</td></tr>`).join('')}
+<tr class="tot"><td>小計</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="n">${act}</td><td>${lvH}h</td><td class="n">${tm.deficitHours || 0}</td><td class="l">${hourly ? `應上 ${expected}h` : `排班應到 ${tm.scheduledH || 0}h｜缺時 ${tm.deficitHours || 0}h`}</td></tr></table>
 </body></html>`
   const alerts = [rows.filter(r => r.note.includes('無打卡')).length && `無打卡 ${rows.filter(r => r.note.includes('無打卡')).map(r => r.d).join('、')}`, (tm.missingPunchDates || []).length && `待補登 ${tm.missingPunchDates.length} 天`].filter(Boolean)
   const line = `${e.name}｜實際 ${act}h、請假 ${lvH}h、缺 ${short}h｜系統缺時 ${tm.deficitHours || 0}h 扣 ${dock.toLocaleString()}｜實領 ${Math.round(net).toLocaleString()}${alerts.length ? '｜⚠ ' + alerts.join('；') : ''}`
