@@ -925,6 +925,63 @@ export function computeScheduledStats(emp, yr, mo, data, holidaySet) {
   }
 }
 
+// 月薪正職應到改以「政府上班日 × 8h」計（2026-11 起，2026-11-25 阿慶定）：與班表無關。
+//   上班日＝週一至週五扣國定假日（getHolidays）；逐日缺時 = 8h − 實做（單日上限 8h，含當日加班）− 請假折抵
+//   非上班日（週末／國定假日）出勤：單日最多 8h 補回當月缺時（makeupHours），超過 8h 的部分仍走加班轉補休，不重複計
+//   只算到昨天；缺下班卡待補登的上班日暫不列應到；臨時事件、活動日規則同舊制
+export const GOVT_DUE_FROM = '2026-11'
+export function computeGovtDueStats(emp, yr, mo, data) {
+  const ym = `${yr}-${pad2(mo)}`, todayStr = new Date().toLocaleDateString('sv-SE')
+  const holidays = new Set(getHolidays(data).map(h => h.date))
+  const suspensions = getSuspensions(data)
+  const allRecs = (data.clockins || []).filter(c => c.date?.startsWith(ym) && nameMatch(c, emp))
+  const payRecs = applyEventRule(allRecs, data, emp.id)
+  const otMin = {}
+  for (const sp of computeOTSpans(payRecs)) {
+    if (sp.missingEnd || sp.missingStart || !sp.startDate) continue
+    otMin[sp.startDate] = (otMin[sp.startDate] || 0) + sp.minutes
+  }
+  const schedOn = {}
+  for (const x of (data.schedules || [])) if (x && x.empId === emp.id && x.year === yr && x.month === mo) schedOn[x.day] = ['出勤', 'W', '上午班', '下午班'].includes(x.shift)
+  let dueMin = 0, shortMin = 0, makeupMin = 0, lateLeaveDays = 0
+  const deficitDates = [], absentDates = [], missingPunchDates = [], makeupDates = []
+  const days = new Date(yr, mo, 0).getDate()
+  for (let day = 1; day <= days; day++) {
+    const ds = `${ym}-${pad2(day)}`
+    if (ds >= todayStr) break
+    if (emp.hireDate && ds < emp.hireDate) continue
+    const dow = new Date(`${ds}T12:00:00`).getDay()
+    const workday = dow !== 0 && dow !== 6 && !holidays.has(ds)
+    const susp0 = suspensions[ds], susp = susp0 && suspAppliesTo(susp0, emp.id) ? susp0 : null
+    if (susp && susp.scope === 'full') continue
+    const raw = allRecs.filter(c => c.date === ds), recs = payRecs.filter(c => c.date === ds)
+    const hasIn = raw.some(c => c.type === '上班'), hasOut = raw.some(c => c.type === '下班')
+    const leaveH = leaveEffectiveHoursOnDate(emp, ds, data), onLeave = leaveH > 0 || dateHasLeave(emp, ds, data)
+    if (hasIn && !hasOut && !onLeave) { missingPunchDates.push(ds); continue }
+    const worked = normalDayMinutes(recs, ds, data) + activityExtraOTMinutes(recs, ds, data) + (otMin[ds] || 0)
+    const done = Math.min(480, worked + (workday || schedOn[day] ? leaveH * 60 : 0))
+    if (!workday) {
+      if (done > 0) { makeupMin += done; makeupDates.push({ date: ds, hours: round2(done / 60) }) }
+      continue
+    }
+    const dueH = susp && susp.scope === 'partial' ? Math.max(0, 8 - suspendedHours(susp, '出勤', 8, recs)) : 8
+    dueMin += dueH * 60
+    let d = Math.max(0, dueH * 60 - done)
+    if (d > 0 && isActivityDay(ds, data) && (hasIn || hasOut)) d = 0 // 活動日提早解散不算缺時
+    if (d <= 0) continue
+    shortMin += d
+    deficitDates.push({ date: ds, hours: round2(d / 60) })
+    if (!hasIn && !hasOut && !onLeave) { if (schedOn[day]) absentDates.push(ds) } // 班表排休不算曠職，只算缺時
+    else lateLeaveDays++
+  }
+  return {
+    scheduledH: round2(dueMin / 60), deficitHours: round2(Math.max(0, shortMin - makeupMin) / 60),
+    absentDays: absentDates.length, absentDates, lateLeaveDays, deficitDates,
+    missingPunchDays: missingPunchDates.length, missingPunchDates, suspShortDays: 0, suspShortDates: [],
+    govtDue: true, makeupHours: round2(makeupMin / 60), makeupDates,
+  }
+}
+
 // 某員工某月「請補休」時數（已核准的補休假，1 天 = 8 小時）— 直接消耗補休餘額
 export function compLeaveTakenInMonth(emp, yr, mo, data) {
   let hours = 0
@@ -1032,7 +1089,7 @@ export function computeCompLedger(emp, data, asOf) {
     //   應上時數(政府行事曆)另存供顯示參考。時薪制按時數給薪、不扣缺時。
     const normalH = computeMonthNormalHours(emp, year, month, data, holidaySet)
     const govtH = proratedGovtHours(emp, year, month)
-    const sched = computeScheduledStats(emp, year, month, data, holidaySet)
+    const sched = !isHourly && `${year}-${pad2(month)}` >= GOVT_DUE_FROM ? computeGovtDueStats(emp, year, month, data) : computeScheduledStats(emp, year, month, data, holidaySet)
     const shortfall = isHourly ? 0 : sched.deficitHours
     // 缺口優先扣低費率補休（1.34 → 1.67 → 2）
     // 2026-09 起「先加權再抵」：1 小時 1.34 桶的補休可抵 1.34 小時缺時（等於加班費照倍率發、缺時照 1 倍扣的淨額）
@@ -1075,7 +1132,7 @@ export function computeCompLedger(emp, data, asOf) {
     }
 
     monthly.push({
-      year, month, govtH, scheduledH: sched.scheduledH,
+      year, month, govtH, scheduledH: sched.scheduledH, govtDue: !!sched.govtDue, makeupHours: sched.makeupHours || 0, makeupDates: sched.makeupDates || [],
       deficitHours: sched.deficitHours, deficitDates: sched.deficitDates,
       absentDays: sched.absentDays, absentDates: sched.absentDates, lateLeaveDays: sched.lateLeaveDays,
       missingPunchDays: sched.missingPunchDays, missingPunchDates: sched.missingPunchDates,

@@ -37,7 +37,7 @@ for (const e of data.employees) {
   const L = PE.computeCompLedger(e, data, { year: YR, month: MO }); const tm = L.monthly.find(m => m.year === YR && m.month === MO) || {}
   const defMap = Object.fromEntries((tm.deficitDates || []).map(x => [x.date, x.hours]))
   const sickMap = PE.sickLeaveFactorMap(e, YR, data)
-  const dates = [...new Set([...recs.map(c => c.date), ...Object.keys(sched).filter(d => SH[sched[d]])])].sort()
+  const dates = [...new Set([...recs.map(c => c.date), ...Object.keys(sched).filter(d => SH[sched[d]]), ...Object.keys(defMap)])].sort()
   const rows = dates.map(d => {
     const dr = recs.filter(c => c.date === d).sort((a, b) => a.time.localeCompare(b.time))
     const pick = t => dr.filter(c => c.type === t).map(c => c.time + (c.note && /補登|更正|統一/.test(c.note) ? '*' : '')).join('/')
@@ -48,7 +48,7 @@ for (const e of data.employees) {
     const lvPaid = r2(Math.min(lvH, lv.reduce((a, l) => a + (half(l) ? 4 : 8) * factor(l), 0))) // 當日請假折抵
     const fullLeave = lv.some(l => !half(l))
     const hasIn = dr.some(c => c.type === '上班'), hasOut = dr.some(c => c.type === '下班')
-    const flag = !dr.length ? (lv.length ? '' : '無打卡') : (hasIn && !hasOut) ? (fullLeave ? '' : '缺下班卡') : (!hasIn && hasOut) ? '缺上班卡' : ''
+    const flag = !dr.length ? (lv.length ? '' : SH[sched[d]] ? '無打卡' : '未出勤') : (hasIn && !hasOut) ? (fullLeave ? '' : '缺下班卡') : (!hasIn && hasOut) ? '缺上班卡' : ''
     return { d: `${MO}/${Number(d.slice(8))}`, w: '日一二三四五六'[new Date(d + 'T00:00').getDay()], s: sched[d] || '-', in: pick('上班'), out: pick('下班'),
       h: r2(nm / 60), ot: r2(om / 60), cnt: SC.roundHours(nm) + SC.roundHours(om), lv: lv.map(l => l.type + (half(l) ? '半天' : '')).join(','), lvH, lvPaid, def: defMap[d] || 0,
       note: [flag, SC.isActivityDay(d, data) ? '活動日' : '', hol.get(d) || '', susp[d] ? (susp[d].label || '停班') : ''].filter(Boolean).join('、') }
@@ -89,7 +89,7 @@ for (const e of data.employees) {
 <table class="sum"><tr><th>項目</th><th>時數</th><th>說明</th></tr>
 <tr><td>期初餘額</td><td>${LG.open ? `欠公司 ${LG.open} 小時` : '0 小時'}</td><td>上月結轉</td></tr>
 ${LG.opening ? `<tr><td>期初補計（欠公司）</td><td class="miss">＋ ${LG.opening} 小時</td><td>${esc(LG.openingNote || '')}</td></tr>` : ''}
-<tr><td>本月缺時（欠公司）</td><td class="miss">＋ ${LG.add} 小時</td><td>排班應到 − 實際 − 請假折抵${tm.consumed ? `（已先以補休 ${tm.consumedHours} 小時加權抵 ${tm.consumed} 小時）` : ''}</td></tr>
+<tr><td>本月缺時（欠公司）</td><td class="miss">＋ ${LG.add} 小時</td><td>${tm.govtDue ? '應到 − 實際 − 請假折抵' : '排班應到 − 實際 − 請假折抵'}${tm.consumed ? `（已先以補休 ${tm.consumedHours} 小時加權抵 ${tm.consumed} 小時）` : ''}</td></tr>
 <tr><td>補休抵扣餘額（公司欠你）</td><td>－ ${LG.offsetByComp} 小時</td><td>${LG.offsetHours ? `補休 ${LG.offsetHours} 小時依費率加權` : '本月無剩餘補休可抵'}</td></tr>
 <tr class="tot"><td>月底餘額</td><td class="miss">欠公司 ${LG.close} 小時</td><td>折算參考：${LG.close} × ${LG.rate} ＝ ${money(Math.round(LG.close * LG.rate))}</td></tr></table>
 <div class="note"><div>・時數帳：每月缺時不扣薪，記入時數帳；當月超過應上班時數的部分（含加班）先抵餘額，餘額逐月往下累計。餘額以後續勞務補足；未補足的餘額於離職月份依當時時薪一併結清。</div></div>` : ''
@@ -106,9 +106,10 @@ ${hourly ? `<table class="sum"><tr><th>項目</th><th>時數</th></tr>
 <tr><td>應上班時數（行政機關辦公${suspH ? `，扣除停班 ${suspH} 小時` : ''}）</td><td>${expected} 小時</td></tr>
 <tr><td>實際上班時數</td><td>${act} 小時</td></tr>
 <tr><td>請假時數${lvText ? `（${lvText}）` : ''}</td><td>${lvH} 小時</td></tr></table>` : `<table class="sum"><tr><th>項目</th><th>時數</th><th>說明</th></tr>
-<tr><td>排班應到</td><td>${tm.scheduledH || 0} 小時</td><td>依班表；國定假日、停班與臨時事件不計${(tm.missingPunchDates || []).length ? '；缺下班卡待補登的日子暫不計' : ''}</td></tr>
+<tr><td>${tm.govtDue ? '本月應到' : '排班應到'}</td><td>${tm.scheduledH || 0} 小時</td><td>${tm.govtDue ? '政府上班日 × 8 小時' : '依班表'}；國定假日、停班與臨時事件不計${(tm.missingPunchDates || []).length ? '；缺下班卡待補登的日子暫不計' : ''}</td></tr>
 <tr><td>請假${lvText ? `（${lvText}）` : ''}</td><td>折抵 ${lvPaidSum} 小時</td><td>全薪假全額折抵、病假與生理假半薪折一半、事假不折抵</td></tr>
-<tr class="tot"><td>本月缺時</td><td class="miss">${tm.deficitHours || 0} 小時</td><td>逐日計算：排班 − 正常工時 − 請假折抵；當日加班先補當日</td></tr>
+${tm.makeupHours ? `<tr><td>假日出勤補回</td><td>${tm.makeupHours} 小時</td><td>週末與國定假日出勤，單日最多 8 小時，先補本月缺時</td></tr>` : ''}
+<tr class="tot"><td>本月缺時</td><td class="miss">${tm.deficitHours || 0} 小時</td><td>${tm.govtDue ? '逐日計算：8 小時 − 當日工時 − 請假折抵，加總後扣除假日出勤補回' : '逐日計算：排班 − 正常工時 − 請假折抵；當日加班先補當日'}</td></tr>
 <tr><td>加班轉補休</td><td>${acc ? r2(acc.hours) : 0} 小時</td><td>${acc && acc.hours ? `當日總工時超過 8 小時的部分，前 2 小時 ×1.34、之後 ×1.67，加權後 ${r2(acc.weighted)} 小時` : '本月沒有超過 8 小時的日子'}</td></tr>
 <tr><td>補休先抵缺時</td><td>－ ${tm.consumed || 0} 小時</td><td>${tm.consumedHours ? `用掉補休 ${tm.consumedHours} 小時（加權後抵 ${tm.consumed} 小時）` : '無'}</td></tr>
 <tr class="tot"><td>${tm.ledgerOn ? '記入時數帳' : '扣薪時數'}</td><td class="miss">${tm.ledgerOn ? (tm.ledger?.add || 0) : (tm.dockHours || 0)} 小時</td><td>${tm.ledgerOn ? '不扣薪，見下方時數帳' : '見下方薪資計算'}</td></tr></table>`}
@@ -119,12 +120,12 @@ ${pay.map(([k, v, c]) => `<tr><td>${esc(k)}</td><td${c ? ` class="${c}"` : ''}>$
 ${ledgerHtml}
 <div class="note"><b>說明</b>
 <div>・實際上班時數：系統打卡紀錄（時間後標 * 者為補登或更正）。一般日依勞基法第 35 條扣休息、正常工時每日上限 8 小時；活動日照登打時間全算。時數按分鐘計，取至小數 2 位。</div>
-${hourly ? '<div>・時薪制（部分工時）：（實際打卡時數按分鐘計［含加班 ×1.0］＋有薪假依當日排班時數折算＋當日超過 8 小時部分之加給：前 2 小時 ×0.34、之後 ×0.67）× 時薪；國定假日有排班出勤者加倍。</div>' : `<div>・系統缺時（扣薪基準）＝排班應到時數 − 實際工時（當日加班先補當日缺時）− 請假折抵；特休全額、病假一半、事假不折抵。本月系統缺時 ${tm.deficitHours || 0} 小時，先用補休抵，不足才扣薪。</div>`}
+${hourly ? '<div>・時薪制（部分工時）：（實際打卡時數按分鐘計［含加班 ×1.0］＋有薪假依當日排班時數折算＋當日超過 8 小時部分之加給：前 2 小時 ×0.34、之後 ×0.67）× 時薪；國定假日有排班出勤者加倍。</div>' : `<div>・系統缺時（扣薪基準）＝${tm.govtDue ? '政府上班日 × 8 小時' : '排班應到時數'} − 實際工時（當日加班先補當日缺時）− 請假折抵；特休全額、病假一半、事假不折抵。本月系統缺時 ${tm.deficitHours || 0} 小時，先用補休抵，不足才扣薪。</div>`}
 ${(tm.missingPunchDates || []).length ? `<div>・待補登（缺下班卡，尚未計入）：${tm.missingPunchDates.map(d => `${MO}/${Number(d.slice(8))}`).join('、')}。</div>` : ''}
 </div>
 <h2>逐日明細｜${YR} 年 ${MO} 月</h2><table class="d"><tr><th>日期</th><th>星期</th><th>排班</th><th>上班</th><th>下班</th><th>當日工時</th><th>加班</th><th>計入時數</th><th>請假</th><th>系統缺時</th><th>備註</th></tr>
 ${rows.map(r => `<tr${r.note.includes('無打卡') ? ' class="bad"' : r.lv ? ' class="lv"' : ''}><td>${r.d}</td><td>${r.w}</td><td>${r.s}</td><td>${esc(r.in) || '—'}</td><td>${esc(r.out) || '—'}</td><td class="n">${r.h || 0}</td><td class="n">${r.ot || ''}</td><td class="n">${r.cnt}</td><td>${r.lv ? r.lv + ' ' + r.lvH + 'h' + (r.lvPaid !== r.lvH ? `（折 ${r.lvPaid}h）` : '') : ''}</td><td class="n">${r.def || ''}</td><td class="l">${esc(r.note)}</td></tr>`).join('')}
-<tr class="tot"><td>小計</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="n">${act}</td><td>${lvH}h</td><td class="n">${tm.deficitHours || 0}</td><td class="l">${hourly ? `應上 ${expected}h` : `排班應到 ${tm.scheduledH || 0}h｜缺時 ${tm.deficitHours || 0}h`}</td></tr></table>
+<tr class="tot"><td>小計</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="n">${act}</td><td>${lvH}h</td><td class="n">${tm.deficitHours || 0}</td><td class="l">${hourly ? `應上 ${expected}h` : `${tm.govtDue ? '應到' : '排班應到'} ${tm.scheduledH || 0}h｜缺時 ${tm.deficitHours || 0}h`}</td></tr></table>
 </body></html>`
   const alerts = [rows.filter(r => r.note.includes('無打卡')).length && `無打卡 ${rows.filter(r => r.note.includes('無打卡')).map(r => r.d).join('、')}`, (tm.missingPunchDates || []).length && `待補登 ${tm.missingPunchDates.length} 天`].filter(Boolean)
   const line = `${e.name}｜實際 ${act}h、請假 ${lvH}h、缺 ${short}h｜系統缺時 ${tm.deficitHours || 0}h 扣 ${dock.toLocaleString()}｜實領 ${Math.round(net).toLocaleString()}${alerts.length ? '｜⚠ ' + alerts.join('；') : ''}`

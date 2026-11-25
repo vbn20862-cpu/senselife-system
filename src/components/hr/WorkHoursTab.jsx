@@ -23,7 +23,7 @@ function dayRows(emp, yr, mo, data, tm) {
   const sched = Object.fromEntries((data.schedules || []).filter(s => s && s.empId === emp.id && s.year === yr && s.month === mo).map(s => [`${ym}-${pad(s.day)}`, s.shift]))
   const defMap = Object.fromEntries((tm.deficitDates || []).map(x => [x.date, x.hours]))
   const leaves = (data.leaveRequests || []).filter(l => l && l.empId === emp.id && l.status === '已核准')
-  const dates = [...new Set([...recs.map(c => c.date), ...Object.keys(sched).filter(d => SHIFT_H[sched[d]])])].sort()
+  const dates = [...new Set([...recs.map(c => c.date), ...Object.keys(sched).filter(d => SHIFT_H[sched[d]]), ...Object.keys(defMap)])].sort()
   return dates.map(d => {
     const dr = recs.filter(c => c.date === d).sort((a, b) => a.time.localeCompare(b.time))
     const dp = payRecs.filter(c => c.date === d)
@@ -89,7 +89,8 @@ export default function WorkHoursTab() {
         <div key={emp.id} style={{ ...E.card }}>
           <div onClick={() => setOpen(o => o === emp.id ? null : emp.id)} style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', cursor: 'pointer' }}>
             <div style={{ width: '72px', fontWeight: 700, fontSize: '15px', color: E.textPrimary }}>{emp.name}</div>
-            {stat('排班應到', `${tm.scheduledH ?? 0}h`)}
+            {stat(tm.govtDue ? '應到（上班日×8）' : '排班應到', `${tm.scheduledH ?? 0}h`)}
+            {tm.makeupHours > 0 && stat('假日出勤補回', `${tm.makeupHours}h`)}
             {stat('實際正常', `${tm.normalH ?? 0}h`)}
             {stat('請假', `${leaveDays} 天`)}
             {!hourly && stat('缺時', `${tm.deficitHours ?? 0}h`, tm.deficitHours > 0 ? '#b42318' : null)}
