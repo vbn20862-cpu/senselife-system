@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { E, useIsMobile } from '../styles/earth'
 import Modal from '../components/Modal'
 import { Plus, Check, X, Trash2, Clock } from 'lucide-react'
-import { LEAVE_TYPES, annualLeaveStatus, computeCompLedger, sickLeaveCap, annualLeaveHoursOf } from '../utils/payrollEngine'
+import { LEAVE_TYPES, annualLeaveStatus, computeCompLedger, sickLeaveCap, annualLeaveHoursOf, sickLeaveFactorMap, isHourlyFor } from '../utils/payrollEngine'
 import { triggerCalendarSync, runCalendarSync } from '../utils/calendarSync'
 
 // 喪假天數（勞工請假規則第 3 條），依親屬關係，工資照給
@@ -79,6 +79,13 @@ export default function Leave({ embedded = false }) {
     const dup = (data.leaveRequests || []).find(l => l && l.empId === empId && (l.status === '待審核' || l.status === '已核准')
       && form.startDate <= (l.endDate || l.startDate) && end >= l.startDate)
     if (dup) { setFormErr(`${dup.startDate}${dup.endDate && dup.endDate !== dup.startDate ? `～${dup.endDate}` : ''} 已有一筆${dup.type}（${dup.status}），不能重複請假。要改請先取消原申請。`); return }
+    // 生理假：每月 1 日（性別平等工作法 §14）
+    if (form.type === '生理假') {
+      if (end !== form.startDate) { setFormErr('生理假每月 1 天，請選單日（可請半天）。'); return }
+      const ym = form.startDate.slice(0, 7)
+      const usedM = (data.leaveRequests || []).filter(l => l && l.empId === empId && l.type === '生理假' && (l.status === '待審核' || l.status === '已核准') && (l.startDate || l.date || '').startsWith(ym)).reduce((a, l) => a + Number(l.days || 1), 0)
+      if (usedM + (form.halfDay ? 0.5 : 1) > 1) { setFormErr(`${Number(ym.slice(5))} 月已請生理假 ${usedM} 天，每月上限 1 天。`); return }
+    }
     // 沒排出勤的日子不用請假：整段期間至少要有一天班表是出勤／上午班／下午班，且不是全天停班
     {
       const WORK = { '出勤': 1, 'W': 1, '上午班': 1, '下午班': 1 }
@@ -90,7 +97,9 @@ export default function Leave({ embedded = false }) {
         const sc = (data.schedules || []).find(x => x && x.empId === empId && x.year === d.getFullYear() && x.month === d.getMonth() + 1 && x.day === d.getDate())
         if (sc && sc.shift) anyScheduled = true
         const offByEvent = susp[ds]?.scope === 'full' && !(susp[ds].excludeEmpIds || []).includes(empId) // 全天事件且這個人沒被排除
-        if (sc && WORK[sc.shift] && !offByEvent && !holidayOn(data, ds)) workDays++ // 國定假日也不是出勤日
+        // 月薪正職 2026-11 起應到＝政府上班日：平日沒排班也算出勤日（可請假折抵）
+        const govtDay = ds >= '2026-11-01' && !isHourlyFor(emp, data, d.getFullYear(), d.getMonth() + 1) && d.getDay() % 6 !== 0
+        if ((sc && WORK[sc.shift] || govtDay) && !offByEvent && !holidayOn(data, ds)) workDays++ // 國定假日也不是出勤日
         d.setDate(d.getDate() + 1)
       }
       if (!workDays) {
@@ -185,12 +194,20 @@ export default function Leave({ embedded = false }) {
   })()
   // 病假／事假超過年度上限：仍可請，超過部分無薪 → 送出前提示
   const capNotice = (() => {
+    if (form.type === '生理假' && form.startDate) {
+      const empId = isAdmin ? Number(form.empId) : myEmp?.id
+      const emp = data.employees.find(e => e.id === empId); if (!emp) return null
+      const yr = Number(form.startDate.slice(0, 4)), m = sickLeaveFactorMap(emp, yr, data)
+      const after = m.menstrualDays + (form.halfDay ? 0.5 : 1)
+      return { warn: after > 3, text: `生理假半薪、免證明、不影響全勤。${yr} 年已核准 ${m.menstrualDays} 天；全年前 3 天不併入病假${after > 3 ? `，這次起併入病假額度（病假已用 ${m.quotaUsed}／${sickLeaveCap(yr)} 天，用完仍可請但無薪）` : ''}。` }
+    }
     if (!['病假', '事假'].includes(form.type) || !form.startDate) return null
     const empId = isAdmin ? Number(form.empId) : myEmp?.id
     if (!empId) return null
     const yr = Number(form.startDate.slice(0, 4))
     const cap = form.type === '病假' ? sickLeaveCap(yr) : 14
     const used = (data.leaveRequests || []).filter(l => l && l.empId === empId && l.type === form.type && l.status !== '已駁回' && l.status !== '已取消' && (l.startDate || l.date || '').startsWith(String(yr))).reduce((sum, l) => sum + Number(l.days || 0), 0)
+      + (form.type === '病假' ? (() => { const e = data.employees.find(x => x.id === empId); const m = e ? sickLeaveFactorMap(e, yr, data) : null; return m ? Math.max(0, m.menstrualDays - 3) : 0 })() : 0) // 生理假超過 3 天併入病假
     const end = form.halfDay ? form.startDate : (form.endDate || form.startDate)
     const days = form.halfDay ? 0.5 : (end >= form.startDate ? daysBetween(form.startDate, end) : 0)
     const over = used + days - cap

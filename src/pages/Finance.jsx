@@ -1806,7 +1806,7 @@ export default function Finance({ tools = false, embedTab = null }) {
           const yearUsed = type => (data.leaveRequests || []).filter(l => l && l.empId === myEmp.id && l.type === type && (!l.status || l.status === '已核准') && (l.startDate || l.date || '').startsWith(String(py))).reduce((s, l) => s + Number(l.days || 0), 0)
           const sickMap = sickLeaveFactorMap(myEmp, py, data)
           const sickOver = l => {
-            if (l.type !== '病假' || (l.status && l.status !== '已核准')) return null
+            if ((l.type !== '病假' && l.type !== '生理假') || (l.status && l.status !== '已核准')) return null
             const s0 = l.startDate || l.date, e0 = l.endDate || s0
             const fs = [...sickMap.entries()].filter(([ds]) => ds >= s0 && ds <= e0 && ds.startsWith(payrollMonth)).map(([, f]) => f)
             if (!fs.length || fs.every(f => f >= 0.5)) return null
@@ -1927,7 +1927,8 @@ export default function Finance({ tools = false, embedTab = null }) {
                   {[
                     [`特休剩餘（${py}）`, myEmp.hireDate ? `${al.remainingDays} 天` : '未設到職日', E.green, myEmp.hireDate ? `額度 ${al.entitledDays} 天・已用 ${al.usedDays} 天` : ''],
                     ['補休餘額', isHourly ? '—' : `${tm.balHours ?? 0}h`, E.coffee, isHourly ? '' : '季底（3/6/9/12月）未休折現'],
-                    [`病假（${py}）`, `${yearUsed('病假')} / ${sickLeaveCap(py)} 天`, yearUsed('病假') > sickLeaveCap(py) ? RED : E.textPrimary, ''],
+                    [`病假（${py}）`, `${sickMap.quotaUsed} / ${sickLeaveCap(py)} 天`, sickMap.quotaUsed > sickLeaveCap(py) ? RED : E.textPrimary, sickMap.menstrualDays > 3 ? `含生理假併入 ${sickMap.menstrualDays - 3} 天` : ''],
+                    ...(sickMap.menstrualDays ? [[`生理假（${py}）`, `${sickMap.menstrualDays} 天`, E.textPrimary, '前 3 天不併入病假']] : []),
                     [`事假（${py}）`, `${yearUsed('事假')} / 14 天`, yearUsed('事假') > 14 ? RED : E.textPrimary, ''],
                   ].map(([label, value, color, sub]) => (
                     <div key={label} style={{ backgroundColor:'#f5f0e8', borderRadius:'8px', padding:'8px 10px' }}>

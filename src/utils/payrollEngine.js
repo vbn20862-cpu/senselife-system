@@ -368,9 +368,9 @@ export function computePayroll(emp, yr, mo, data, options = {}) {
       case '特休': factor = 0; label = '特休（全薪）'; break
       case '婚假': case '喪假': case '公假': case '公傷病假':
         factor = 0; label = `${lv.type}（給薪）`; break
-      case '生理假': case '產假': case '產檢假': case '育嬰假': case '陪產假':
+      case '產假': case '產檢假': case '育嬰假': case '陪產假':
         factor = 0; label = `${lv.type}（性平法）`; break
-      case '普通傷病假': case '病假':
+      case '普通傷病假': case '病假': case '生理假':
         factor = -0.5; label = `${lv.type}（半薪）`; break
       case '事假':
         factor = -1; label = '事假（不給薪）'; break
@@ -694,7 +694,7 @@ export const LEAVE_TYPES = [
   { type: '產假',    cat: 'paid',   desc: '8 週，全薪' },
   { type: '陪產假',  cat: 'paid',   desc: '7 天，全薪' },
   { type: '病假',    cat: 'half',   desc: '一年 30 天內半薪（2026 年 12 天），超過仍可請、無薪' },
-  { type: '生理假',  cat: 'half',   desc: '每月 1 天，半薪；全年 3 天內不併入病假，超過併入病假額度（性別平等工作法 §14）' },
+  { type: '生理假',  cat: 'half',   desc: '每月 1 天，半薪，免證明；全年前 3 天不併入病假，第 4 天起併入病假額度，病假用完仍可請、無薪；不影響全勤（性別平等工作法 §14、§21）' },
   { type: '事假',    cat: 'unpaid', desc: '一年 14 天，無薪（超過仍可請）' },
 ]
 export const PAY_FACTOR = { paid: 1.0, half: 0.5, unpaid: 0 }
@@ -705,11 +705,15 @@ export function leaveTypeCat(type) {
 // 病假年度上限：半薪額度內給半薪，超過仍可請但無薪（系統 2026/9 上線，當年上限 12 天）
 export const sickLeaveCap = (yr) => (yr === 2026 ? 12 : 30)
 
-// 某員工某年病假逐日給薪係數 Map(date → 0~0.5)：依日期先後累計，額度內 0.5、超過 0
+// 生理假（性別平等工作法 §14，2026-11-26 加）：每月 1 日；全年前 3 日不併入病假，第 4 日起併入病假額度；
+//   併入與不併入都半薪。併入後病假額度用完，仍應准假但得不給薪（勞動部解釋）。不得影響全勤獎金（§21）
+export const MENSTRUAL_FREE_DAYS = 3
+// 某員工某年病假＋生理假逐日給薪係數 Map(date → 0~0.5)：依日期先後累計病假額度，額度內 0.5、超過 0
+//   map.quotaUsed＝已用病假額度（病假＋併入的生理假）；map.menstrualDays＝生理假總天數
 export function sickLeaveFactorMap(emp, yr, data) {
   const days = []
   for (const l of (data.leaveRequests || [])) {
-    if (!l || l.empId !== emp.id || l.type !== '病假') continue
+    if (!l || l.empId !== emp.id || (l.type !== '病假' && l.type !== '生理假')) continue
     if (l.status && l.status !== '已核准') continue
     const start = l.startDate || l.date
     const end = l.endDate || start
@@ -718,25 +722,30 @@ export function sickLeaveFactorMap(emp, yr, data) {
     const d = new Date(start + 'T00:00:00'), last = new Date(end + 'T00:00:00')
     while (d <= last) {
       const ds = d.toLocaleDateString('sv-SE')
-      if (ds.startsWith(String(yr)) && !isFullSuspDay(ds, data, emp.id)) days.push({ ds, w }) // 停班日不耗病假額度
+      if (ds.startsWith(String(yr)) && !isFullSuspDay(ds, data, emp.id)) days.push({ ds, w, m: l.type === '生理假' }) // 停班日不耗病假額度
       d.setDate(d.getDate() + 1)
     }
   }
   days.sort((a, b) => a.ds.localeCompare(b.ds))
   const cap = sickLeaveCap(yr)
   const map = new Map()
-  let used = 0
-  for (const { ds, w } of days) {
-    const paidPart = Math.max(0, Math.min(w, cap - used))
-    used += w
-    map.set(ds, w > 0 ? 0.5 * (paidPart / w) : 0.5)
+  let used = 0, mUsed = 0
+  for (const { ds, w, m } of days) {
+    const free = m ? Math.max(0, Math.min(w, MENSTRUAL_FREE_DAYS - mUsed)) : 0 // 生理假全年前 3 日不併入
+    if (m) mUsed += w
+    const merged = w - free
+    const paidMerged = Math.max(0, Math.min(merged, cap - used))
+    used += merged
+    map.set(ds, w > 0 ? 0.5 * ((free + paidMerged) / w) : 0.5)
   }
+  map.quotaUsed = used
+  map.menstrualDays = mUsed
   return map
 }
 
 // 某筆請假在某日的給薪係數（病假依年度累計判斷是否超過上限）
 function leaveFactorOn(l, emp, ds, data, sickMaps) {
-  if (l.type === '病假') {
+  if (l.type === '病假' || l.type === '生理假') {
     const yr = Number(ds.slice(0, 4))
     if (!sickMaps[yr]) sickMaps[yr] = sickLeaveFactorMap(emp, yr, data)
     return sickMaps[yr].get(ds) ?? 0.5

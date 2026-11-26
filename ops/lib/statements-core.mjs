@@ -44,7 +44,7 @@ for (const e of data.employees) {
     const nm = SC.normalDayMinutes(dr, d, data), om = (ot[d] || 0) + SC.activityExtraOTMinutes(dr, d, data), lv = leaves(d)
     const half = l => (l.startDate === l.endDate && (l.halfDay || Number(l.days) === 0.5))
     const lvH = Math.min(SH[sched[d]] || 0, lv.reduce((a, l) => a + (half(l) ? 4 : 8), 0))
-    const factor = l => l.type === '病假' ? (sickMap.get(d) ?? 0.5) : (PE.PAY_FACTOR[PE.leaveTypeCat(l.type)] ?? 1) // 與引擎 leaveFactorOn 同規則（病假依年度額度）
+    const factor = l => (l.type === '病假' || l.type === '生理假') ? (sickMap.get(d) ?? 0.5) : (PE.PAY_FACTOR[PE.leaveTypeCat(l.type)] ?? 1) // 與引擎 leaveFactorOn 同規則（病假依年度額度）
     const lvPaid = r2(Math.min(lvH, lv.reduce((a, l) => a + (half(l) ? 4 : 8) * factor(l), 0))) // 當日請假折抵
     const fullLeave = lv.some(l => !half(l))
     const hasIn = dr.some(c => c.type === '上班'), hasOut = dr.some(c => c.type === '下班')
@@ -107,7 +107,7 @@ ${hourly ? `<table class="sum"><tr><th>項目</th><th>時數</th></tr>
 <tr><td>實際上班時數</td><td>${act} 小時</td></tr>
 <tr><td>請假時數${lvText ? `（${lvText}）` : ''}</td><td>${lvH} 小時</td></tr></table>` : `<table class="sum"><tr><th>項目</th><th>時數</th><th>說明</th></tr>
 <tr><td>${tm.govtDue ? '本月應到' : '排班應到'}</td><td>${tm.scheduledH || 0} 小時</td><td>${tm.govtDue ? '政府上班日 × 8 小時' : '依班表'}；國定假日、停班與臨時事件不計${(tm.missingPunchDates || []).length ? '；缺下班卡待補登的日子暫不計' : ''}</td></tr>
-<tr><td>請假${lvText ? `（${lvText}）` : ''}</td><td>折抵 ${lvPaidSum} 小時</td><td>全薪假全額折抵、病假與生理假半薪折一半、事假不折抵</td></tr>
+<tr><td>請假${lvText ? `（${lvText}）` : ''}</td><td>折抵 ${lvPaidSum} 小時</td><td>全薪假全額折抵、病假與生理假半薪折一半（超過病假額度不折抵）、事假不折抵</td></tr>
 ${tm.makeupHours ? `<tr><td>假日出勤補回</td><td>${tm.makeupHours} 小時</td><td>週末與國定假日出勤，單日最多 8 小時，先補本月缺時</td></tr>` : ''}
 <tr class="tot"><td>本月缺時</td><td class="miss">${tm.deficitHours || 0} 小時</td><td>${tm.govtDue ? '逐日計算：8 小時 − 當日工時 − 請假折抵，加總後扣除假日出勤補回' : '逐日計算：排班 − 正常工時 − 請假折抵；當日加班先補當日'}</td></tr>
 <tr><td>加班轉補休</td><td>${acc ? r2(acc.hours) : 0} 小時</td><td>${acc && acc.hours ? `當日總工時超過 8 小時的部分，前 2 小時 ×1.34、之後 ×1.67，加權後 ${r2(acc.weighted)} 小時` : '本月沒有超過 8 小時的日子'}</td></tr>
